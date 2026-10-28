@@ -114,12 +114,32 @@
 
 ## 기술 스택
 
-❓ 플랫폼을 정해야 한다.
+✅ **macOS 전용, Swift**로 만든다.
 
-| 선택지 | 장점 | 단점 |
-|---|---|---|
-| **macOS 네이티브 (Swift / SwiftUI)** | 메뉴바 앱에 가장 자연스럽고 PokeTokenBar와 같은 구조라 참고하기 쉬움 | macOS 전용 |
-| **Tauri (Rust + TypeScript UI)** | 크로스플랫폼 트레이 앱, 가벼움 | 메뉴바 애니메이션 구현이 까다로움 |
-| **Electron (TypeScript)** | 웹 기술 그대로 사용, 크로스플랫폼 | 무겁고 상주 앱으로는 메모리 부담 |
+| 항목 | 선택 |
+|---|---|
+| 언어 | Swift 6 |
+| UI | SwiftUI (`MenuBarExtra` 팝오버) + 필요한 곳만 AppKit (`NSStatusItem` 애니메이션) |
+| 최소 버전 | 💡 macOS 14 (Sonoma) 이상. PokeTokenBar와 같음 |
+| 빌드 | Swift Package Manager |
+| 저장 | 💡 로컬 파일 (JSON 또는 SQLite). 서버 없음 |
+| 배포 | 💡 GitHub Releases, 나중에 Homebrew cask |
 
-💡 macOS 네이티브를 추천한다. 게임 로직(리그, 시뮬레이션)은 UI와 분리된 모듈로 만들어 나중에 다른 플랫폼으로 옮길 수 있게 한다.
+💡 모듈 구조: 게임 로직은 UI와 분리해서 테스트하기 쉽게 만든다.
+
+```
+Sources/
+  TokenBaseballCore/   게임 로직 (UI 의존 없음)
+    Usage/             로컬 로그에서 토큰 사용량 읽기
+    League/            리그, 일정, 순위, 승강
+    Match/             투구 단위 경기 시뮬레이션
+    World/             세계 시뮬레이션 (CPU 팀, 성장, 맞춰주기)
+    Club/              시설, 홍보, 재정, 인지도
+    Players/           선수 생성, 능력·잠재력, 영입
+  TokenBaseball/       macOS 앱 (상단바, 팝오버, 설정)
+Tests/
+  TokenBaseballCoreTests/
+```
+
+- 경기 시뮬레이션은 시드를 넣으면 항상 같은 결과가 나오게 만들어 테스트한다.
+- 💡 레포의 `.gitignore`는 지금 Node용이라 Swift/Xcode용으로 바꾼다.
