@@ -9,12 +9,19 @@ extension Game {
             for row in standings[tier.index] { lastWinRate[row.teamID] = row.winRate }
         }
         giveAwards()
+        // 강등 뒤 스폰서 감소는 한 시즌 동안 이어지고 여기서 끝난다.
+        if sponsorPenaltySeasons > 0 { sponsorPenaltySeasons -= 1 }
 
-        // 순위 상금
+        // 순위 상금. 시즌 도중에 다시 창단한 구단은 치른 경기가 적어 순위 상금을 받지 않는다.
         let myRank = rank(of: userTeamID)
-        let prize = isBankrupt ? 0 : Balance.prizeMoney(userTier, rank: myRank)
+        let myGames = standings[userTier.index].first { $0.teamID == userTeamID }.map { $0.wins + $0.losses + $0.draws } ?? 0
+        let fullSeason = myGames >= Balance.roundsPerSeason / 2
+        let prize = isBankrupt || !fullSeason ? 0 : Balance.prizeMoney(userTier, rank: myRank)
         if !isBankrupt {
             post("정규시즌 종료. \(userTeam.name)은(는) \(userTier.displayName) \(myRank)위로 마쳤습니다.")
+            if !fullSeason, Balance.prizeMoney(userTier, rank: myRank) > 0 {
+                post("시즌 도중에 창단해 이번 시즌 순위 상금은 없습니다.")
+            }
         }
         if prize > 0 {
             funds.earn(prize, .prize)
@@ -132,6 +139,19 @@ extension Game {
         sponsorPenaltySeasons = 1
         teams[userTeamID].fame *= 1 - Balance.fameRelegationDrop
         post("강등되었습니다. 다음 시즌은 \(tier.displayName) 리그입니다. 인지도가 크게 떨어지고 스폰서 수입이 줄어듭니다.")
+
+        // 해외 스카우트는 1~2부에서만 쓸 수 있다. 나가 있던 스카우트는 돌아오고 비용을 돌려받는다.
+        if let trip = scoutTrip, trip.region == .overseas, tier > .semiPro {
+            let refund = trip.cost ?? scoutCost(.overseas)
+            scoutTrip = nil
+            funds.earn(refund, .recruit)
+            post("해외 스카우트가 취소되어 ₩\(refund.formatted())을 돌려받았습니다.")
+        }
+        let limit = Balance.rosterLimit(tier)
+        let count = teams[userTeamID].roster.count
+        if count > limit {
+            post("\(tier.displayName) 리그의 로스터 정원은 \(limit)명입니다. 지금 \(count)명이라 선수를 내보내기 전에는 새로 영입할 수 없습니다.")
+        }
 
         // 강등 조항: 다른 구단이 정해진 이적료를 내고 데려간다. 거절할 수 없다.
         for player in roster(of: userTeamID) where player.contract.relegationClause && rng.chance(0.6) {
@@ -331,19 +351,26 @@ extension Game {
 
     mutating func endOffseason() {
         // 재계약하지 않은 계약 만료 선수는 떠난다.
-        let leaving = roster(of: userTeamID).filter { $0.contract.seasonsLeft <= 0 }
+        // 역제안에 아직 답하지 않은 선수는 다음 경기가 끝날 때까지 기다려 준다
+        // (마지막 친선 경기 뒤에 온 역제안은 답할 틈이 없기 때문이다).
+        counters.removeAll { players[$0.playerID]?.teamID != userTeamID }
+        let waiting = Set(counters.map(\.playerID))
+        let expired = roster(of: userTeamID).filter { $0.contract.seasonsLeft <= 0 }
+        let leaving = expired.filter { !waiting.contains($0.id) }
         for player in leaving { moveToFreeAgency(player.id) }
         if !leaving.isEmpty {
             post("계약이 끝나 떠난 선수: \(leaving.map(\.name).joined(separator: ", "))")
         }
+        let staying = expired.filter { waiting.contains($0.id) }
+        if !staying.isEmpty {
+            post("재계약 역제안에 답하지 않은 선수: \(staying.map(\.name).joined(separator: ", ")). 다음 경기가 끝날 때까지 답하지 않으면 떠납니다.")
+        }
 
-        // 남은 후보·제안 정리
-        for candidate in candidates { removePlayer(candidate.playerID) }
-        candidates = []
+        // 남은 후보·제안 정리. 드래프트 지명권은 사라지고, 스카우트 후보와 출장은 새 시즌으로 이어진다.
+        for candidate in candidates where candidate.source == .draft { removePlayer(candidate.playerID) }
+        candidates.removeAll { $0.source == .draft }
         offers = []
         proposals = []
-        counters = []
-        scoutTrip = nil
 
         // CPU 구단: FA에서 약한 자리를 채우고, 로스터를 리그에 맞게 정리한다.
         let targets = LeagueTier.allCases.map { leagueTargetAverage($0) }
@@ -361,7 +388,6 @@ extension Game {
         appliedForPromotion = false
         expiryNoticeSent = false
         relegatedThisOffseason = false
-        if sponsorPenaltySeasons > 0 { sponsorPenaltySeasons -= 1 }
         funds.startNewSeason()
         for team in teams {
             teams[team.id].streak = 0

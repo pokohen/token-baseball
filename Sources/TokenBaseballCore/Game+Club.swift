@@ -165,6 +165,8 @@ extension Game {
         bestTier = tier
         promotionUses = [:]
         sponsorPenaltySeasons = 0
+        relegatedThisOffseason = false
+        youthBoost = 0
         lastResult = nil
         charges = max(charges, 1)
         chargeAnchor = now

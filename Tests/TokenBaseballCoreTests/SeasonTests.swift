@@ -757,3 +757,189 @@ enum Invariants {
         #expect(game.roster(of: team).filter { $0.isPitcher }.count >= Balance.minPitchers)
     }
 }
+
+@Suite struct OffseasonEdgeTests {
+    /// 마지막 친선 경기만 남긴 오프시즌으로 간다.
+    static func beforeLastFriendly(seed: UInt64) throws -> (Game, AutoManager) {
+        var game = TestGame.make(seed: seed)
+        var manager = AutoManager(tokensPerMatch: 2_000_000)
+        try ContractTests.toOffseason(&game, &manager)
+        while game.friendliesPlayed < Balance.friendliesPerOffseason - 1 { try manager.playOne(&game) }
+        return (game, manager)
+    }
+
+    /// 계약이 끝난 선수 한 명에게 역제안이 와 있는 상태로 만든다.
+    static func addCounter(_ game: inout Game) throws -> PlayerID {
+        let player = try #require(game.roster(of: game.userTeamID).first { !$0.isPitcher })
+        game.players[player.id]?.contract.seasonsLeft = 0
+        game.proposals.removeAll { $0.playerID == player.id }
+        game.counters.removeAll { $0.playerID == player.id }
+        game.counters.append(Proposal(
+            id: game.newMarketID(), kind: .renewal, playerID: player.id, salary: 123_000, years: 2, fee: 0))
+        return player.id
+    }
+
+    func play(_ game: inout Game, _ clock: inout Date) throws {
+        clock = clock.addingTimeInterval(3600)
+        try game.startMatch(now: clock)
+        game.runMatchToEnd()
+    }
+
+    @Test func 마지막_친선_경기_뒤에_남은_역제안은_새_시즌_첫_경기까지_답할_수_있다() throws {
+        var (game, manager) = try Self.beforeLastFriendly(seed: 31)
+        let id = try Self.addCounter(&game)
+        try play(&game, &manager.clock)
+
+        #expect(game.phase == .regular)
+        #expect(game.players[id]?.teamID == game.userTeamID)
+        let counter = try #require(game.counters.first { $0.playerID == id })
+        // 기다려 주는 동안 새 제안으로 시간을 끌 수는 없다.
+        #expect(throws: GameError.self) { try game.proposeRenewal(id, salary: 1_000, years: 1) }
+
+        try game.acceptCounter(counter.id)
+        #expect(game.players[id]?.contract.seasonsLeft == 2)
+        #expect(game.players[id]?.contract.salary == 123_000)
+        try play(&game, &manager.clock)
+        #expect(game.players[id]?.teamID == game.userTeamID)
+    }
+
+    @Test func 역제안에_끝내_답하지_않으면_새_시즌_첫_경기_뒤에_떠난다() throws {
+        var (game, manager) = try Self.beforeLastFriendly(seed: 31)
+        let id = try Self.addCounter(&game)
+        try play(&game, &manager.clock)
+        #expect(game.players[id]?.teamID == game.userTeamID)
+
+        try play(&game, &manager.clock)
+        #expect(game.players[id]?.teamID == nil)
+        #expect(game.counters.isEmpty)
+        #expect(game.currentLineup != nil)
+        #expect(game.roster(of: game.userTeamID).allSatisfy { $0.contract.seasonsLeft > 0 })
+    }
+
+    @Test func 시즌_중_재계약은_남은_시즌에_새_기간을_더한다() throws {
+        var game = TestGame.make(seed: 31)
+        let player = try #require(game.roster(of: game.userTeamID).first)
+        game.players[player.id]?.contract.seasonsLeft = 1
+        game.counters.append(Proposal(
+            id: game.newMarketID(), kind: .renewal, playerID: player.id, salary: 50_000, years: 2, fee: 0))
+        try game.acceptCounter(try #require(game.counters.first).id)
+        #expect(game.players[player.id]?.contract.seasonsLeft == 3)
+    }
+
+    @Test func 스카우트_출장과_데려온_후보는_새_시즌으로_이어진다() throws {
+        var (game, manager) = try Self.beforeLastFriendly(seed: 31)
+        game.teams[game.userTeamID].scoutLevel = 1
+        TestGame.addTokens(&game, 500_000_000, id: "scout", at: manager.clock)
+        try game.sendScout(.national)
+        try play(&game, &manager.clock)
+        #expect(game.phase == .regular)
+        #expect(game.scoutTrip?.matchesLeft == 2)
+
+        try play(&game, &manager.clock)
+        try play(&game, &manager.clock)
+        #expect(game.scoutTrip == nil)
+        #expect(game.candidates.contains { $0.source == .scout })
+    }
+
+    @Test func 마지막_친선_경기_뒤에_돌아온_스카우트_후보도_사라지지_않는다() throws {
+        var (game, manager) = try Self.beforeLastFriendly(seed: 31)
+        game.scoutTrip = ScoutTrip(region: .local, matchesLeft: 1)
+        try play(&game, &manager.clock)
+        #expect(game.phase == .regular)
+        #expect(game.candidates.contains { $0.source == .scout })
+        #expect(game.offers.isEmpty)
+        #expect(!game.candidates.contains { $0.source == .draft })
+    }
+
+    @Test func 강등되면_해외_스카우트는_취소되고_비용을_돌려받는다() throws {
+        var game = UpperLeagueTests.game(in: .semiPro, ability: 68, seed: 71)
+        try game.upgrade(.scout)
+        let before = game.funds.balance
+        try game.sendScout(.overseas)
+        #expect(game.funds.balance < before)
+
+        game.teams[game.userTeamID].tier = .amateur
+        game.userRelegated(to: .amateur)
+        #expect(game.scoutTrip == nil)
+        #expect(game.funds.balance == before)
+    }
+
+    @Test func 강등_뒤_스폰서_수입은_다음_시즌_동안_절반이고_그_뒤에_돌아온다() throws {
+        var game = UpperLeagueTests.game(in: .amateur, ability: 45, seed: 72)
+        var manager = AutoManager(tokensPerMatch: 2_000_000_000)
+        // 4부 한 팀과 자리를 바꿔 강등된다.
+        let up = game.teams(in: .citizenPro)[0].id
+        game.teams[up].tier = .amateur
+        game.teams[game.userTeamID].tier = .citizenPro
+        game.userRelegated(to: .citizenPro)
+        game.startOffseason()
+        while game.phase == .offseason { try manager.playOne(&game) }
+        #expect(game.sponsorPenaltySeasons == 1)
+
+        // 정규시즌 첫 경기의 스폰서 수입이 절반이다.
+        let expected = Int(game.userTeam.fame) * Balance.sponsorPerFame(game.userTier) / 2
+        #expect(expected > 0)
+        try game.startMatch(now: manager.clock.addingTimeInterval(3600))
+        game.runMatchToEnd()
+        #expect(game.funds.seasonIncome["스폰서"] == expected)
+
+        while game.phase == .regular { try manager.playOne(&game) }
+        #expect(game.sponsorPenaltySeasons == 0)
+    }
+
+    @Test func FA_여러_명에게_한꺼번에_제안해도_외국인_한도를_넘지_않는다() throws {
+        var game = UpperLeagueTests.game(in: .semiPro, ability: 68, seed: 73)
+        game.startOffseason()
+        game.teams[game.userTeamID].fame = 100_000
+        // 이미 외국인 2명이 있는 팀으로 만든다. 로스터에는 빈자리가 넉넉하다.
+        #expect(game.userTeam.roster.count + 6 <= Balance.rosterLimit(.semiPro))
+        for player in game.roster(of: game.userTeamID).prefix(2) { game.players[player.id]?.isForeign = true }
+        for _ in 0..<6 {
+            var spec = PlayerFactory.Spec(position: .left, tier: .semiPro, season: game.season)
+            spec.foreign = true
+            let player = game.makePlayer(spec)
+            game.players[player.id]?.contract.seasonsLeft = 0
+            game.freeAgents.append(player.id)
+            try game.proposeFreeAgent(
+                player.id, salary: Balance.marketSalary(ability: player.ability) * 4, years: 1)
+        }
+        var clock = TestGame.start
+        try play(&game, &clock)
+        let foreign = game.roster(of: game.userTeamID).filter(\.isForeign).count
+        #expect(foreign == Balance.foreignPlayerLimit)
+    }
+
+    @Test func 시즌_막판에_다시_창단한_구단은_순위_상금을_받지_않는다() throws {
+        var game = TestGame.make(seed: 74)
+        var manager = AutoManager(tokensPerMatch: 2_000_000)
+        while game.round < 34 { try manager.playOne(&game) }
+        game.goBankrupt()
+        try game.foundNewClub(setup: .init(city: "광주", name: "광주 새출발 야구단"), now: manager.clock)
+        // 두 경기만 이기고 승률 1위가 된 상황.
+        let tier = game.userTier.index
+        let row = try #require(game.standings[tier].firstIndex { $0.teamID == game.userTeamID })
+        game.youthBoost = 3
+        while game.phase == .regular {
+            game.standings[tier][row].wins = 2
+            game.standings[tier][row].losses = 0
+            manager.clock = manager.clock.addingTimeInterval(3600)
+            try game.startMatch(now: manager.clock)
+            // 마지막 공 직전에 순위표를 다시 맞춘다.
+            game.runMatchToEnd()
+        }
+        #expect(game.funds.seasonIncome["상금·지원금"] == nil)
+        #expect(game.news.contains { $0.text.contains("시즌 도중에 창단") })
+    }
+
+    @Test func 다시_창단하면_지난_구단의_강등_상태와_유소년_효과가_남지_않는다() throws {
+        var game = TestGame.make(seed: 75)
+        game.relegatedThisOffseason = true
+        game.youthBoost = 2
+        game.sponsorPenaltySeasons = 1
+        game.goBankrupt()
+        try game.foundNewClub(setup: .init(city: "광주", name: "광주 새출발 야구단"), now: TestGame.start)
+        #expect(!game.relegatedThisOffseason)
+        #expect(game.youthBoost == 0)
+        #expect(game.sponsorPenaltySeasons == 0)
+    }
+}

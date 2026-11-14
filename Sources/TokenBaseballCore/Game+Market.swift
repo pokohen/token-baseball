@@ -57,6 +57,8 @@ public enum ScoutRegion: String, Codable, CaseIterable, Sendable {
 public struct ScoutTrip: Codable, Equatable, Sendable {
     public var region: ScoutRegion
     public var matchesLeft: Int
+    /// 보낼 때 낸 비용 (취소되면 돌려준다). 예전 저장 파일에는 없다.
+    public var cost: Int?
 }
 
 public enum OfferResponse: Sendable {
@@ -137,7 +139,7 @@ extension Game {
         let cost = scoutCost(region)
         try checkCanSpend(cost)
         funds.spend(cost, .recruit)
-        scoutTrip = ScoutTrip(region: region, matchesLeft: 3)
+        scoutTrip = ScoutTrip(region: region, matchesLeft: 3, cost: cost)
         post("\(region.rawValue) 스카우트를 보냈습니다. 3경기 뒤에 돌아옵니다.")
     }
 
@@ -230,6 +232,9 @@ extension Game {
             throw GameError("내 팀 선수가 아닙니다.")
         }
         guard isExpiring(player) else { throw GameError("계약 마지막 시즌인 선수만 재계약할 수 있습니다.") }
+        guard phase == .offseason || player.contract.seasonsLeft > 0 else {
+            throw GameError("협상 기간이 끝났습니다. 선수의 역제안을 받아들일지만 정할 수 있습니다.")
+        }
         guard (1...3).contains(years), salary > 0 else { throw GameError("조건이 올바르지 않습니다.") }
         guard !proposals.contains(where: { $0.playerID == id }) else {
             throw GameError("이미 제안을 보냈습니다. 다음 경기 뒤에 답이 옵니다.")
@@ -298,7 +303,7 @@ extension Game {
         }
         counters.removeAll { $0.id == id }
         players[player.id]?.contract = Contract(
-            salary: counter.salary, seasonsLeft: counter.years + (phase == .offseason ? 0 : 1),
+            salary: counter.salary, seasonsLeft: counter.years + max(0, player.contract.seasonsLeft),
             relegationClause: player.contract.relegationClause)
         post("\(player.name)와(과) 재계약했습니다 (\(counter.years)시즌, 연봉 ₩\(counter.salary.formatted())).")
     }
@@ -376,6 +381,19 @@ extension Game {
         }
         offers = []
 
+        // 오프시즌 끝에 역제안 때문에 기다려 준 선수: 새 시즌 첫 경기까지 답이 없으면 떠난다.
+        if phase == .regular {
+            let gone = roster(of: userTeamID).filter { $0.contract.seasonsLeft <= 0 }
+            for player in gone {
+                moveToFreeAgency(player.id)
+                counters.removeAll { $0.playerID == player.id }
+            }
+            if !gone.isEmpty {
+                post("재계약하지 못해 떠난 선수: \(gone.map(\.name).joined(separator: ", "))")
+                fillUserMinimumRoster()
+            }
+        }
+
         // 후보 만료
         for index in candidates.indices { candidates[index].matchesLeft -= 1 }
         for candidate in candidates where candidate.matchesLeft <= 0 { removePlayer(candidate.playerID) }
@@ -400,6 +418,8 @@ extension Game {
         // 새 오퍼
         guard tradeWindowOpen else { return }
         if phase == .offseason {
+            // 마지막 친선 경기 뒤에는 곧바로 새 시즌이라 답할 틈이 없다.
+            guard friendliesPlayed < Balance.friendliesPerOffseason else { return }
             // 오프시즌에는 경기가 끝날 때마다 오퍼가 들어온다. 강등됐으면 몰려온다.
             let count = relegatedThisOffseason ? rng.int(2...3) : 1
             generateIncomingOffers(count: count)
@@ -424,7 +444,7 @@ extension Game {
             if !starter { chance -= 0.15 }
             if rng.chance(clamp(chance, 0.02, 0.95)) {
                 players[player.id]?.contract = Contract(
-                    salary: proposal.salary, seasonsLeft: proposal.years + (phase == .offseason ? 0 : 1),
+                    salary: proposal.salary, seasonsLeft: proposal.years + max(0, player.contract.seasonsLeft),
                     relegationClause: player.contract.relegationClause)
                 post("\(player.name)이(가) 재계약에 합의했습니다 (\(proposal.years)시즌, 연봉 ₩\(proposal.salary.formatted())).")
             } else if rng.chance(0.6) {
@@ -443,7 +463,8 @@ extension Game {
                 return
             }
             let full = userTeam.roster.count >= Balance.rosterLimit(userTier)
-            if !full, crisisMatchesLeft == nil, rng.chance(joinChance(player, salary: proposal.salary)) {
+            let foreignOK = (try? checkForeignLimit(player)) != nil
+            if !full, foreignOK, crisisMatchesLeft == nil, rng.chance(joinChance(player, salary: proposal.salary)) {
                 add(player.id, to: userTeamID)
                 players[player.id]?.contract = Contract(salary: proposal.salary, seasonsLeft: proposal.years)
                 post("FA \(player.name)이(가) 우리 제안을 받아들였습니다.")
