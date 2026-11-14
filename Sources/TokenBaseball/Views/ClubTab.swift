@@ -1,0 +1,116 @@
+import SwiftUI
+import TokenBaseballCore
+
+struct ClubTab: View {
+    @EnvironmentObject var model: AppModel
+    let game: Game
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Card("시설") {
+                facility(.training, name: Balance.trainingNames[game.userTeam.trainingLevel - 1],
+                         effect: "성장 ×\(String(format: "%.2f", Balance.trainingMultiplier[game.userTeam.trainingLevel - 1]))")
+                Divider()
+                facility(.stadium, name: Balance.stadiumNames[game.userTeam.stadiumLevel - 1],
+                         effect: "수용 \(Balance.stadiumCapacity[game.userTeam.stadiumLevel - 1].formatted())명 · 홈 보정 +\(String(format: "%.1f", Balance.stadiumHomeEdge[game.userTeam.stadiumLevel - 1] * 100))%")
+                Divider()
+                facility(.scout, name: game.userTeam.scoutLevel == 0 ? "없음" : "스카우트 팀",
+                         effect: game.userTeam.scoutLevel == 0 ? "지으면 스카우트를 보낼 수 있음" : "후보 \(3 + game.userTeam.scoutLevel / 2)명, 잠재력 평가가 더 정확")
+            }
+
+            Card("홍보", trailing: "인지도 \(Int(game.userTeam.fame))") {
+                ForEach(Promotion.allCases, id: \.self) { promotion in
+                    let blocked = game.promotionBlockedReason(promotion)
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(promotion.rawValue).font(.callout)
+                            Text(blocked ?? (promotion.note.isEmpty ? "인지도 +\(Int(game.promotionEffect(promotion)))" : "인지도 +\(Int(game.promotionEffect(promotion))) · \(promotion.note)")).note()
+                        }
+                        Spacer()
+                        Button(Format.money(game.price(promotion.cost))) {
+                            model.perform { try $0.promote(promotion) }
+                        }
+                        .disabled(blocked != nil || game.funds.balance < game.price(promotion.cost))
+                    }
+                }
+                Text("같은 홍보는 쓸수록 효과가 줄어듭니다 (시즌마다 초기화).").note()
+            }
+
+            Card("훈련 방침") {
+                focusSlider("타격", \.batting)
+                focusSlider("투구", \.pitching)
+                focusSlider("수비", \.defense)
+                focusSlider("주루", \.running)
+                Text("비중대로 경험치가 나뉩니다. 토큰을 쓰는 동안에는 선수들이 조금 더 빨리 큽니다.").note()
+            }
+
+            finance
+        }
+    }
+
+    private func facility(_ facility: Facility, name: String, effect: String) -> some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text("\(facility.rawValue) Lv\(game.facilityLevel(facility)) · \(name)").font(.callout.weight(.medium))
+                Text(effect).note()
+            }
+            Spacer()
+            if let cost = game.upgradeCost(facility) {
+                Button("업그레이드 \(Format.money(cost))") { model.perform { try $0.upgrade(facility) } }
+                    .disabled(game.funds.balance < cost || game.crisisMatchesLeft != nil)
+            } else {
+                Text("최고 레벨").note()
+            }
+        }
+    }
+
+    private func focusSlider(_ label: String, _ keyPath: WritableKeyPath<TrainingFocus, Double>) -> some View {
+        let total = game.userTeam.focus.batting + game.userTeam.focus.pitching
+            + game.userTeam.focus.defense + game.userTeam.focus.running
+        let share = total > 0 ? game.userTeam.focus[keyPath: keyPath] / total : 0.25
+        return HStack {
+            Text(label).font(.callout).frame(width: 36, alignment: .leading)
+            Slider(
+                value: Binding(
+                    get: { game.userTeam.focus[keyPath: keyPath] },
+                    set: { value in
+                        model.perform {
+                            var focus = $0.userTeam.focus
+                            focus[keyPath: keyPath] = value
+                            $0.setTrainingFocus(focus)
+                        }
+                    }),
+                in: 0.05...1)
+            Text("\(Int((share * 100).rounded()))%").font(.callout.monospacedDigit()).frame(width: 40, alignment: .trailing)
+        }
+    }
+
+    private var finance: some View {
+        Card("이번 시즌 재정") {
+            let income = FundsLedger.Category.allCases.compactMap { category in
+                game.funds.seasonIncome[category.rawValue].map { (category.rawValue, $0) }
+            }
+            let expense = FundsLedger.Category.allCases.compactMap { category in
+                game.funds.seasonExpense[category.rawValue].map { (category.rawValue, $0) }
+            }
+            let totalIncome = income.reduce(0) { $0 + $1.1 }
+            let totalExpense = expense.reduce(0) { $0 + $1.1 }
+            Text("수입 \(Format.money(totalIncome))").font(.caption.bold())
+            ForEach(income, id: \.0) { name, amount in
+                KeyValueRow(
+                    key: "\(name) (\(totalIncome > 0 ? amount * 100 / totalIncome : 0)%)",
+                    value: "₩\(amount.formatted())", valueColor: Theme.win)
+            }
+            if income.isEmpty { Text("아직 수입이 없습니다.").note() }
+            Divider()
+            Text("지출 \(Format.money(totalExpense))").font(.caption.bold())
+            ForEach(expense, id: \.0) { name, amount in
+                KeyValueRow(key: name, value: "−₩\(amount.formatted())", valueColor: Theme.loss)
+            }
+            if expense.isEmpty { Text("아직 지출이 없습니다.").note() }
+            Divider()
+            KeyValueRow(key: "오늘 토큰으로 번 금액", value: "₩\(model.todayTokens.formatted())")
+            KeyValueRow(key: "경기당 연봉", value: "−₩\(game.salaryPerMatch.formatted())")
+        }
+    }
+}
