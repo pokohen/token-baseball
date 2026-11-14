@@ -296,6 +296,9 @@ public struct Game: Codable, Equatable, Sendable {
         player.joinedSeason = season
         player.joinedTier = teams[team].tier.rawValue
         player.isFranchiseStar = false
+        // 구단을 옮긴 선수는 적어도 이번 시즌은 뛴다. (계약이 끝난 채로 팔려 간 선수가
+        // 시즌 중에 트레이드로 돌아왔다가 곧바로 떠나는 일이 없게 한다.)
+        player.contract.seasonsLeft = max(1, player.contract.seasonsLeft)
         players[playerID] = player
         teams[team].roster.append(playerID)
     }

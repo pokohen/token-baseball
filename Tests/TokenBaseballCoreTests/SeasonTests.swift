@@ -960,4 +960,29 @@ enum Invariants {
         }
         #expect(seen.count == 2)
     }
+
+    @Test func 계약이_끝난_채_팔린_선수가_트레이드로_돌아와도_곧바로_떠나지_않는다() throws {
+        var game = TestGame.make(seed: 77)
+        var clock = TestGame.start
+        let buyer = try #require(game.teams.first { !$0.isUser && $0.tier == game.userTier }).id
+        let mine = game.roster(of: game.userTeamID).filter { !$0.isPitcher }
+        // 맞교환으로 한 명이 나가도 야수 9명이 남게 한 명을 더 둔다.
+        let extra = game.makePlayer(PlayerFactory.Spec(position: .left, tier: game.userTier, season: game.season))
+        game.add(extra.id, to: game.userTeamID)
+        // 계약이 끝난 선수 둘이 다른 구단으로 갔다.
+        for player in mine.prefix(2) {
+            game.players[player.id]?.contract.seasonsLeft = 0
+            game.add(player.id, to: buyer)
+            #expect(game.players[player.id]?.contract.seasonsLeft == 1)
+        }
+        // 한 명은 이적 오퍼의 맞교환으로, 한 명은 그대로 돌아온다.
+        game.offers.append(TransferOffer(
+            id: game.newMarketID(), playerID: mine[2].id, fromTeam: buyer, fee: 0, swapPlayerID: mine[0].id))
+        try game.respond(to: try #require(game.offers.last).id, .accept)
+        game.add(mine[1].id, to: game.userTeamID)
+
+        try play(&game, &clock)
+        #expect(game.players[mine[0].id]?.teamID == game.userTeamID)
+        #expect(game.players[mine[1].id]?.teamID == game.userTeamID)
+    }
 }
