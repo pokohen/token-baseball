@@ -1,0 +1,709 @@
+import Foundation
+import Testing
+@testable import TokenBaseballCore
+
+/// 테스트용 자동 감독: 사람이 누를 만한 것을 대신 누른다.
+struct AutoManager {
+    var clock = TestGame.start
+    var tokenID = 0
+    /// 경기마다 쓰는 토큰.
+    var tokensPerMatch: Int
+    var log: [String] = []
+
+    mutating func playOne(_ game: inout Game) throws {
+        clock = clock.addingTimeInterval(3600)
+        tokenID += 1
+        if tokensPerMatch > 0 {
+            TestGame.addTokens(&game, tokensPerMatch, id: "t\(tokenID)", at: clock)
+        }
+        manage(&game)
+        try game.startMatch(now: clock)
+        game.runMatchToEnd()
+    }
+
+    mutating func manage(_ game: inout Game) {
+        guard !game.isBankrupt else { return }
+        // 승격 신청: 인지도가 모자라면 홍보로 채운다.
+        if game.phase == .regular, !game.appliedForPromotion, let need = game.promotionRequirement,
+           game.round < Balance.applicationDeadlineRound {
+            for promotion in [Promotion.tv, .festival, .sns, .newspaper, .flyer] where game.userTeam.fame < need.fame {
+                for _ in 0..<4 where game.userTeam.fame < need.fame { try? game.promote(promotion) }
+            }
+            try? game.applyForPromotion()
+        }
+        // 시설
+        for facility in Facility.allCases {
+            if let cost = game.upgradeCost(facility), game.funds.balance > cost * 3 { try? game.upgrade(facility) }
+        }
+        // 재계약: 요구 조건을 그대로 들어준다.
+        for player in game.roster(of: game.userTeamID) where game.isExpiring(player) {
+            let demand = game.renewalDemand(player)
+            try? game.proposeRenewal(player.id, salary: demand.salary, years: demand.years)
+        }
+        for counter in game.counters { try? game.acceptCounter(counter.id) }
+        // 영입: 테스트를 열고, 지금 선수보다 낫거나 크게 클 후보와 계약한다. 자리가 없으면 가장 약한 선수를 내보낸다.
+        if game.candidates.isEmpty { try? game.holdTryout() }
+        for candidate in game.candidates {
+            guard let player = game.players[candidate.playerID] else { continue }
+            let mates = game.roster(of: game.userTeamID).filter { $0.isPitcher == player.isPitcher }
+            guard let worst = mates.min(by: { ($0.ability, $0.id) < ($1.ability, $1.id) }) else { continue }
+            let promising = player.age <= 23 && player.potential > worst.ability + 12
+            guard player.ability > worst.ability + 2 || promising || candidate.source == .draft else { continue }
+            if game.userTeam.roster.count >= Balance.rosterLimit(game.userTier) { try? game.release(worst.id) }
+            try? game.sign(candidate: candidate.id)
+        }
+        // 오프시즌에는 FA 시장에서 가장 좋은 선수에게 제안한다.
+        if game.phase == .offseason, game.userTeam.roster.count < Balance.rosterLimit(game.userTier) {
+            for player in game.freeAgentMarket.prefix(3) {
+                try? game.proposeFreeAgent(
+                    player.id, salary: Balance.marketSalary(ability: player.ability) * 3 / 2, years: 2)
+            }
+        }
+        if game.userTeam.scoutLevel >= 1, game.scoutTrip == nil { try? game.sendScout(.national) }
+        // 들어온 오퍼는 거절한다.
+        for offer in game.offers { try? game.respond(to: offer.id, .reject) }
+    }
+}
+
+enum Invariants {
+    static func check(_ game: Game, _ comment: Comment) {
+        #expect(game.teams.count == 60, comment)
+        var seen: Set<PlayerID> = []
+        for tier in LeagueTier.allCases {
+            let teams = game.teams(in: tier)
+            #expect(teams.count == 10, "\(comment) \(tier.displayName)")
+            for team in teams {
+                let roster = game.roster(of: team.id)
+                #expect(roster.count == team.roster.count, "\(comment) 없는 선수가 로스터에 있음")
+                #expect(roster.count <= Balance.rosterLimit(tier), "\(comment) \(team.name) \(roster.count)명")
+                #expect(roster.filter { !$0.isPitcher }.count >= 9, "\(comment) \(team.name) 야수 부족")
+                #expect(roster.filter { $0.isPitcher }.count >= 2, "\(comment) \(team.name) 투수 부족")
+                #expect(LineupBuilder.build(team: team, players: game.players) != nil, "\(comment) \(team.name)")
+                for player in roster {
+                    #expect(player.teamID == team.id, comment)
+                    #expect(player.ability <= player.potential + 0.01, "\(comment) \(player.name)")
+                    #expect(seen.insert(player.id).inserted, "\(comment) 두 팀에 있는 선수")
+                    for key in Attributes.Key.allCases {
+                        #expect((1.0...99.0).contains(player.attributes[key]), comment)
+                    }
+                }
+                if !team.isUser {
+                    let strength = game.strength(of: team.id)
+                    let range = Balance.strengthRange(tier)
+                    #expect(
+                        strength >= range.lowerBound - 0.01 && strength <= range.upperBound + 0.01,
+                        "\(comment) \(team.name) 강도 \(strength)")
+                }
+            }
+        }
+        for id in game.freeAgents {
+            #expect(game.players[id]?.teamID == nil, comment)
+            #expect(!seen.contains(id), comment)
+        }
+    }
+}
+
+@Suite struct SeasonFlowTests {
+    @Test func 한_시즌이_36라운드로_끝나고_오프시즌을_거쳐_다음_시즌이_시작된다() throws {
+        var game = TestGame.make(seed: 11)
+        var manager = AutoManager(tokensPerMatch: 300_000)
+        for _ in 0..<36 {
+            #expect(game.phase == .regular)
+            try manager.playOne(&game)
+        }
+        // 정규시즌이 끝나면 (플레이오프가 없으면) 오프시즌이다.
+        #expect(game.round == 36)
+        #expect(game.phase != .regular)
+        #expect(!game.awards.isEmpty)
+        for tier in LeagueTier.allCases {
+            #expect(game.awards.contains { $0.tier == tier && $0.title == "MVP" && $0.season == 1 })
+        }
+
+        while game.phase == .playoff { try manager.playOne(&game) }
+        #expect(game.phase == .offseason)
+        #expect(game.nextMatch()?.kind == .friendly)
+        // 친선 상대는 다른 리그 팀이다.
+        #expect(game.teams[try #require(game.nextMatch()).opponent].tier != game.userTier)
+
+        let standingsBefore = game.standings
+        for played in 1...5 {
+            try manager.playOne(&game)
+            if played < 5 {
+                #expect(game.friendliesPlayed == played)
+                // 친선 경기는 순위에 반영되지 않는다.
+                #expect(game.standings == standingsBefore)
+            }
+        }
+        #expect(game.phase == .regular)
+        #expect(game.season == 2)
+        #expect(game.round == 0)
+        #expect(game.standings.flatMap { $0 }.allSatisfy { $0.games == 0 })
+        Invariants.check(game, "2시즌 시작")
+    }
+
+    @Test func 신청하지_않으면_1위를_해도_승격하지_못하고_다음_순위_팀이_올라간다() throws {
+        var game = TestGame.make(seed: 21)
+        TestGame.addTokens(&game, 500_000_000, id: "seed", at: TestGame.start)
+        // 내 팀을 압도적으로 강하게 만든다.
+        for id in game.userTeam.roster {
+            for key in Attributes.Key.allCases { game.players[id]?.attributes[key] = 60 }
+            game.players[id]?.potential = 60
+        }
+        var manager = AutoManager(tokensPerMatch: 0)
+        for _ in 0..<36 {
+            manager.clock = manager.clock.addingTimeInterval(3600)
+            try game.startMatch(now: manager.clock)
+            game.runMatchToEnd()
+        }
+        #expect(game.lastWinRate[game.userTeamID] ?? 0 > 0.8)
+        #expect(game.phase == .offseason)
+        #expect(game.userTier == .citizenAmateur)
+        // 6부에서 두 팀은 올라갔거나 플레이오프를 치렀고, 리그는 여전히 10팀이다.
+        #expect(game.teams(in: .citizenAmateur).count == 10)
+        #expect(game.teams(in: .citizenSemiPro).count == 10)
+        #expect(game.news.contains { $0.text.contains("신청하지 않아") })
+    }
+
+    @Test func 신청하고_1위를_하면_자동_승격한다() throws {
+        var game = TestGame.make(seed: 22)
+        for id in game.userTeam.roster {
+            for key in Attributes.Key.allCases { game.players[id]?.attributes[key] = 60 }
+            game.players[id]?.potential = 60
+        }
+        var manager = AutoManager(tokensPerMatch: 3_000_000)
+        for _ in 0..<36 { try manager.playOne(&game) }
+
+        #expect(game.appliedForPromotion || game.season > 1 || game.phase == .offseason)
+        #expect(game.phase == .offseason)
+        #expect(game.userTier == .citizenSemiPro)
+        #expect(game.bestTier == .citizenSemiPro)
+        #expect(game.news.contains { $0.text.hasPrefix("승격!") })
+        #expect(game.funds.seasonIncome["상금·지원금"] ?? 0 > 0)
+        for tier in LeagueTier.allCases { #expect(game.teams(in: tier).count == 10) }
+    }
+
+    @Test func 꼴찌는_자동_강등되고_9위는_승강_플레이오프를_치른다() throws {
+        var game = TestGame.make(seed: 23)
+        TestGame.addTokens(&game, 500_000_000, id: "seed", at: TestGame.start)
+        // 내 팀을 5부로 올려 놓고 아주 약하게 만든다.
+        let swap = game.teams(in: .citizenSemiPro)[0].id
+        game.teams[swap].tier = .citizenAmateur
+        game.teams[game.userTeamID].tier = .citizenSemiPro
+        game.startSeasonSchedules()
+        for id in game.userTeam.roster {
+            for key in Attributes.Key.allCases { game.players[id]?.attributes[key] = 5 }
+        }
+        var manager = AutoManager(tokensPerMatch: 0)
+        for _ in 0..<36 {
+            manager.clock = manager.clock.addingTimeInterval(3600)
+            try game.startMatch(now: manager.clock)
+            game.runMatchToEnd()
+        }
+        #expect(game.phase == .offseason)
+        #expect(game.userTier == .citizenAmateur)
+        #expect(game.relegatedThisOffseason)
+        #expect(game.sponsorPenaltySeasons == 1)
+        #expect(game.news.contains { $0.text.hasPrefix("강등") })
+        // 강등되면 오퍼가 몰려온다.
+        #expect(game.offers.count >= 3)
+    }
+
+    @Test func 승강_플레이오프는_3전_2선승이고_이기면_올라간다() throws {
+        var game = TestGame.make(seed: 24)
+        for id in game.userTeam.roster {
+            for key in Attributes.Key.allCases { game.players[id]?.attributes[key] = 55 }
+            game.players[id]?.potential = 55
+        }
+        // 정규시즌 마지막 직전까지 순위표를 직접 채운다: 내 팀이 2위.
+        let tier = LeagueTier.citizenAmateur
+        game.round = 36
+        game.appliedForPromotion = true
+        for index in game.standings[tier.index].indices {
+            let id = game.standings[tier.index][index].teamID
+            game.standings[tier.index][index].wins = id == game.userTeamID ? 30 : 10 + index
+            game.standings[tier.index][index].losses = 36 - game.standings[tier.index][index].wins
+        }
+        let top = game.standings[tier.index].firstIndex { $0.teamID != game.userTeamID }!
+        game.standings[tier.index][top].wins = 34
+        game.standings[tier.index][top].losses = 2
+        for other in LeagueTier.allCases where other != tier {
+            for index in game.standings[other.index].indices {
+                game.standings[other.index][index].wins = 20 - index
+                game.standings[other.index][index].losses = 16 + index
+            }
+        }
+        game.endRegularSeason()
+
+        #expect(game.phase == .playoff)
+        let mine = try #require(game.series.first { $0.lowerTeam == game.userTeamID })
+        #expect(mine.upperTier == .citizenSemiPro)
+        // 1차전은 상위 리그 팀 홈
+        #expect(game.nextMatch()?.kind == .playoff)
+        #expect(game.nextMatch()?.userIsHome == false)
+
+        var clock = TestGame.start
+        var games = 0
+        while game.phase == .playoff {
+            clock = clock.addingTimeInterval(3600)
+            if games == 1 { #expect(game.nextMatch()?.userIsHome == true) }
+            try game.startMatch(now: clock)
+            #expect(game.live?.state.rules.maxInnings == nil)
+            game.runMatchToEnd()
+            games += 1
+        }
+        #expect((2...3).contains(games))
+        #expect(game.phase == .offseason)
+        let promoted = game.news.contains { $0.text.hasPrefix("승격!") }
+        #expect(game.userTier == (promoted ? .citizenSemiPro : .citizenAmateur))
+        for league in LeagueTier.allCases { #expect(game.teams(in: league).count == 10) }
+    }
+}
+
+@Suite struct ContractTests {
+    static func toOffseason(_ game: inout Game, _ manager: inout AutoManager) throws {
+        while game.phase != .offseason { try manager.playOne(&game) }
+    }
+
+    @Test func 재계약하지_않은_선수는_오프시즌이_끝나면_떠난다() throws {
+        var game = TestGame.make(seed: 31)
+        TestGame.addTokens(&game, 500_000_000, id: "seed", at: TestGame.start)
+        // 모든 선수의 계약을 이번 시즌까지로 만든다.
+        for id in game.userTeam.roster { game.players[id]?.contract.seasonsLeft = 1 }
+        let original = game.userTeam.roster
+        // 은퇴하지 않을 젊은 선수로 본다.
+        let first = game.userTeam.roster[0]
+        game.players[first]?.age = 25
+        let salaryBefore = game.players[first]!.contract.salary
+        #expect(game.isExpiring(game.players[first]!))
+
+        var clock = TestGame.start
+        func next() -> Date { clock = clock.addingTimeInterval(3600); return clock }
+        while game.phase != .offseason {
+            try game.startMatch(now: next())
+            game.runMatchToEnd()
+        }
+        // 시즌이 끝날 때 연봉이 오른다 (내려가지 않는다).
+        #expect(game.players[first]!.contract.salary > salaryBefore)
+        // 은퇴한 선수 자리에 온 임시 선수를 빼면 모두 계약 만료다.
+        #expect(game.roster(of: game.userTeamID).filter { original.contains($0.id) }.allSatisfy { game.isExpiring($0) })
+        #expect(game.news.contains { $0.text.hasPrefix("계약 만료") })
+
+        // 한 명만 재계약한다: 요구 조건 그대로면 대부분 받아들인다.
+        let keeper = game.players[first]!
+        let demand = game.renewalDemand(keeper)
+        try game.proposeRenewal(keeper.id, salary: demand.salary * 2, years: demand.years)
+        #expect(throws: GameError.self) { try game.proposeRenewal(keeper.id, salary: demand.salary, years: 1) }
+        // 답은 다음 경기가 끝난 뒤에 온다.
+        #expect(game.players[first]!.contract.seasonsLeft == 0)
+        try game.startMatch(now: next())
+        game.runMatchToEnd()
+        if !game.counters.isEmpty { try game.acceptCounter(game.counters[0].id) }
+        let renewed = game.players[first]!.contract.seasonsLeft > 0
+
+        while game.phase == .offseason {
+            try game.startMatch(now: next())
+            game.runMatchToEnd()
+        }
+        #expect(game.season == 2)
+        #expect(game.userTeam.roster.contains(first) == renewed)
+        // 떠난 자리는 임시 선수로 채워져 경기를 계속할 수 있다.
+        #expect(game.currentLineup != nil)
+        #expect(game.news.contains { $0.text.hasPrefix("계약이 끝나 떠난 선수") })
+        Invariants.check(game, "계약 만료 뒤")
+    }
+
+    @Test func 오퍼를_수락하면_이적료를_받고_선수가_떠난다() throws {
+        var game = TestGame.make(seed: 32)
+        TestGame.addTokens(&game, 5_000_000, id: "a", at: TestGame.hours(1))
+        try game.holdTryout()
+        for candidate in game.candidates { try? game.sign(candidate: candidate.id) }
+        game.generateIncomingOffers(count: 1)
+        var offer = try #require(game.offers.first)
+        if offer.swapPlayerID != nil {
+            game.offers = []
+            game.phase = .offseason
+            game.generateIncomingOffers(count: 1)
+            game.phase = .regular
+            offer = try #require(game.offers.first)
+        }
+        let before = game.funds.balance
+        let player = offer.playerID
+
+        try game.respond(to: offer.id, .accept)
+        #expect(game.funds.balance == before + offer.fee)
+        #expect(game.players[player]?.teamID == offer.fromTeam)
+        #expect(!game.userTeam.roster.contains(player))
+        #expect(game.funds.seasonIncome["선수 판매"] == offer.fee)
+    }
+
+    @Test func 답하지_않은_오퍼는_다음_경기가_끝나면_사라진다() throws {
+        var game = TestGame.make(seed: 33)
+        game.generateIncomingOffers(count: 1)
+        let offer = try #require(game.offers.first)
+        #expect(game.offers.contains { $0.id == offer.id })
+        try TestGame.playOne(&game, at: TestGame.hours(1))
+        #expect(!game.offers.contains { $0.id == offer.id })
+        #expect(game.news.contains { $0.text.contains("답이 없어 사라졌습니다") })
+    }
+
+    @Test func 트레이드_마감_뒤에는_이적_제안을_할_수_없다() throws {
+        var game = TestGame.make(seed: 34)
+        TestGame.addTokens(&game, 50_000_000, id: "a", at: TestGame.hours(1))
+        let target = game.roster(of: game.teams(in: .citizenAmateur)[0].id)[0]
+        #expect(game.tradeWindowOpen)
+        try game.proposeTransfer(target.id, fee: 100_000)
+        game.round = Balance.tradeDeadlineRound
+        #expect(!game.tradeWindowOpen)
+        let other = game.roster(of: game.teams(in: .citizenAmateur)[1].id)[0]
+        #expect(throws: GameError.self) { try game.proposeTransfer(other.id, fee: 100_000) }
+        // FA 영입은 오프시즌에만
+        #expect(game.freeAgentMarket.isEmpty)
+    }
+
+    @Test func 프로급_선수는_시민_구단에_오지_않는다() {
+        let game = TestGame.make(seed: 35)
+        let star = game.roster(of: game.teams(in: .pro)[0].id)[0]
+        #expect(game.joinChance(star, salary: 1_000_000_000) == 0)
+    }
+}
+
+@Suite struct BankruptcyTests {
+    @Test func 자금이_0_아래로_5경기를_버티면_파산하고_새_구단으로_다시_시작한다() throws {
+        var game = TestGame.make(seed: 41)
+        game.funds.spend(50_000_000, .salary)
+        #expect(game.funds.balance < 0)
+        var clock = TestGame.start
+        func next() -> Date { clock = clock.addingTimeInterval(3600); return clock }
+
+        try game.startMatch(now: next())
+        game.runMatchToEnd()
+        #expect(game.financialState == .crisis(matchesLeft: 5))
+        // 위기 중에는 시설 업그레이드와 영입을 할 수 없다.
+        #expect(throws: GameError.self) { try game.holdTryout() }
+        #expect(throws: GameError.self) { try game.upgrade(.training) }
+
+        for left in [4, 3, 2, 1] {
+            try game.startMatch(now: next())
+            game.runMatchToEnd()
+            #expect(game.financialState == .crisis(matchesLeft: left))
+        }
+        let oldName = game.userTeam.name
+        let oldRoster = game.userTeam.roster
+        try game.startMatch(now: next())
+        game.runMatchToEnd()
+
+        #expect(game.isBankrupt)
+        #expect(game.financialState == .bankrupt)
+        #expect(game.hallOfFame.map(\.name) == [oldName])
+        #expect(oldRoster.allSatisfy { game.freeAgents.contains($0) })
+        #expect(game.nextMatch() == nil)
+        #expect(throws: GameError.self) { try game.startMatch(now: next()) }
+        #expect(game.teams.filter(\.isUser).isEmpty)
+
+        try game.foundNewClub(setup: .init(city: "부산", name: "부산 새출발 야구단"), now: next())
+        #expect(!game.isBankrupt)
+        #expect(game.userTeam.name == "부산 새출발 야구단")
+        #expect(game.userTier == .citizenAmateur)
+        #expect(game.funds.balance == 100_000)
+        #expect(game.userTeam.roster.count == 14)
+        #expect(game.teams.filter(\.isUser).count == 1)
+        Invariants.check(game, "새 구단")
+        try game.startMatch(now: next())
+        game.runMatchToEnd()
+    }
+
+    @Test func 유예_중에_자금을_메우면_위기에서_벗어난다() throws {
+        var game = TestGame.make(seed: 42)
+        game.funds.spend(1_000_000, .salary)
+        try TestGame.playOne(&game, at: TestGame.hours(1))
+        #expect(game.financialState == .crisis(matchesLeft: 5))
+
+        TestGame.addTokens(&game, 50_000_000, id: "a", at: TestGame.hours(2))
+        game.refreshFinancialState()
+        #expect(game.crisisMatchesLeft == nil)
+        try game.holdTryout()
+    }
+
+    @Test func 자금이_다음_다섯_경기_연봉보다_적으면_경고한다() {
+        var game = TestGame.make(seed: 43)
+        TestGame.addTokens(&game, 100_000_000, id: "a", at: TestGame.hours(1))
+        #expect(game.financialState == .healthy)
+        game.funds.spend(game.funds.balance - 10, .facility)
+        #expect(game.financialState == .warning)
+    }
+}
+
+@Suite struct SoakTests {
+    @Test func 여섯_시즌을_돌려도_세계가_무너지지_않는다() throws {
+        var game = TestGame.make(seed: 2026)
+        var manager = AutoManager(tokensPerMatch: 40_000_000)
+        var tiers: [LeagueTier] = []
+        var moved = 0
+
+        while game.season <= 6 {
+            let season = game.season
+            let before = game.teams.map(\.tier)
+            while game.season == season {
+                try manager.playOne(&game)
+                if game.isBankrupt {
+                    try game.foundNewClub(setup: .init(city: "대전", name: "대전 재창단 \(season)"), now: manager.clock)
+                }
+            }
+            moved += zip(before, game.teams.map(\.tier)).filter { $0 != $1 }.count
+            tiers.append(game.userTier)
+            Invariants.check(game, "\(game.season)시즌 시작")
+            print("[소크] \(season)시즌: \(before[game.userTeamID].rawValue)부 \(String(format: "%.3f", game.lastWinRate[game.userTeamID] ?? 0)), 강도 \(String(format: "%.1f", game.strength(of: game.userTeamID))), 리그 CPU 평균 \(String(format: "%.1f", game.cpuAverageStrength(game.userTier))), 인지도 \(Int(game.userTeam.fame)), 자금 \(game.funds.balance / 1_000_000)M, 로스터 \(game.userTeam.roster.count)")
+        }
+        print("[소크] 내 팀 리그 변화: \(tiers.map(\.rawValue)), 리그를 옮긴 팀 수 합계 \(moved), 선수 \(game.players.count)명, FA \(game.freeAgents.count)명")
+        // 승강이 실제로 일어난다.
+        #expect(moved >= 20)
+        // 충분히 투자하면 올라간다.
+        #expect(tiers.last! < .citizenAmateur)
+        // 선수 수가 끝없이 늘지 않는다.
+        #expect(game.players.count < 1_800)
+    }
+
+    @Test func 같은_시드와_같은_입력이면_한_시즌_결과가_똑같다() throws {
+        func run() throws -> Game {
+            var game = TestGame.make(seed: 555)
+            var manager = AutoManager(tokensPerMatch: 2_000_000)
+            for _ in 0..<45 { try manager.playOne(&game) }
+            return game
+        }
+        let first = try run()
+        let second = try run()
+        #expect(first == second)
+    }
+
+    @Test func 맞춰주기를_끄면_CPU_팀이_내_팀을_따라오지_않는다() throws {
+        func leagueAverage(_ band: RubberBand) throws -> Double {
+            var game = TestGame.make(seed: 808)
+            TestGame.addTokens(&game, 500_000_000, id: "seed", at: TestGame.start)
+            game.settings.rubberBand = band
+            // 내 팀이 리그 상한 수준이다.
+            for id in game.userTeam.roster {
+                for key in Attributes.Key.allCases { game.players[id]?.attributes[key] = 40 }
+                game.players[id]?.potential = 40
+            }
+            var clock = TestGame.start
+            while game.season == 1 {
+                clock = clock.addingTimeInterval(3600)
+                try game.startMatch(now: clock)
+                game.runMatchToEnd()
+            }
+            return game.cpuAverageStrength(.citizenAmateur)
+        }
+        let off = try leagueAverage(.off)
+        let strong = try leagueAverage(.strong)
+        print("[맞춰주기] 끄기 \(String(format: "%.2f", off)) / 강하게 \(String(format: "%.2f", strong))")
+        // 강하게: 시즌당 한도(+5)만큼만 따라온다. 끄기: 그대로다.
+        #expect(strong > off + 2)
+        #expect(strong <= 30.9 + 5 + 1.5)
+        #expect(abs(off - 30.9) < 2)
+    }
+}
+
+@Suite struct UpperLeagueTests {
+    /// 내 팀을 원하는 리그로 옮기고 그 리그 수준의 선수단으로 만든다.
+    static func game(in tier: LeagueTier, ability: Double, seed: UInt64) -> Game {
+        var game = TestGame.make(seed: seed)
+        TestGame.addTokens(&game, 50_000_000_000, id: "seed", at: TestGame.start)
+        let swap = game.teams(in: tier)[0].id
+        game.teams[swap].tier = .citizenAmateur
+        game.teams[game.userTeamID].tier = tier
+        for id in game.userTeam.roster {
+            for key in Attributes.Key.allCases { game.players[id]?.attributes[key] = ability }
+            game.players[id]?.potential = ability
+            game.players[id]?.age = 26
+            game.players[id]?.contract = Contract(salary: 1_000_000, seasonsLeft: 3)
+        }
+        game.normalizeCPURoster(swap, leagueTarget: nil)
+        game.startSeasonSchedules()
+        return game
+    }
+
+    @Test func 프로_리그에서_두_시즌을_돌려도_무너지지_않고_상위_리그_기능이_돈다() throws {
+        var game = Self.game(in: .pro, ability: 80, seed: 61)
+        var manager = AutoManager(tokensPerMatch: 2_000_000_000)
+
+        // TV 광고는 3부 이상에서만 할 수 있다.
+        try game.promote(.tv)
+        // 해외 스카우트는 스카우트 시설이 있어야 하고 1~2부에서만 보낼 수 있다.
+        #expect(throws: GameError.self) { try game.sendScout(.overseas) }
+        try game.upgrade(.scout)
+        try game.sendScout(.overseas)
+
+        var sawDraftBoard = false
+        var foreignSigned = 0
+        while game.season <= 2 {
+            // 외국인 후보가 오면 한도(3명)까지 계약한다.
+            for candidate in game.candidates where game.players[candidate.playerID]?.isForeign == true {
+                let before = game.roster(of: game.userTeamID).filter(\.isForeign).count
+                if before >= Balance.foreignPlayerLimit {
+                    #expect(throws: GameError.self) { try game.sign(candidate: candidate.id) }
+                } else if (try? game.sign(candidate: candidate.id)) != nil {
+                    foreignSigned += 1
+                }
+            }
+            if game.scoutTrip == nil, game.candidates.isEmpty { try? game.sendScout(.overseas) }
+            if game.candidates.contains(where: { $0.source == .draft }) {
+                sawDraftBoard = true
+                #expect(game.phase == .offseason)
+                #expect(game.friendliesPlayed >= Balance.draftAfterFriendly)
+                #expect(game.candidates.filter { $0.source == .draft }.count == 5)
+                let pick = try #require(game.candidates.first { $0.source == .draft })
+                // 로스터가 가득 차 있으면 지명할 수 없다. 한 명을 내보내고 지명한다.
+                if game.userTeam.roster.count >= Balance.rosterLimit(game.userTier) {
+                    #expect(throws: GameError.self) { try game.sign(candidate: pick.id) }
+                    let batters = game.roster(of: game.userTeamID).filter { !$0.isPitcher }
+                    try game.release(try #require(batters.min { $0.ability < $1.ability }).id)
+                }
+                try game.sign(candidate: pick.id)
+                // 드래프트는 한 명만 지명한다.
+                #expect(!game.candidates.contains { $0.source == .draft })
+                #expect(game.players[pick.playerID]?.teamID == game.userTeamID)
+            }
+            try manager.playOne(&game)
+            #expect(!game.isBankrupt)
+        }
+        #expect(sawDraftBoard)
+        #expect(foreignSigned >= 1)
+        #expect(game.roster(of: game.userTeamID).filter(\.isForeign).count <= Balance.foreignPlayerLimit)
+        #expect(game.userTeam.roster.count <= 28)
+        Invariants.check(game, "프로 두 시즌 뒤")
+    }
+
+    @Test func 시민_리그에서는_해외_스카우트와_TV_광고를_쓸_수_없다() throws {
+        var game = TestGame.make(seed: 62)
+        TestGame.addTokens(&game, 5_000_000_000, id: "seed", at: TestGame.start)
+        try game.upgrade(.scout)
+        #expect(throws: GameError.self) { try game.sendScout(.overseas) }
+        #expect(throws: GameError.self) { try game.promote(.tv) }
+        try game.sendScout(.local)
+        // 3경기 뒤에 후보가 온다.
+        for hour in 1...2 { try TestGame.playOne(&game, at: TestGame.hours(Double(hour))) }
+        #expect(game.candidates.isEmpty)
+        try TestGame.playOne(&game, at: TestGame.hours(3))
+        #expect(game.candidates.filter { $0.source == .scout }.count == 3)
+        #expect(game.scoutTrip == nil)
+    }
+
+    @Test func 강등_조항이_있는_선수는_강등되면_이적료를_남기고_떠난다() {
+        var game = Self.game(in: .amateur, ability: 55, seed: 63)
+        for id in game.userTeam.roster { game.players[id]?.contract.relegationClause = true }
+        let before = game.userTeam.roster
+        let balance = game.funds.balance
+
+        game.teams[game.userTeamID].tier = .citizenPro
+        game.userRelegated(to: .citizenPro)
+
+        let gone = before.filter { !game.userTeam.roster.contains($0) }
+        #expect(!gone.isEmpty)
+        #expect(gone.allSatisfy { id in
+            guard let team = game.players[id]?.teamID else { return false }
+            return game.teams[team].tier < .citizenPro
+        })
+        #expect(game.funds.balance > balance)
+        #expect(game.funds.seasonIncome["선수 판매"] == game.funds.balance - balance)
+        #expect(game.news.contains { $0.text.hasPrefix("강등 조항 발동") })
+    }
+
+    @Test func 시민_구단_때부터_함께한_선수는_프로에_오면_프랜차이즈_스타가_된다() {
+        var game = Self.game(in: .semiPro, ability: 70, seed: 64)
+        let veteran = game.userTeam.roster[0]
+        let newcomer = game.userTeam.roster[1]
+        game.players[veteran]?.joinedTier = 6
+        game.players[newcomer]?.joinedTier = 2
+        for id in game.userTeam.roster.dropFirst(2) { game.players[id]?.joinedTier = 3 }
+        let fame = game.userTeam.fame
+        let salary = game.players[veteran]!.contract.salary
+
+        game.teams[game.userTeamID].tier = .pro
+        game.userPromoted(to: .pro)
+
+        #expect(game.players[veteran]?.isFranchiseStar == true)
+        #expect(game.players[newcomer]?.isFranchiseStar == false)
+        #expect(game.userTeam.fame >= fame + Balance.fameFranchiseStar)
+        // 승격하면 연봉이 한 번 더 오른다.
+        #expect(game.players[veteran]!.contract.salary > salary)
+        #expect(game.bestTier == .pro)
+    }
+
+    @Test func 상위_리그_9위는_승강_플레이오프를_홈에서_시작하고_지면_강등된다() throws {
+        var game = Self.game(in: .citizenSemiPro, ability: 12, seed: 65)
+        let tier = LeagueTier.citizenSemiPro
+        game.round = 36
+        for league in LeagueTier.allCases {
+            for index in game.standings[league.index].indices {
+                game.standings[league.index][index].wins = 30 - index * 2
+                game.standings[league.index][index].losses = 6 + index * 2
+            }
+        }
+        // 내 팀을 9위로 만든다.
+        let mine = game.standings[tier.index].firstIndex { $0.teamID == game.userTeamID }!
+        let rows = Standings.ranked(game.standings[tier.index])
+        let ninth = rows[8]
+        game.standings[tier.index][mine].wins = ninth.wins
+        game.standings[tier.index][mine].losses = ninth.losses
+        let other = game.standings[tier.index].firstIndex { $0.teamID == ninth.teamID }!
+        if other != mine {
+            game.standings[tier.index][other].wins = 30 - mine * 2
+            game.standings[tier.index][other].losses = 6 + mine * 2
+        }
+        #expect(game.rank(of: game.userTeamID) == 9)
+        game.endRegularSeason()
+
+        #expect(game.phase == .playoff)
+        let series = try #require(game.series.first { $0.upperTeam == game.userTeamID })
+        #expect(series.upperTier == tier)
+        #expect(game.nextMatch()?.userIsHome == true)
+
+        var clock = TestGame.start
+        while game.phase == .playoff {
+            clock = clock.addingTimeInterval(3600)
+            try game.startMatch(now: clock)
+            game.runMatchToEnd()
+        }
+        // 능력 12짜리 팀은 진다.
+        #expect(game.userTier == .citizenAmateur)
+        #expect(game.relegatedThisOffseason)
+        for league in LeagueTier.allCases { #expect(game.teams(in: league).count == 10) }
+    }
+
+    @Test func 마지막_라운드에_파산해도_새_구단으로_이어서_할_수_있다() throws {
+        var game = TestGame.make(seed: 66)
+        // 내 자리가 2위로 끝나게 순위표를 채우고, 마지막 라운드에서 유예가 끝나게 한다.
+        game.round = 35
+        game.appliedForPromotion = true
+        for league in LeagueTier.allCases {
+            for index in game.standings[league.index].indices {
+                let mine = game.standings[league.index][index].teamID == game.userTeamID
+                game.standings[league.index][index].wins = mine ? 30 : 34 - index * 3
+                game.standings[league.index][index].losses = 35 - game.standings[league.index][index].wins
+            }
+        }
+        game.funds.spend(900_000_000, .salary)
+        game.crisisMatchesLeft = 1
+        var clock = TestGame.start
+        clock = clock.addingTimeInterval(3600)
+        try game.startMatch(now: clock)
+        game.runMatchToEnd()
+
+        #expect(game.isBankrupt)
+        // 해체된 구단 때문에 플레이오프 단계에 걸려 있으면 안 된다.
+        #expect(game.phase == .offseason)
+        #expect(game.series.isEmpty)
+
+        try game.foundNewClub(setup: .init(city: "광주", name: "광주 새출발 야구단"), now: clock)
+        #expect(game.nextMatch()?.kind == .friendly)
+        while game.season == 1 {
+            clock = clock.addingTimeInterval(3600)
+            TestGame.addTokens(&game, 1_000_000, id: "t\(clock.timeIntervalSince1970)", at: clock)
+            try game.startMatch(now: clock)
+            game.runMatchToEnd()
+        }
+        #expect(game.phase == .regular)
+        #expect(game.nextMatch()?.kind == .regular)
+        Invariants.check(game, "파산 뒤 새 시즌")
+    }
+}
