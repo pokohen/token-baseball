@@ -707,3 +707,53 @@ enum Invariants {
         Invariants.check(game, "파산 뒤 새 시즌")
     }
 }
+
+@Suite struct OpponentRosterTests {
+    static func isPlayable(_ game: Game, _ id: TeamID) -> Bool {
+        LineupBuilder.build(team: game.teams[id], players: game.players) != nil
+    }
+
+    /// 야수를 8명만 남긴다.
+    static func dropBatters(_ game: inout Game, _ id: TeamID) {
+        let batters = game.roster(of: id).filter { !$0.isPitcher }
+        for player in batters.dropFirst(8) { game.moveToFreeAgency(player.id) }
+    }
+
+    @Test func 친선_상대가_로스터는_꽉_찼는데_야수가_모자라도_오프시즌이_멈추지_않는다() throws {
+        var game = TestGame.make(seed: 31)
+        var manager = AutoManager(tokensPerMatch: 2_000_000)
+        try ContractTests.toOffseason(&game, &manager)
+        let opponent = try #require(game.nextMatch()).opponent
+        let tier = game.teams[opponent].tier
+
+        // 야수 8명에 투수로 정원을 꽉 채운 상대를 만든다.
+        Self.dropBatters(&game, opponent)
+        while game.teams[opponent].roster.count < Balance.rosterLimit(tier) {
+            let pitcher = game.makePlayer(PlayerFactory.Spec(position: .reliever, tier: tier, season: game.season))
+            game.add(pitcher.id, to: opponent)
+        }
+        #expect(!Self.isPlayable(game, opponent))
+
+        try manager.playOne(&game)
+        #expect(game.friendliesPlayed == 1)
+        #expect(Self.isPlayable(game, opponent))
+        #expect(game.teams[opponent].roster.count <= Balance.rosterLimit(tier))
+    }
+
+    @Test func 윗_리그_로스터를_그대로_들고_강등된_구단도_경기를_치를_수_있게_정리된다() throws {
+        var game = TestGame.make(seed: 31)
+        let team = try #require(game.teams(in: .amateur).first { !$0.isUser }).id
+        #expect(game.teams[team].roster.count == Balance.rosterLimit(.amateur))
+
+        // 22명 그대로 18명 정원인 리그로 내려가고, 야수가 떠나 8명만 남는다.
+        game.teams[team].tier = .citizenPro
+        Self.dropBatters(&game, team)
+        #expect(game.teams[team].roster.count >= Balance.rosterLimit(.citizenPro))
+        #expect(!Self.isPlayable(game, team))
+
+        game.ensurePlayable(team)
+        #expect(Self.isPlayable(game, team))
+        #expect(game.teams[team].roster.count <= Balance.rosterLimit(.citizenPro))
+        #expect(game.roster(of: team).filter { $0.isPitcher }.count >= Balance.minPitchers)
+    }
+}

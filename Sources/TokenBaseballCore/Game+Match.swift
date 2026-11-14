@@ -286,9 +286,17 @@ extension Game {
     /// 경기를 치를 수 없는 CPU 구단이면 빈자리를 채운다.
     mutating func ensurePlayable(_ id: TeamID) {
         guard !teams[id].isUser else { return }
-        if LineupBuilder.build(team: teams[id], players: players) == nil
-            || roster(of: id).filter({ $0.isPitcher }).count < Balance.minPitchers {
-            fillCPURoster(id, target: strength(of: id))
+        func short() -> Bool {
+            LineupBuilder.build(team: teams[id], players: players) == nil
+                || roster(of: id).filter({ $0.isPitcher }).count < Balance.minPitchers
         }
+        guard short() else { return }
+        let target = strength(of: id)
+        fillCPURoster(id, target: target)
+        // 로스터가 꽉 차서 못 채웠으면 (윗 리그 인원을 그대로 들고 강등된 구단 등)
+        // 정원을 넘는 포지션을 먼저 비우고 다시 채운다.
+        guard short() else { return }
+        trimCPURosterToShape(id)
+        fillCPURoster(id, target: target)
     }
 }

@@ -179,14 +179,8 @@ extension Game {
         let floor = max(range.lowerBound + 0.5, target - tolerance)
         let ceiling = min(range.upperBound - 0.5, target + tolerance)
 
-        // 포지션별로 정원을 넘는 선수는 내보내고 (능력이 낮은 고령 선수부터), 빈자리를 채운다.
-        let shape = PlayerFactory.rosterPositions(tier)
-        for position in Position.allCases {
-            let quota = shape.filter { $0 == position }.count
-            let same = roster(of: id).filter { $0.position == position }
-                .sorted { ($0.ability - Double($0.age) * 0.3, -$0.id) > ($1.ability - Double($1.age) * 0.3, -$1.id) }
-            for extra in same.dropFirst(quota) { moveToFreeAgency(extra.id) }
-        }
+        // 포지션별로 정원을 넘는 선수는 내보내고, 빈자리를 채운다.
+        trimCPURosterToShape(id)
         fillCPURoster(id, target: target)
 
         // 강도가 범위나 목표를 벗어나면 주축 선수를 바꾼다.
@@ -200,6 +194,19 @@ extension Game {
             } else {
                 break
             }
+        }
+    }
+
+    /// 지금 리그의 로스터 구성에서 포지션별 정원을 넘는 선수를 FA로 내보낸다 (능력이 낮은 고령 선수부터).
+    /// 끝나면 로스터가 정원 이하가 되어 빈자리를 모두 채울 수 있다.
+    mutating func trimCPURosterToShape(_ id: TeamID) {
+        guard !teams[id].isUser else { return }
+        let shape = PlayerFactory.rosterPositions(teams[id].tier)
+        for position in Position.allCases {
+            let quota = shape.filter { $0 == position }.count
+            let same = roster(of: id).filter { $0.position == position }
+                .sorted { ($0.ability - Double($0.age) * 0.3, -$0.id) > ($1.ability - Double($1.age) * 0.3, -$1.id) }
+            for extra in same.dropFirst(quota) { moveToFreeAgency(extra.id) }
         }
     }
 
