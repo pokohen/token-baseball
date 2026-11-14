@@ -52,4 +52,34 @@ import Testing
         #expect(ledger.collect(reader.records(since: ledger.collectSince), now: now) == 550)
         #expect(ledger.collect(reader.records(since: ledger.collectSince), now: now.addingTimeInterval(60)) == 0)
     }
+
+    @Test func 누적값이_줄어들어도_이미_센_사용량을_다시_세지_않는다() throws {
+        let root = try write([
+            Self.tokenCount(at: "2026-11-14T01:00:00.000Z", input: 50_000, cached: 0, output: 500),
+            // 누적값이 잠깐 줄었다가 다시 늘어난다.
+            Self.tokenCount(at: "2026-11-14T01:00:05.000Z", input: 49_000, cached: 0, output: 500),
+            Self.tokenCount(at: "2026-11-14T01:00:09.000Z", input: 51_000, cached: 0, output: 600),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let records = CodexUsageReader(root: root).records()
+        #expect(records.reduce(0) { $0 + $1.usage.total } == 50_500 + 2_100)
+    }
+
+    @Test func 누적_합계가_같은_이벤트가_다시_나와도_서로_다른_기록이다() throws {
+        let root = try write([
+            Self.tokenCount(at: "2026-11-14T01:00:00.000Z", input: 1_000, cached: 0, output: 100),
+            Self.tokenCount(at: "2026-11-14T01:00:05.000Z", input: 100, cached: 0, output: 0),
+            Self.tokenCount(at: "2026-11-14T01:00:09.000Z", input: 1_000, cached: 0, output: 100),
+        ])
+        defer { try? FileManager.default.removeItem(at: root) }
+        let reader = CodexUsageReader(root: root)
+        let records = reader.records()
+        #expect(Set(records.map(\.id)).count == records.count)
+        // 다시 읽어도 같은 이름이라 장부가 두 번 세지 않는다.
+        #expect(reader.records().map(\.id) == records.map(\.id))
+        var ledger = FundsLedger(startedAt: try Date("2026-11-14T00:00:00Z", strategy: .iso8601))
+        let now = try Date("2026-11-14T01:10:00Z", strategy: .iso8601)
+        #expect(ledger.collect(records, now: now) == 1_100 + 1_000)
+        #expect(ledger.collect(reader.records(), now: now.addingTimeInterval(20)) == 0)
+    }
 }

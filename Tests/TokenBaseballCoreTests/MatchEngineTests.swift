@@ -191,6 +191,25 @@ enum TestTeams {
         #expect(Self.find(away: 20, home: 45, tier: .citizenAmateur) { $0.inning < 9 } == nil)
     }
 
+    @Test func 말_공격_중에_콜드게임_점수_차가_되면_그_자리에서_끝난다() {
+        let cold = MatchRules(coldGame: true, homeEdge: 0)
+        var endedMidInning = 0
+        for seed in 1...300 {
+            var match = TestTeams.match(
+                awayAbility: 20, homeAbility: 45, tier: .citizenAmateur, rules: cold, seed: UInt64(seed))
+            while !match.isFinished {
+                match.step()
+                guard !match.isFinished, match.isBottom else { continue }
+                let lead = match.home.runs - match.away.runs
+                // 홈팀이 이미 기준을 넘겼는데 말 공격이 이어지면 안 된다.
+                #expect(!(match.inning >= 7 && lead >= 7), "시드 \(seed) \(match.inningLabel) \(lead)점 차")
+                #expect(!(match.inning >= 5 && lead >= 10), "시드 \(seed) \(match.inningLabel) \(lead)점 차")
+            }
+            if match.inning < 9, match.isBottom, match.outs < 3 { endedMidInning += 1 }
+        }
+        #expect(endedMidInning > 0)
+    }
+
     @Test func 기록이_서로_맞아떨어진다() {
         for seed in 1...200 {
             var match = TestTeams.match(awayAbility: 48, homeAbility: 52, seed: UInt64(seed))

@@ -18,7 +18,8 @@ public enum Format {
 
     /// 토큰 수: `120.5M`, `950.2K`, `812`.
     public static func tokens(_ count: Int) -> String {
-        if count >= 1_000_000 { return String(format: "%.1fM", Double(count) / 1_000_000) }
+        // 반올림해서 1000.0K가 되는 수는 M으로 넘긴다.
+        if count >= 999_950 { return String(format: "%.1fM", Double(count) / 1_000_000) }
         if count >= 1_000 { return String(format: "%.1fK", Double(count) / 1_000) }
         return "\(count)"
     }

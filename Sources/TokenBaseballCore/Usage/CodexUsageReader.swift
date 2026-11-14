@@ -26,20 +26,23 @@ public struct CodexUsageReader: Sendable {
             guard let data = try? Data(contentsOf: file, options: .mappedIfSafe) else { continue }
             let session = file.deletingPathExtension().lastPathComponent
             var previous = Totals()
+            var ordinal = 0
             for line in data.split(separator: UInt8(ascii: "\n")) {
                 guard let event = Self.parse(line: line) else { continue }
+                ordinal += 1
                 let now = event.totals
-                // 누적값이 줄어들면 (세션이 새로 시작되면) 처음부터 다시 센다.
-                if now.input < previous.input || now.output < previous.output { previous = Totals() }
-                let input = now.input - previous.input
+                // 누적값이 줄어들면 그 이벤트는 세지 않고 거기서부터 다시 잰다.
+                // (이미 센 사용량을 처음부터 다시 더하지 않기 위해서다.)
+                let input = max(0, now.input - previous.input)
                 let cached = min(input, max(0, now.cached - previous.cached))
-                let output = now.output - previous.output
+                let output = max(0, now.output - previous.output)
                 previous = now
                 guard input + output > 0 else { continue }
                 // Codex의 input에는 캐시에서 읽은 토큰이 들어 있다. 겹치지 않게 나눈다.
                 let usage = TokenUsage(input: input - cached, output: output, cacheRead: cached)
+                // 로그는 뒤에 덧붙기만 하므로 파일 안에서 몇 번째 이벤트인지가 변하지 않는 이름이 된다.
                 result.append(UsageRecord(
-                    id: "codex:\(session):\(now.input + now.output)", timestamp: event.timestamp, usage: usage))
+                    id: "codex:\(session):\(ordinal)", timestamp: event.timestamp, usage: usage))
             }
         }
         return result

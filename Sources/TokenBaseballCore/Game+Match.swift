@@ -81,7 +81,8 @@ extension Game {
         let home = next.userIsHome ? userTeamID : next.opponent
         let away = next.userIsHome ? next.opponent : userTeamID
         let tier = next.kind == .friendly ? min(userTier, teams[next.opponent].tier) : userTier
-        guard let state = makeMatch(home: home, away: away, kind: next.kind, tier: userTier, seed: rng.next()) else {
+        // 친선 경기 규칙은 두 구단 중 윗 리그를 따른다 (콜드게임은 시민 구단끼리만).
+        guard let state = makeMatch(home: home, away: away, kind: next.kind, tier: tier, seed: rng.next()) else {
             throw GameError("경기를 시작할 수 없습니다.")
         }
 

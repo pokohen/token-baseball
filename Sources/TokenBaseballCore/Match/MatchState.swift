@@ -603,11 +603,18 @@ public struct MatchState: Codable, Equatable, Sendable {
         if outs >= 3 { endHalfInning(&events) }
     }
 
-    /// 끝내기: 9회말 이후 홈팀이 앞서는 순간 경기가 끝난다.
+    /// 말 공격 중에 경기가 끝나는 경우.
+    /// 끝내기: 9회말 이후 홈팀이 앞서는 순간. 콜드게임: 홈팀이 기준 점수 차를 넘기는 순간.
     @discardableResult
     private mutating func checkWalkOff(_ events: inout [MatchEvent]) -> Bool {
-        guard !isFinished, isBottom, inning >= 9, home.runs > away.runs else { return false }
-        events.append(MatchEvent(.play, "끝내기! \(home.name)의 승리"))
+        guard !isFinished, isBottom, home.runs > away.runs else { return false }
+        if inning >= 9 {
+            events.append(MatchEvent(.play, "끝내기! \(home.name)의 승리"))
+        } else if coldGameReached(lead: home.runs - away.runs) {
+            events.append(MatchEvent(.inning, "콜드게임이 선언됩니다"))
+        } else {
+            return false
+        }
         finish(&events)
         return true
     }

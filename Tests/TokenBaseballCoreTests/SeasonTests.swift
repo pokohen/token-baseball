@@ -942,4 +942,22 @@ enum Invariants {
         #expect(game.youthBoost == 0)
         #expect(game.sponsorPenaltySeasons == 0)
     }
+
+    @Test func 윗_리그_구단과의_친선_경기에는_콜드게임이_없다() throws {
+        var game = UpperLeagueTests.game(in: .citizenPro, ability: 50, seed: 76)
+        game.startOffseason()
+        var seen: Set<Bool> = []
+        for played in 0..<Balance.friendliesPerOffseason {
+            var copy = game
+            copy.friendliesPlayed = played
+            let opponent = try #require(copy.nextMatch()).opponent
+            let upper = min(copy.userTier, copy.teams[opponent].tier)
+            try copy.startMatch(now: TestGame.start.addingTimeInterval(3600))
+            // 콜드게임은 두 구단이 모두 시민 구단일 때만 있다.
+            #expect(copy.live?.state.rules.coldGame == upper.isCitizen)
+            #expect(copy.live?.tier == upper)
+            seen.insert(upper.isCitizen)
+        }
+        #expect(seen.count == 2)
+    }
 }

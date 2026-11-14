@@ -15,6 +15,11 @@ import Testing
     @Test func 토큰과_시간() {
         #expect(Format.tokens(120_500_000) == "120.5M")
         #expect(Format.tokens(950_200) == "950.2K")
+        #expect(Format.tokens(999_949) == "999.9K")
+        #expect(Format.tokens(999_950) == "1.0M")
+        #expect(Format.tokens(999_999) == "1.0M")
+        #expect(Format.tokens(1_000) == "1.0K")
+        #expect(Format.tokens(999) == "999")
         #expect(Format.countdown(23 * 60) == "0:23")
         #expect(Format.countdown(3600) == "1:00")
     }
