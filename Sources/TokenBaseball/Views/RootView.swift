@@ -37,7 +37,8 @@ struct RootView: View {
                 OnboardingView(bankrupt: model.game?.isBankrupt == true)
             }
         }
-        .onAppear { model.acknowledgeResult() }
+        .onAppear { model.setPopoverVisible(true) }
+        .onDisappear { model.setPopoverVisible(false) }
     }
 
     private func main(_ game: Game) -> some View {

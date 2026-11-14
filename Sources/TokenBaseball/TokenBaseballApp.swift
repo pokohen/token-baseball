@@ -42,6 +42,5 @@ struct MenuBarLabel: View {
             Text(model.menuBarText)
                 .monospacedDigit()
         }
-        .help(model.tooltip)
     }
 }

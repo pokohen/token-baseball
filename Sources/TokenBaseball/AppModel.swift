@@ -23,7 +23,11 @@ final class AppModel: ObservableObject {
     private var pendingSave: Task<Void, Never>?
     private var timers: [Timer] = []
     private var pitchesSinceSave = 0
-    private var wasMatchReady = false
+    /// 직전에 경기를 치를 수 있는 상태였는지. 앱을 켠 직후에는 아직 모른다 (nil).
+    private var wasMatchReady: Bool?
+    /// 팝오버가 열려 있는지. 열려 있을 때 끝난 경기는 바로 확인한 것으로 본다.
+    private var popoverVisible = false
+    private let launchedAt = Date()
 
     /// 공 하나에 걸리는 시간. 배속과 건너뛰기는 없다.
     static let pitchInterval: Duration = .seconds(3)
@@ -73,8 +77,29 @@ final class AppModel: ObservableObject {
         guard game != nil else { return }
         game?.refreshCharges(now: now)
         let ready = (game?.charges ?? 0) > 0 && game?.nextMatch() != nil && game?.live == nil
-        if ready, !wasMatchReady { notify("경기를 치를 수 있습니다", "상단바를 눌러 경기를 시작하세요.") }
+        // 경기 기회가 새로 생겼을 때만 알린다. 앱을 켤 때마다 알리지 않는다.
+        if ready, wasMatchReady == false { notify("경기를 치를 수 있습니다", "상단바를 눌러 경기를 시작하세요.") }
         wasMatchReady = ready
+        updateStatusTooltip()
+    }
+
+    /// 상단바 아이콘의 툴팁. MenuBarExtra의 라벨에 붙인 `.help`는 상단바 버튼까지 전달되지 않아서
+    /// 버튼에 직접 넣는다.
+    private func updateStatusTooltip() {
+        let text = tooltip
+        for window in NSApp.windows {
+            guard let button = Self.statusButton(in: window.contentView), button.toolTip != text else { continue }
+            button.toolTip = text
+        }
+    }
+
+    private static func statusButton(in view: NSView?) -> NSStatusBarButton? {
+        guard let view else { return nil }
+        if let button = view as? NSStatusBarButton { return button }
+        for child in view.subviews {
+            if let button = statusButton(in: child) { return button }
+        }
+        return nil
     }
 
     private func scheduleAnimation() {
@@ -96,12 +121,14 @@ final class AppModel: ObservableObject {
         let startedAt = game.funds.startedAt
         let sources = sources
         Task.detached(priority: .utility) {
+            // 읽기 시작한 시각까지만 반영한 것으로 적는다. 읽는 동안 쌓인 기록은 다음에 읽는다.
+            let readAt = Date()
             let records = sources.records(since: since)
             let startOfDay = Calendar.current.startOfDay(for: Date())
             let today = sources.total(since: max(startOfDay, startedAt)).total
             await MainActor.run { [weak self] in
                 guard let self, self.game != nil else { return }
-                let earned = self.game?.collect(records, now: Date()) ?? 0
+                let earned = self.game?.collect(records, now: readAt) ?? 0
                 self.todayTokens = today
                 self.recentRate = earned
                 if earned > 0 {
@@ -176,6 +203,12 @@ final class AppModel: ObservableObject {
         save()
     }
 
+    /// 팝오버가 열리고 닫힐 때 부른다.
+    func setPopoverVisible(_ visible: Bool) {
+        popoverVisible = visible
+        if visible { acknowledgeResult() }
+    }
+
     // MARK: 실시간 중계
 
     private func runMatchLoop() {
@@ -202,6 +235,8 @@ final class AppModel: ObservableObject {
         let finished = game?.live == nil
         if finished, let result = game?.lastResult {
             notify("경기 종료", "\(result.opponent)전 \(result.label)")
+            // 팝오버로 결과를 보고 있었으면 상단바에 "경기 종료"를 남기지 않는다.
+            if popoverVisible { game?.acknowledgeResult() }
         } else if events.contains(where: { $0.kind == .score }), let live = game?.live {
             let battingIsMine = live.state.isBottom == live.userIsHome
             if battingIsMine { notify("득점!", events.last { $0.kind == .score }?.text ?? "") }
@@ -233,8 +268,8 @@ final class AppModel: ObservableObject {
         guard let game, !game.isBankrupt else { return .rest }
         if game.live != nil { return .batting }
         // 토큰 사용이 일정 시간 없으면 쉰다.
-        if let lastTokenAt, now.timeIntervalSince(lastTokenAt) > 600 { return .rest }
-        if lastTokenAt == nil, now.timeIntervalSince(game.funds.checkpoint) > 600 { return .rest }
+        // (장부의 반영 시각은 토큰을 안 써도 계속 갱신되므로 기준으로 쓸 수 없다.)
+        if now.timeIntervalSince(lastTokenAt ?? launchedAt) > 600 { return .rest }
         var drills: [Sprites.Drill] = [.batting, .pitching, .fielding, .running]
         if game.userTeam.trainingLevel >= 3 { drills.append(.weights) }
         return drills[(Int(now.timeIntervalSince1970) / 8) % drills.count]
