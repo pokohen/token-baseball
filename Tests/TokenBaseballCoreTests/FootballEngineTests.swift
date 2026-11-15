@@ -159,4 +159,37 @@ enum FootballSample {
         let closed = FootballSample.run(away: 50, home: 50, games: 500, awayTactic: .defensive, homeTactic: .defensive)
         #expect(open.goalsPerGame > closed.goalsPerGame + 0.3, "\(open.goalsPerGame) vs \(closed.goalsPerGame)")
     }
+
+    @Test(arguments: [true, false])
+    func 골키퍼가_퇴장당해도_골문은_비지_않는다(benchKeeper: Bool) {
+        var rng = SeededRNG(seed: 21)
+        for _ in 0..<40 {
+            let away = FootballSample.side(id: 1, ability: 50, &rng)
+            var home = FootballSample.side(id: 2, ability: 50, &rng)
+            if !benchKeeper {
+                // 벤치에 골키퍼가 없는 팀
+                home.players.removeAll { !$0.isOnPitch && $0.natural == .goalkeeper }
+            }
+            var match = FootballMatch(away: away, home: home, rules: FootballRules(mustHaveWinner: true), seed: rng.next())
+            for _ in 0..<rng.int(1...200) { match.step() }
+            guard !match.isFinished, let keeper = match.home.keeperIndex else { continue }
+            // 그 전에 다른 선수가 퇴장당했을 수도 있다.
+            let before = match.home.onPitchCount
+            var events: [MatchEvent] = []
+            match.sendOff(home: true, index: keeper, &events)
+            #expect(match.home.onPitchCount == before - 1)
+            #expect(match.home.players.filter { $0.isOnPitch && $0.slot == .goalkeeper }.count == 1)
+            #expect(match.home.players[keeper].sentOff && !match.home.players[keeper].isOnPitch)
+            #expect(events.contains { $0.kind == .change })
+            if benchKeeper {
+                #expect(match.home.players[match.home.keeperIndex!].natural == .goalkeeper)
+                #expect(match.home.subsUsed >= 1)
+            }
+            match.runToEnd()
+            #expect(match.result != nil && match.result != .draw)
+            #expect(match.home.players.filter { $0.isOnPitch && $0.slot == .goalkeeper }.count == 1)
+            #expect(match.home.onPitchCount == 11 - match.home.redCards)
+            #expect(match.home.subsUsed <= Balance.footballMaxSubs)
+        }
+    }
 }

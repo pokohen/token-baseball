@@ -6,7 +6,7 @@ struct OnboardingView: View {
     @EnvironmentObject var model: AppModel
     let bankrupt: Bool
 
-    @State private var step = 0
+    @State private var step: Int
     @State private var city = NameGenerator.userCities[0]
     @State private var name = ""
     @State private var colorIndex = 0
@@ -14,6 +14,11 @@ struct OnboardingView: View {
     @State private var sport = Sport.baseball
 
     /// 파산 뒤 다시 만들 때는 종목을 바꿀 수 없다 (세계가 그대로 이어진다).
+    init(bankrupt: Bool, step: Int = 0) {
+        self.bankrupt = bankrupt
+        _step = State(initialValue: step)
+    }
+
     private var fixedSport: Sport? { bankrupt ? model.game?.sport : nil }
     private var chosen: Sport { fixedSport ?? sport }
     private var defaultName: String { chosen == .football ? "\(city) 시민 FC" : "\(city) 시민 야구단" }

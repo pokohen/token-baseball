@@ -23,13 +23,11 @@ struct SettingsTab: View {
 
             Card("종목", trailing: "지금: \(game.sport.label)") {
                 let other: Sport = game.sport == .football ? .baseball : .football
-                HStack {
-                    Text(model.hasSave(for: other)
-                        ? "\(other.label) 구단이 저장되어 있습니다."
-                        : "\(other.label) 구단은 아직 없습니다. 바꾸면 창단 화면이 나옵니다.").font(.callout)
-                    Spacer()
-                    Button("\(other.symbol) \(other.label)로 바꾸기") { model.switchSport(to: other) }
-                }
+                Text(model.hasSave(for: other)
+                    ? "\(other.label) 구단이 저장되어 있습니다."
+                    : "\(other.label) 구단은 아직 없습니다. 바꾸면 창단 화면이 나옵니다.").font(.callout)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button("\(other.symbol) \(other.label)로 바꾸기") { model.switchSport(to: other) }
                 Text("구단은 종목별로 따로 저장됩니다. 쉬는 구단은 그동안 쓴 토큰을 받지 않고, 경기 기회도 쌓이지 않습니다.").note()
             }
             .font(.callout)

@@ -33,6 +33,7 @@ enum Snapshot {
         model.todayTokens = 60_000_000
 
         render(OnboardingView(bankrupt: false), model, directory, "00-onboarding")
+        render(OnboardingView(bankrupt: false, step: 1), model, directory, "01-onboarding-종목")
         for tab in AppTab.allCases {
             render(TabContent(tab: tab, game: game).padding(12), model, directory, "1-\(tab.rawValue)")
         }

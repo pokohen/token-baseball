@@ -163,7 +163,8 @@ final class AppModel: ObservableObject {
     func pollUsage() {
         guard let game, !game.isBankrupt else { return }
         let since = game.funds.collectSince
-        let startedAt = game.funds.startedAt
+        // 오늘 사용량은 이 구단이 자금으로 받은 것만 센다 (창단 전, 쉬는 동안 쓴 토큰은 빼고).
+        let startedAt = max(game.funds.startedAt, game.funds.resumedAt ?? .distantPast)
         let sources = sources
         let generation = matchGeneration
         Task.detached(priority: .utility) {

@@ -638,13 +638,7 @@ public struct FootballMatch: Codable, Equatable, Sendable {
         if penalty { text += " — 페널티킥!" } else if dangerous { text += " — 위험한 위치의 프리킥" }
         say(&events, sentOff ? .change : .play, text)
 
-        if sentOff {
-            defending.redCards += 1
-            defending.players[index].line.redCards += 1
-            defending.players[index].isOnPitch = false
-            defending.players[index].sentOff = true
-            if fouler.slot == .goalkeeper { replaceKeeper(home: !homeHasBall, &events) }
-        }
+        if sentOff { sendOff(home: !homeHasBall, index: index, &events) }
         if penalty {
             zone = 2
             pending = .penalty
@@ -652,6 +646,18 @@ public struct FootballMatch: Codable, Equatable, Sendable {
             zone = 2
             pending = .freeKick
         }
+    }
+
+    /// 퇴장 처리: 선수가 나가고, 골키퍼였으면 골문을 지킬 선수를 정한다.
+    mutating func sendOff(home isHome: Bool, index: Int, _ events: inout [MatchEvent]) {
+        var side = isHome ? home : away
+        let wasKeeper = side.players[index].slot == .goalkeeper
+        side.redCards += 1
+        side.players[index].line.redCards += 1
+        side.players[index].isOnPitch = false
+        side.players[index].sentOff = true
+        if isHome { home = side } else { away = side }
+        if wasKeeper { replaceKeeper(home: isHome, &events) }
     }
 
     /// 골키퍼가 퇴장당했을 때: 벤치 골키퍼를 넣거나, 필드 선수가 장갑을 낀다.
