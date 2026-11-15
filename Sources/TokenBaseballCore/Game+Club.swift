@@ -320,6 +320,10 @@ extension Game {
         teams[userTeamID].tactic = tactic
     }
 
+    public mutating func setFormation(_ formation: Formation) {
+        teams[userTeamID].formation = formation
+    }
+
     public var currentLineup: Lineup? {
         LineupBuilder.build(team: userTeam, players: players)
     }

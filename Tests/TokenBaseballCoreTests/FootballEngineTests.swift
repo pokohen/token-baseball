@@ -5,10 +5,12 @@ import Testing
 enum FootballSample {
     /// 모든 선수의 능력이 `ability`인 팀.
     static func side(
-        id: TeamID, ability: Double, tier: LeagueTier = .amateur, tactic: Tactic = .balanced, _ rng: inout SeededRNG
+        id: TeamID, ability: Double, tier: LeagueTier = .amateur, tactic: Tactic = .balanced,
+        formation: Formation? = nil, _ rng: inout SeededRNG
     ) -> FootballSide {
         var team = Team(id: id, name: "팀\(id) FC", city: "", tier: tier, isUser: false, season: 1)
         team.tactic = tactic
+        team.formation = formation
         var players: [PlayerID: Player] = [:]
         for (index, position) in PlayerFactory.rosterPositions(tier, sport: .football).enumerated() {
             var spec = PlayerFactory.Spec(position: position, tier: tier, season: 1)
@@ -30,13 +32,14 @@ enum FootballSample {
 
     static func run(
         away: Double, home: Double, games: Int, rules: FootballRules = FootballRules(),
-        awayTactic: Tactic = .balanced, homeTactic: Tactic = .balanced, seed: UInt64 = 7
+        awayTactic: Tactic = .balanced, homeTactic: Tactic = .balanced,
+        awayFormation: Formation? = nil, homeFormation: Formation? = nil, seed: UInt64 = 7
     ) -> Stats {
         var rng = SeededRNG(seed: seed)
         var stats = Stats()
         for _ in 0..<games {
-            let a = side(id: 1, ability: away, tactic: awayTactic, &rng)
-            let h = side(id: 2, ability: home, tactic: homeTactic, &rng)
+            let a = side(id: 1, ability: away, tactic: awayTactic, formation: awayFormation, &rng)
+            let h = side(id: 2, ability: home, tactic: homeTactic, formation: homeFormation, &rng)
             var match = FootballMatch(away: a, home: h, rules: rules, seed: rng.next())
             var steps = 0
             while !match.isFinished {

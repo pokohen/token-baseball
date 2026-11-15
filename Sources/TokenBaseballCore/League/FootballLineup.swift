@@ -1,6 +1,6 @@
 import Foundation
 
-/// 축구 한 경기에 나서는 선수 구성 (4-4-2).
+/// 축구 한 경기에 나서는 선수 구성.
 public struct FootballLineup: Equatable, Sendable {
     /// 선발 11명과 서는 자리. 골키퍼 → 수비 → 미드필더 → 공격 순.
     public var starters: [(id: PlayerID, slot: Position)]
@@ -14,11 +14,6 @@ public struct FootballLineup: Equatable, Sendable {
 }
 
 public enum FootballLineupBuilder {
-    /// 4-4-2의 열한 자리.
-    public static let formation: [Position] =
-        [.goalkeeper] + Array(repeating: .defender, count: 4)
-        + Array(repeating: .midfielder, count: 4) + Array(repeating: .forward, count: 2)
-
     /// 제 포지션이 아닌 자리에 서면 능력이 이만큼만 나온다.
     static let outOfPosition = 0.88
 
@@ -29,6 +24,7 @@ public enum FootballLineupBuilder {
         guard roster.count >= Balance.footballStarters,
               roster.contains(where: { $0.position == .goalkeeper })
         else { return nil }
+        let formation = (team.formation ?? .f442).slots
         let ranked = roster.sorted { ($0.ability, -$0.id) > ($1.ability, -$1.id) }
 
         var chosen: [Player]
@@ -104,7 +100,7 @@ public enum FootballLineupBuilder {
         guard starters.count == Balance.footballStarters else { return nil }
         return FootballSide(
             teamID: team.id, name: team.name, shortName: team.shortName,
-            players: starters + bench, tactic: team.tactic ?? .balanced)
+            players: starters + bench, tactic: team.tactic ?? .balanced, formation: team.formation)
     }
 
     /// 팀 강도를 정하는 선수들: 자동으로 짠 선발 11명.

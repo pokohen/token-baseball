@@ -284,13 +284,23 @@ struct FootballLiveView: View {
     }
 }
 
-/// 축구의 경기 전 방침: 전술 성향.
+/// 축구의 경기 전 방침: 포메이션과 전술 성향.
 struct TacticCard: View {
     @EnvironmentObject var model: AppModel
     let game: Game
 
     var body: some View {
-        Card("전술", trailing: "4-4-2") {
+        let formation = game.userTeam.formation ?? .f442
+        Card("전술", trailing: formation.label) {
+            Picker("포메이션", selection: Binding(
+                get: { formation },
+                set: { value in model.perform { $0.setFormation(value) } })
+            ) {
+                ForEach(Formation.allCases, id: \.self) { Text($0.label).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            Text(formation.summary).note()
             Picker("전술 성향", selection: Binding(
                 get: { game.userTeam.tactic ?? .balanced },
                 set: { value in model.perform { $0.setTactic(value) } })

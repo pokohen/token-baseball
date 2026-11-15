@@ -53,6 +53,8 @@ public struct FootballSide: Codable, Equatable, Sendable {
     /// 앞의 11명이 선발, 나머지가 벤치.
     public var players: [FootballPlayerState]
     public var tactic: Tactic
+    /// nil이면 4-4-2 (이 값이 없던 때의 저장 파일도 그렇게 읽는다).
+    public var formation: Formation?
     public var goals = 0
     public var shots = 0, shotsOnTarget = 0, corners = 0, fouls = 0, offsides = 0
     public var yellowCards = 0, redCards = 0
@@ -61,13 +63,18 @@ public struct FootballSide: Codable, Equatable, Sendable {
     public var subsUsed = 0
     public var shootoutGoals = 0, shootoutKicks = 0
 
-    public init(teamID: TeamID, name: String, shortName: String, players: [FootballPlayerState], tactic: Tactic) {
+    public init(teamID: TeamID, name: String, shortName: String, players: [FootballPlayerState], tactic: Tactic,
+        formation: Formation? = nil
+    ) {
         self.teamID = teamID
         self.name = name
         self.shortName = shortName
         self.players = players
         self.tactic = tactic
+        self.formation = formation
     }
+
+    var shape: Formation { formation ?? .f442 }
 
     var onPitchCount: Int { players.filter(\.isOnPitch).count }
 
@@ -311,8 +318,10 @@ public struct FootballMatch: Codable, Equatable, Sendable {
             }
         case 1:
             let m = ratio(
-                attacking.mean([.midfielder]) { $0.passing * 0.6 + $0.dribbling * 0.4 },
-                defending.mean([.midfielder]) { $0.tackling * 0.7 + $0.physical * 0.3 })
+                attacking.mean([.midfielder]) { $0.passing * 0.6 + $0.dribbling * 0.4 }
+                    + attacking.shape.midfieldShift,
+                defending.mean([.midfielder]) { $0.tackling * 0.7 + $0.physical * 0.3 }
+                    + defending.shape.midfieldShift)
             let advance = clamp(0.34 * m, 0.12, 0.7)
             let lose = clamp(0.27 / m, 0.08, 0.5)
             if roll < advance {
@@ -333,8 +342,9 @@ public struct FootballMatch: Codable, Equatable, Sendable {
             let m = ratio(
                 attacking.mean([.forward, .midfielder], weights: [.forward: 2]) {
                     $0.dribbling * 0.4 + $0.speed * 0.3 + $0.passing * 0.3
-                },
-                defending.mean([.defender]) { $0.tackling * 0.6 + $0.physical * 0.2 + $0.speed * 0.2 })
+                } + attacking.shape.attackShift,
+                defending.mean([.defender]) { $0.tackling * 0.6 + $0.physical * 0.2 + $0.speed * 0.2 }
+                    + defending.shape.defenseShift)
             let shot = clamp(0.21 * m, 0.07, 0.5)
             let penalty = clamp(0.006 * m, 0.002, 0.015)
             let offside = 0.035
