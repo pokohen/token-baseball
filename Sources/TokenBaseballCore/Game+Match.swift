@@ -70,11 +70,13 @@ extension Game {
     public mutating func startMatch(now: Date) throws {
         refreshCharges(now: now)
         guard !isBankrupt else { throw GameError("구단이 해체되었습니다. 새 구단을 만들어 주세요.") }
-        guard live == nil else { throw GameError("진행 중인 경기가 끝나야 다음 경기를 시작할 수 있습니다.") }
+        guard !isMatchLive else { throw GameError("진행 중인 경기가 끝나야 다음 경기를 시작할 수 있습니다.") }
         guard charges > 0 else { throw GameError("아직 경기 기회가 없습니다.") }
         guard let next = nextMatch() else { throw GameError("지금은 치를 경기가 없습니다.") }
-        guard LineupBuilder.build(team: userTeam, players: players) != nil else {
-            throw GameError("야수 9명과 투수 1명 이상이 있어야 경기를 할 수 있습니다.")
+        guard canField(userTeam) else {
+            throw GameError(sport == .football
+                ? "골키퍼 1명을 포함해 11명이 있어야 경기를 할 수 있습니다."
+                : "야수 9명과 투수 1명 이상이 있어야 경기를 할 수 있습니다.")
         }
 
         ensurePlayable(next.opponent)
@@ -82,6 +84,10 @@ extension Game {
         let away = next.userIsHome ? next.opponent : userTeamID
         let tier = next.kind == .friendly ? min(userTier, teams[next.opponent].tier) : userTier
         // 친선 경기 규칙은 두 구단 중 윗 리그를 따른다 (콜드게임은 시민 구단끼리만).
+        if sport == .football {
+            try startFootballMatch(next, home: home, away: away, tier: tier, now: now)
+            return
+        }
         guard let state = makeMatch(home: home, away: away, kind: next.kind, tier: tier, seed: rng.next()) else {
             throw GameError("경기를 시작할 수 없습니다.")
         }
@@ -108,6 +114,7 @@ extension Game {
     /// 공 하나 진행. 내 경기가 끝나면 그 라운드의 나머지와 세계 시뮬레이션까지 처리한다.
     @discardableResult
     public mutating func stepMatch() -> [MatchEvent] {
+        if liveFootball != nil { return stepFootballMatch() }
         guard var match = live else { return [] }
         let events = match.state.step()
         for index in match.others.indices where !match.others[index].isFinished {
@@ -120,7 +127,7 @@ extension Game {
 
     /// 화면 없이 끝까지 (테스트와 자동 진행용). 앱 화면에서는 부르지 않는다.
     public mutating func runMatchToEnd() {
-        while live != nil { stepMatch() }
+        while isMatchLive { stepMatch() }
     }
 
     // MARK: 경기 끝
@@ -155,7 +162,8 @@ extension Game {
                     apply(game, tier: other, countsForStandings: true)
                 }
             }
-            summary += settleUserMatch(kind: .regular, mine: mine, theirs: theirs, userIsHome: userIsHome)
+            summary += settleUserMatch(
+                kind: .regular, myScore: mine.runs, theirScore: theirs.runs, opponent: theirs.teamID, userIsHome: userIsHome)
             round += 1
         case .playoff:
             apply(state, tier: userTier, countsForStandings: false)
@@ -165,10 +173,12 @@ extension Game {
                 let winner = state.home.runs > state.away.runs ? state.home.teamID : state.away.teamID
                 if winner == series[index].upperTeam { series[index].upperWins += 1 } else { series[index].lowerWins += 1 }
             }
-            summary += settleUserMatch(kind: .playoff, mine: mine, theirs: theirs, userIsHome: userIsHome)
+            summary += settleUserMatch(
+                kind: .playoff, myScore: mine.runs, theirScore: theirs.runs, opponent: theirs.teamID, userIsHome: userIsHome)
         case .friendly:
             apply(state, tier: userTier, countsForStandings: false)
-            summary += settleUserMatch(kind: .friendly, mine: mine, theirs: theirs, userIsHome: userIsHome)
+            summary += settleUserMatch(
+                kind: .friendly, myScore: mine.runs, theirScore: theirs.runs, opponent: theirs.teamID, userIsHome: userIsHome)
             friendliesPlayed += 1
         }
 
@@ -232,13 +242,15 @@ extension Game {
     }
 
     /// 내 경기 정산: 인지도, 관중 수입, 스폰서, 연봉.
+    /// `shootoutWon`: 승부차기로 끝난 축구 경기에서 내가 이겼는지.
     mutating func settleUserMatch(
-        kind: MatchKind, mine: MatchTeam, theirs: MatchTeam, userIsHome: Bool
+        kind: MatchKind, myScore: Int, theirScore: Int, opponent: TeamID, userIsHome: Bool,
+        shootoutWon: Bool? = nil
     ) -> [String] {
         var lines: [String] = []
         let tier = userTier
-        let won = mine.runs > theirs.runs
-        let drew = mine.runs == theirs.runs
+        let won = shootoutWon ?? (myScore > theirScore)
+        let drew = shootoutWon == nil && myScore == theirScore
         var fameGain = 0.0
 
         switch kind {
@@ -254,7 +266,7 @@ extension Game {
         case .playoff:
             if won { fameGain += Balance.fameWin * 2 }
         case .friendly:
-            if won, teams[theirs.teamID].tier < tier { fameGain += Balance.fameFriendlyUpset }
+            if won, teams[opponent].tier < tier { fameGain += Balance.fameFriendlyUpset }
         }
         if fameGain != 0 {
             teams[userTeamID].fame = max(0, teams[userTeamID].fame + fameGain)
@@ -288,7 +300,8 @@ extension Game {
     mutating func ensurePlayable(_ id: TeamID) {
         guard !teams[id].isUser else { return }
         func short() -> Bool {
-            LineupBuilder.build(team: teams[id], players: players) == nil
+            if sport == .football { return !canField(teams[id]) }
+            return LineupBuilder.build(team: teams[id], players: players) == nil
                 || roster(of: id).filter({ $0.isPitcher }).count < Balance.minPitchers
         }
         guard short() else { return }

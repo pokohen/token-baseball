@@ -96,6 +96,15 @@ public struct LiveMatch: Codable, Equatable, Sendable {
     public var tier: LeagueTier
 }
 
+/// 진행 중인 내 축구 경기와, 같은 라운드의 내 리그 다른 경기들.
+public struct LiveFootballMatch: Codable, Equatable, Sendable {
+    public var kind: MatchKind
+    public var state: FootballMatch
+    public var others: [FootballMatch]
+    public var userIsHome: Bool
+    public var tier: LeagueTier
+}
+
 /// 끝난 내 경기 결과. 상단바의 "경기 종료" 표시에 쓴다.
 public struct LastResult: Codable, Equatable, Sendable {
     public var kind: MatchKind
@@ -106,9 +115,12 @@ public struct LastResult: Codable, Equatable, Sendable {
     /// 팝오버를 열어 확인했는지.
     public var acknowledged = false
     public var summary: [String]
+    /// 승부차기로 끝난 경기: 내가 이겼는지. 그 밖에는 nil.
+    public var shootoutWon: Bool? = nil
 
     public var label: String {
-        myRuns > theirRuns ? "승 \(myRuns):\(theirRuns)" : myRuns < theirRuns ? "패 \(myRuns):\(theirRuns)" : "무 \(myRuns):\(theirRuns)"
+        if let shootoutWon { return "\(shootoutWon ? "승" : "패") \(myRuns):\(theirRuns) 승부차기" }
+        return myRuns > theirRuns ? "승 \(myRuns):\(theirRuns)" : myRuns < theirRuns ? "패 \(myRuns):\(theirRuns)" : "무 \(myRuns):\(theirRuns)"
     }
 }
 
@@ -141,6 +153,8 @@ public struct GameError: Error, Equatable, CustomStringConvertible, Sendable {
 public struct Game: Codable, Equatable, Sendable {
     public var settings = Settings()
     public var funds: FundsLedger
+    /// 종목. 종목을 나누기 전의 저장 파일에는 없고, 없으면 야구다.
+    public internal(set) var sportChoice: Sport?
 
     // 세계
     var rng: SeededRNG
@@ -167,6 +181,8 @@ public struct Game: Codable, Equatable, Sendable {
     public internal(set) var charges = 1
     public internal(set) var chargeAnchor: Date
     public internal(set) var live: LiveMatch?
+    /// 진행 중인 축구 경기. 야구는 `live`를 쓴다.
+    public internal(set) var liveFootball: LiveFootballMatch?
     public internal(set) var lastResult: LastResult?
     /// 이번 틱에 뛴 선수의 출전 계수.
     var playedFactor: [PlayerID: Double] = [:]
@@ -204,6 +220,20 @@ public struct Game: Codable, Equatable, Sendable {
 
     // MARK: 읽기
 
+    public var sport: Sport { sportChoice ?? .baseball }
+    /// 내 경기가 진행 중인지 (종목과 상관없이).
+    public var isMatchLive: Bool { live != nil || liveFootball != nil }
+
+    public func rosterLimit(_ tier: LeagueTier) -> Int { Balance.rosterLimit(tier, sport: sport) }
+    func rosterPositions(_ tier: LeagueTier) -> [Position] { PlayerFactory.rosterPositions(tier, sport: sport) }
+
+    /// 이 구단이 지금 경기를 치를 수 있는 구성인지.
+    public func canField(_ team: Team) -> Bool {
+        sport == .football
+            ? FootballLineupBuilder.build(team: team, players: players) != nil
+            : LineupBuilder.build(team: team, players: players) != nil
+    }
+
     public var userTeam: Team { teams[userTeamID] }
     public var userTier: LeagueTier { teams[userTeamID].tier }
 
@@ -212,7 +242,7 @@ public struct Game: Codable, Equatable, Sendable {
     }
 
     public func rankedStandings(_ tier: LeagueTier) -> [StandingRow] {
-        Standings.ranked(standings[tier.index])
+        Standings.ranked(standings[tier.index], sport: sport)
     }
 
     public func rank(of team: TeamID) -> Int {
@@ -225,7 +255,9 @@ public struct Game: Codable, Equatable, Sendable {
     }
 
     public func strength(of team: TeamID) -> Double {
-        LineupBuilder.strength(team: teams[team], players: players)
+        sport == .football
+            ? FootballLineupBuilder.strength(team: teams[team], players: players)
+            : LineupBuilder.strength(team: teams[team], players: players)
     }
 
     /// 가격 난이도를 곱한 비용.
@@ -345,8 +377,9 @@ extension Game {
     }
 
     /// 새 게임: 6개 리그 60팀을 만들고, 내 시민 구단을 6부에 넣는다.
-    public static func newGame(setup: ClubSetup, now: Date, seed: UInt64) -> Game {
+    public static func newGame(setup: ClubSetup, now: Date, seed: UInt64, sport: Sport = .baseball) -> Game {
         var game = Game(funds: FundsLedger(startedAt: now), rng: SeededRNG(seed: seed), chargeAnchor: now)
+        if sport != .baseball { game.sportChoice = sport }
         var taken: Set<String> = [setup.name]
 
         for tier in LeagueTier.allCases {
@@ -363,8 +396,8 @@ extension Game {
                     game.fillUserStartRoster()
                 } else {
                     let identity = tier == .pro
-                        ? NameGenerator.proTeams[slot]
-                        : NameGenerator.cpuTeam(tier: tier, taken: taken, &game.rng)
+                        ? NameGenerator.proTeams(sport)[slot]
+                        : NameGenerator.cpuTeam(tier: tier, taken: taken, sport: sport, &game.rng)
                     taken.insert(identity.name)
                     game.teams.append(Team(
                         id: id, name: identity.name, city: identity.city, tier: tier, isUser: false, season: 1))
@@ -383,10 +416,10 @@ extension Game {
         self.chargeAnchor = chargeAnchor
     }
 
-    /// 시작 로스터 14명: 동네 사회인 야구 선수. 숨은 보석은 많아야 1명.
+    /// 시작 로스터 (야구 14명, 축구 16명): 동네 사회인 선수. 숨은 보석은 많아야 1명.
     mutating func fillUserStartRoster() {
         let tier = LeagueTier.citizenAmateur
-        let positions = PlayerFactory.rosterPositions(tier)
+        let positions = rosterPositions(tier)
         let gemIndex: Int? = rng.chance(0.5) ? rng.int(0...(positions.count - 1)) : nil
         for (index, position) in positions.enumerated() {
             var spec = PlayerFactory.Spec(position: position, tier: tier, season: season)
@@ -425,12 +458,12 @@ extension Game {
     /// 목표 강도에 맞는 선수로 로스터의 빈자리를 채운다.
     mutating func fillCPURoster(_ id: TeamID, target: Double) {
         let tier = teams[id].tier
-        var needed = PlayerFactory.rosterPositions(tier)
+        var needed = rosterPositions(tier)
         for player in roster(of: id) {
             if let index = needed.firstIndex(of: player.position) { needed.remove(at: index) }
         }
         let range = Balance.abilityRange(tier)
-        for position in needed where teams[id].roster.count < Balance.rosterLimit(tier) {
+        for position in needed where teams[id].roster.count < rosterLimit(tier) {
             var spec = PlayerFactory.Spec(position: position, tier: tier, season: season)
             let center = clamp(target + rng.gaussian() * 4, range.lowerBound, range.upperBound)
             spec.ability = center...center

@@ -6,7 +6,10 @@ extension Game {
 
     mutating func endRegularSeason() {
         for tier in LeagueTier.allCases {
-            for row in standings[tier.index] { lastWinRate[row.teamID] = row.winRate }
+            for row in standings[tier.index] {
+                lastWinRate[row.teamID] = sport == .football
+                    ? Double(row.points) / Double(max(1, row.games * 3)) : row.winRate
+            }
         }
         giveAwards()
         // 강등 뒤 스폰서 감소는 한 시즌 동안 이어지고 여기서 끝난다.
@@ -62,11 +65,10 @@ extension Game {
                 let away = series[index].nextAway
                 ensurePlayable(home)
                 ensurePlayable(away)
-                guard var game = makeMatch(
-                    home: home, away: away, kind: .playoff, tier: series[index].upperTier, seed: rng.next())
+                guard let homeWon = homeWinsCPUMatch(
+                    home: home, away: away, kind: .playoff, tier: series[index].upperTier)
                 else { series[index].upperWins = 2; break }
-                game.runToEnd()
-                let winner = game.home.runs > game.away.runs ? home : away
+                let winner = homeWon ? home : away
                 if winner == series[index].upperTeam { series[index].upperWins += 1 } else { series[index].lowerWins += 1 }
             }
         }
@@ -147,7 +149,7 @@ extension Game {
             funds.earn(refund, .recruit)
             post("해외 스카우트가 취소되어 ₩\(refund.formatted())을 돌려받았습니다.")
         }
-        let limit = Balance.rosterLimit(tier)
+        let limit = rosterLimit(tier)
         let count = teams[userTeamID].roster.count
         if count > limit {
             post("\(tier.displayName) 리그의 로스터 정원은 \(limit)명입니다. 지금 \(count)명이라 선수를 내보내기 전에는 새로 영입할 수 없습니다.")
@@ -170,6 +172,10 @@ extension Game {
 
     mutating func giveAwards() {
         awards.removeAll { $0.season < season - 1 }
+        if sport == .football {
+            giveFootballAwards()
+            return
+        }
         for tier in LeagueTier.allCases {
             let everyone = teams(in: tier).flatMap { roster(of: $0.id) }
             let batters = everyone.filter { !$0.isPitcher && $0.batting.plateAppearances >= 80 }
@@ -255,7 +261,9 @@ extension Game {
             for id in team.roster {
                 guard var player = players[id] else { continue }
                 let improvement = max(0, player.ability - player.abilityAtSeasonStart)
-                let performance = player.isPitcher
+                let performance = player.position.sport == .football
+                    ? Self.footballPerformance(player) * 1.3
+                    : player.isPitcher
                     ? Double(player.pitching.wins + player.pitching.saves) / 15
                     : max(0, player.batting.ops - 0.7)
                 let bonus = min(Balance.raiseMaxBonus, improvement * 0.02 + performance * 0.15)
@@ -279,7 +287,7 @@ extension Game {
         // FA 시장에 새 얼굴
         for tier in LeagueTier.allCases {
             for _ in 0..<6 {
-                let positions = PlayerFactory.rosterPositions(tier)
+                let positions = rosterPositions(tier)
                 let player = makePlayer(PlayerFactory.Spec(position: rng.pick(positions), tier: tier, season: season))
                 players[player.id]?.contract.seasonsLeft = 0
                 freeAgents.append(player.id)
@@ -316,7 +324,7 @@ extension Game {
             var pool: [PlayerID] = []
             for _ in 0..<14 {
                 var spec = PlayerFactory.Spec(
-                    position: rng.pick(PlayerFactory.rosterPositions(tier)), tier: tier, season: season)
+                    position: rng.pick(rosterPositions(tier)), tier: tier, season: season)
                 spec.age = 18...22
                 spec.ability = (range.lowerBound - 8)...(range.lowerBound + 6)
                 spec.potential = (range.lowerBound + 8)...(range.upperBound + 5)
@@ -341,7 +349,7 @@ extension Game {
                     }
                     pool.removeFirst(board.count)
                     post("신인 드래프트: 지명 후보 \(board.count)명이 왔습니다. 선수 탭에서 한 명을 고르세요.")
-                } else if teams[team.id].roster.count < Balance.rosterLimit(tier) {
+                } else if teams[team.id].roster.count < rosterLimit(tier) {
                     add(pool.removeFirst(), to: team.id)
                 }
             }
@@ -395,6 +403,7 @@ extension Game {
                 guard var player = players[id] else { continue }
                 player.batting = BattingLine()
                 player.pitching = PitchingLine()
+                if player.position.sport == .football { player.football = FootballLine() }
                 player.abilityAtSeasonStart = player.ability
                 player.isHot = false
                 players[id] = player
@@ -408,7 +417,7 @@ extension Game {
     mutating func signFreeAgentForCPU(_ id: TeamID) {
         let tier = teams[id].tier
         let range = Balance.abilityRange(tier)
-        guard teams[id].roster.count < Balance.rosterLimit(tier),
+        guard teams[id].roster.count < rosterLimit(tier),
               let weakest = coreRoster(id).min(by: { ($0.ability, $0.id) < ($1.ability, $1.id) })
         else { return }
         let options = freeAgents.compactMap { players[$0] }.filter {
@@ -423,6 +432,10 @@ extension Game {
 
     /// 내 팀에 경기를 치를 최소 인원이 없으면 임시 선수를 데려온다.
     mutating func fillUserMinimumRoster() {
+        if sport == .football {
+            fillUserMinimumSquad()
+            return
+        }
         var added: [String] = []
         func count(_ pitcher: Bool) -> Int { roster(of: userTeamID).filter { $0.isPitcher == pitcher }.count }
         while count(false) < Balance.minBatters || count(true) < Balance.minPitchers {

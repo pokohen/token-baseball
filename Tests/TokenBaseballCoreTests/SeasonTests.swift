@@ -75,10 +75,17 @@ enum Invariants {
             for team in teams {
                 let roster = game.roster(of: team.id)
                 #expect(roster.count == team.roster.count, "\(comment) 없는 선수가 로스터에 있음")
-                #expect(roster.count <= Balance.rosterLimit(tier), "\(comment) \(team.name) \(roster.count)명")
-                #expect(roster.filter { !$0.isPitcher }.count >= 9, "\(comment) \(team.name) 야수 부족")
-                #expect(roster.filter { $0.isPitcher }.count >= 2, "\(comment) \(team.name) 투수 부족")
-                #expect(LineupBuilder.build(team: team, players: game.players) != nil, "\(comment) \(team.name)")
+                #expect(roster.count <= game.rosterLimit(tier), "\(comment) \(team.name) \(roster.count)명")
+                if game.sport == .football {
+                    #expect(roster.allSatisfy { $0.position.sport == .football }, "\(comment) \(team.name) 야구 선수")
+                    #expect(roster.contains { $0.position == .goalkeeper }, "\(comment) \(team.name) 골키퍼 없음")
+                    #expect(roster.count >= 11, "\(comment) \(team.name) \(roster.count)명")
+                } else {
+                    #expect(roster.allSatisfy { $0.position.sport == .baseball }, "\(comment) \(team.name) 축구 선수")
+                    #expect(roster.filter { !$0.isPitcher }.count >= 9, "\(comment) \(team.name) 야수 부족")
+                    #expect(roster.filter { $0.isPitcher }.count >= 2, "\(comment) \(team.name) 투수 부족")
+                }
+                #expect(game.canField(team), "\(comment) \(team.name)")
                 for player in roster {
                     #expect(player.teamID == team.id, comment)
                     #expect(player.ability <= player.potential + 0.01, "\(comment) \(player.name)")

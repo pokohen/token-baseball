@@ -117,7 +117,7 @@ extension Game {
         // 선수들은 FA 시장으로 나가고, 빈자리는 새 CPU 구단이 채운다.
         for id in old.roster { moveToFreeAgency(id) }
         let taken = Set(teams.map(\.name))
-        let identity = NameGenerator.cpuTeam(tier: old.tier, taken: taken, &rng)
+        let identity = NameGenerator.cpuTeam(tier: old.tier, taken: taken, sport: sport, &rng)
         var replacement = Team(
             id: old.id, name: identity.name, city: identity.city, tier: old.tier, isUser: false, season: season)
         replacement.gamesPlayed = old.gamesPlayed
@@ -127,6 +127,7 @@ extension Game {
         isBankrupt = true
         crisisMatchesLeft = nil
         live = nil
+        liveFootball = nil
         offers = []
         proposals = []
         counters = []
@@ -203,12 +204,12 @@ extension Game {
         switch facility {
         case .training:
             teams[userTeamID].trainingLevel += 1
-            post("훈련소 Lv\(userTeam.trainingLevel): \(Balance.trainingNames[userTeam.trainingLevel - 1])")
+            post("훈련소 Lv\(userTeam.trainingLevel): \(Balance.trainingNames(sport)[userTeam.trainingLevel - 1])")
         case .stadium:
             teams[userTeamID].stadiumLevel += 1
             let fame = Balance.stadiumFamePerLevel * Double(userTeam.stadiumLevel)
             teams[userTeamID].fame += fame
-            post("경기장 Lv\(userTeam.stadiumLevel): \(Balance.stadiumNames[userTeam.stadiumLevel - 1]). 인지도 +\(Int(fame)).")
+            post("경기장 Lv\(userTeam.stadiumLevel): \(Balance.stadiumNames(sport)[userTeam.stadiumLevel - 1]). 인지도 +\(Int(fame)).")
         case .scout:
             teams[userTeamID].scoutLevel += 1
             post("스카우트 시설 Lv\(userTeam.scoutLevel)")
@@ -284,6 +285,14 @@ extension Game {
             return
         }
         let chosen = ids.compactMap { players[$0] }
+        if sport == .football {
+            guard chosen.count == Balance.footballStarters, Set(ids).count == chosen.count,
+                  chosen.allSatisfy({ $0.teamID == userTeamID }),
+                  chosen.contains(where: { $0.position == .goalkeeper })
+            else { throw GameError("골키퍼 1명을 포함해 내 팀 선수 11명을 골라야 합니다.") }
+            teams[userTeamID].lineupOverride = ids
+            return
+        }
         guard chosen.count == 9, Set(ids).count == 9,
               chosen.allSatisfy({ $0.teamID == userTeamID && !$0.isPitcher })
         else { throw GameError("내 팀 야수 9명을 골라야 합니다.") }
@@ -297,6 +306,14 @@ extension Game {
             }
         }
         teams[userTeamID].starterOverride = id
+    }
+
+    public var currentFootballLineup: FootballLineup? {
+        FootballLineupBuilder.build(team: userTeam, players: players)
+    }
+
+    public mutating func setTactic(_ tactic: Tactic) {
+        teams[userTeamID].tactic = tactic
     }
 
     public var currentLineup: Lineup? {
@@ -325,6 +342,7 @@ extension Game {
     }
 
     public func leaders(_ tier: LeagueTier, count: Int = 5) -> [(title: String, rows: [Leader])] {
+        if sport == .football { return footballLeaders(tier, count: count) }
         let everyone = teams(in: tier).flatMap { roster(of: $0.id) }
         let minPA = max(1, round * 2)
         let minOuts = max(1, round * 2)
