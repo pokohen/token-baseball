@@ -205,9 +205,9 @@ struct FootballLiveView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 HStack {
-                    Text("원정").frame(maxWidth: .infinity, alignment: .trailing)
+                    Text("원정 · \(state.away.shape.label)").frame(maxWidth: .infinity, alignment: .trailing)
                     Text(state.wentToShootout ? "승부차기 \(state.away.shootoutGoals) : \(state.home.shootoutGoals)" : " ")
-                    Text("홈").frame(maxWidth: .infinity, alignment: .leading)
+                    Text("홈 · \(state.home.shape.label)").frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .note()
             }
@@ -298,9 +298,12 @@ struct TacticCard: View {
             ) {
                 ForEach(Formation.allCases, id: \.self) { Text($0.label).tag($0) }
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            .pickerStyle(.menu)
+            .fixedSize()
             Text(formation.summary).note()
+            if let next = game.nextMatch() {
+                Text("다음 상대 \(game.teams[next.opponent].shortName)의 예상 포메이션: \(game.formation(of: next.opponent).label)").note()
+            }
             Picker("전술 성향", selection: Binding(
                 get: { game.userTeam.tactic ?? .balanced },
                 set: { value in model.perform { $0.setTactic(value) } })

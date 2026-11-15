@@ -103,6 +103,39 @@ public enum FootballLineupBuilder {
             players: starters + bench, tactic: team.tactic ?? .balanced, formation: team.formation)
     }
 
+    /// 이 포메이션으로 섰을 때 선발 11명의 평균 능력 (제 포지션이 아닌 자리는 깎아서).
+    static func fit(_ formation: Formation, team: Team, players: [PlayerID: Player]) -> Double? {
+        var auto = team
+        auto.lineupOverride = []
+        auto.formation = formation
+        guard let lineup = build(team: auto, players: players) else { return nil }
+        let total = lineup.starters.reduce(0.0) { sum, entry in
+            guard let player = players[entry.id] else { return sum }
+            return sum + player.ability * (entry.slot == player.position ? 1 : outOfPosition)
+        }
+        return total / Double(lineup.starters.count)
+    }
+
+    /// CPU 구단이 쓸 포메이션: 선수 구성에 잘 맞는 것들 가운데 하나.
+    /// 가장 잘 맞는 포메이션과 차이가 작은 후보 중에서 구단과 시즌에 따라 고르므로,
+    /// 선수단이 그대로면 한 시즌 동안 같은 포메이션을 쓴다. 난수를 쓰지 않는다.
+    public static func fitted(team: Team, players: [PlayerID: Player], season: Int) -> Formation {
+        let scores = Formation.allCases.compactMap { formation in
+            fit(formation, team: team, players: players).map { (formation, $0) }
+        }
+        guard let best = scores.map(\.1).max() else { return .f442 }
+        let candidates = scores.filter { $0.1 >= best - fitTolerance }.map(\.0)
+        var hash = UInt64(truncatingIfNeeded: team.id) &* 0x9E37_79B9_7F4A_7C15
+            &+ UInt64(truncatingIfNeeded: season) &* 0xBF58_476D_1CE4_E5B9
+        hash ^= hash >> 31
+        hash = hash &* 0x94D0_49BB_1331_11EB
+        hash ^= hash >> 29
+        return candidates[Int(hash % UInt64(candidates.count))]
+    }
+
+    /// 이만큼까지는 "비슷하게 잘 맞는" 포메이션으로 본다 (평균 능력 차이).
+    static let fitTolerance = 0.3
+
     /// 팀 강도를 정하는 선수들: 자동으로 짠 선발 11명.
     public static func core(team: Team, players: [PlayerID: Player]) -> [Player] {
         var auto = team

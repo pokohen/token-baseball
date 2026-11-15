@@ -11,9 +11,20 @@ extension Game {
             homeEdge: Balance.stadiumHomeEdge[teams[home].stadiumLevel - 1])
     }
 
+    /// 이 구단이 다음 경기에 쓸 포메이션. 내 구단은 고른 것, CPU 구단은 선수 구성에 맞는 것.
+    public func formation(of id: TeamID) -> Formation {
+        let team = teams[id]
+        if let chosen = team.formation { return chosen }
+        if team.isUser { return .f442 }
+        return FootballLineupBuilder.fitted(team: team, players: players, season: season)
+    }
+
     func makeFootballMatch(home: TeamID, away: TeamID, kind: MatchKind, seed: UInt64) -> FootballMatch? {
-        guard let homeSide = FootballLineupBuilder.side(team: teams[home], players: players),
-              let awaySide = FootballLineupBuilder.side(team: teams[away], players: players)
+        var homeTeam = teams[home], awayTeam = teams[away]
+        homeTeam.formation = formation(of: home)
+        awayTeam.formation = formation(of: away)
+        guard let homeSide = FootballLineupBuilder.side(team: homeTeam, players: players),
+              let awaySide = FootballLineupBuilder.side(team: awayTeam, players: players)
         else { return nil }
         return FootballMatch(away: awaySide, home: homeSide, rules: footballRules(for: kind, home: home), seed: seed)
     }

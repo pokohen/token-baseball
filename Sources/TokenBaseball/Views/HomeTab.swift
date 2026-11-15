@@ -101,7 +101,7 @@ struct NextMatchCard: View {
                     EmblemView(team: opponent, size: 28)
                     VStack(alignment: .leading) {
                         Text("\(next.userIsHome ? "홈" : "원정") vs \(opponent.name)").font(.callout.weight(.medium))
-                        Text("\(next.label) · \(opponent.tier.displayName) · 강도 \(Int(game.strength(of: opponent.id)))").note()
+                        Text("\(next.label) · \(opponent.tier.displayName) · 강도 \(Int(game.strength(of: opponent.id)))\(game.sport == .football ? " · \(game.formation(of: opponent.id).label)" : "")").note()
                     }
                     Spacer()
                     Button("경기 시작") {

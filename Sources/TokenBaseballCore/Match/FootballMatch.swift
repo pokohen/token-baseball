@@ -74,7 +74,7 @@ public struct FootballSide: Codable, Equatable, Sendable {
         self.formation = formation
     }
 
-    var shape: Formation { formation ?? .f442 }
+    public var shape: Formation { formation ?? .f442 }
 
     var onPitchCount: Int { players.filter(\.isOnPitch).count }
 
