@@ -233,7 +233,7 @@ extension Game {
                 player.age += 1
                 if player.age >= Balance.declineStartAge {
                     // 체력·주력부터 떨어진다.
-                    for key in Attributes.Key.allCases {
+                    for key in Attributes.Key.all(for: player.position.sport) {
                         let drop = key == .stamina || key == .speed ? rng.double(2.5...5) : rng.double(0.5...2)
                         player.attributes[key] = max(1, player.attributes[key] - drop)
                     }

@@ -8,9 +8,13 @@ public enum PlayerFactory {
         let weights = Attributes.weights(for: position)
         let relevant = Set(weights.map { $0.0 })
 
-        for key in Attributes.Key.allCases {
+        for key in Attributes.Key.all(for: position.sport) {
             if relevant.contains(key) {
                 attributes[key] = clamp(ability + rng.gaussian() * 6, 1, 99)
+            } else if position.sport == .football {
+                // 제 포지션에 덜 중요한 능력치. 골키핑은 골키퍼가 아니면 거의 없다.
+                let share = key == .keeping ? 0.15 : position == .goalkeeper ? 0.3 : 0.6
+                attributes[key] = clamp(ability * share + rng.gaussian() * 4, 1, 70)
             } else if position.isPitcher {
                 // 투수의 타격·수비 능력치 (지명타자 제도라 타석에는 서지 않는다)
                 attributes[key] = clamp(ability * 0.4 + rng.gaussian() * 3, 1, 60)
@@ -65,7 +69,7 @@ public enum PlayerFactory {
         potential = clamp(potential, ability, 99)
 
         var traits: [Trait] = []
-        let pool = Trait.allCases.filter { $0.forPitcher == spec.position.isPitcher || $0 == .ironGlove && !spec.position.isPitcher }
+        let pool = Trait.pool(for: spec.position)
         if rng.chance(0.25), !pool.isEmpty { traits.append(rng.pick(pool)) }
         if rng.chance(0.06), pool.count > 1 {
             let extra = rng.pick(pool)
@@ -76,9 +80,10 @@ public enum PlayerFactory {
         let clause = !tier.isCitizen && rng.chance(0.2)
         let salary = Balance.marketSalary(ability: ability) * (spec.foreign ? 2 : 1)
 
+        let sport = spec.position.sport
         var player = Player(
             id: id,
-            name: spec.foreign ? NameGenerator.foreignName(&rng) : NameGenerator.playerName(&rng),
+            name: spec.foreign ? NameGenerator.foreignName(&rng) : NameGenerator.playerName(&rng, sport: sport),
             age: age,
             position: spec.position,
             bats: rng.chance(0.3) ? .left : .right,
@@ -88,7 +93,7 @@ public enum PlayerFactory {
             scoutBias: spec.scoutBias ?? rng.gaussian(),
             contract: Contract(salary: salary, seasonsLeft: years, relegationClause: clause),
             teamID: nil,
-            origin: spec.foreign ? "해외 리그 출신" : NameGenerator.origin(tier: tier, &rng),
+            origin: spec.foreign ? "해외 리그 출신" : NameGenerator.origin(tier: tier, sport: sport, &rng),
             traits: traits,
             isForeign: spec.foreign,
             joinedSeason: spec.season,
@@ -96,6 +101,7 @@ public enum PlayerFactory {
             isFranchiseStar: false,
             batting: BattingLine(),
             pitching: PitchingLine(),
+            football: sport == .football ? FootballLine() : nil,
             lastStartGame: -99,
             abilityAtSeasonStart: ability,
             isHot: false
@@ -107,7 +113,14 @@ public enum PlayerFactory {
     }
 
     /// 한 팀 로스터의 포지션 목록.
-    public static func rosterPositions(_ tier: LeagueTier) -> [Position] {
+    public static func rosterPositions(_ tier: LeagueTier, sport: Sport = .baseball) -> [Position] {
+        if sport == .football {
+            let shape = Balance.footballShape(tier)
+            return Array(repeating: Position.goalkeeper, count: shape.keepers)
+                + Array(repeating: .defender, count: shape.defenders)
+                + Array(repeating: .midfielder, count: shape.midfielders)
+                + Array(repeating: .forward, count: shape.forwards)
+        }
         let shape = Balance.rosterShape(tier)
         var positions: [Position] = Position.fieldPositions + [.designated]
         let extras: [Position] = [.catcher, .shortstop, .center, .first, .third, .left, .second, .right]

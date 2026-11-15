@@ -4,6 +4,15 @@ public enum Position: String, Codable, CaseIterable, Sendable {
     case starter = "SP", reliever = "RP", closer = "CL"
     case catcher = "C", first = "1B", second = "2B", third = "3B", shortstop = "SS"
     case left = "LF", center = "CF", right = "RF", designated = "DH"
+    // 축구
+    case goalkeeper = "GK", defender = "DF", midfielder = "MF", forward = "FW"
+
+    public var sport: Sport {
+        switch self {
+        case .goalkeeper, .defender, .midfielder, .forward: .football
+        default: .baseball
+        }
+    }
 
     public var isPitcher: Bool { self == .starter || self == .reliever || self == .closer }
 
@@ -21,6 +30,10 @@ public enum Position: String, Codable, CaseIterable, Sendable {
         case .center: "중견수"
         case .right: "우익수"
         case .designated: "지명타자"
+        case .goalkeeper: "골키퍼"
+        case .defender: "수비수"
+        case .midfielder: "미드필더"
+        case .forward: "공격수"
         }
     }
 
@@ -30,6 +43,12 @@ public enum Position: String, Codable, CaseIterable, Sendable {
     ]
     public static let infield: [Position] = [.first, .second, .third, .shortstop]
     public static let outfield: [Position] = [.left, .center, .right]
+    /// 축구의 네 포지션.
+    public static let football: [Position] = [.goalkeeper, .defender, .midfielder, .forward]
+
+    public static func all(for sport: Sport) -> [Position] {
+        allCases.filter { $0.sport == sport }
+    }
 }
 
 public enum Hand: String, Codable, Sendable {
@@ -48,11 +67,40 @@ public struct Attributes: Codable, Equatable, Sendable {
     public var control = 1.0
     public var breaking = 1.0
     public var stamina = 1.0
+    // 축구 (스피드와 체력은 위의 것을 같이 쓴다)
+    public var shooting = 1.0
+    public var passing = 1.0
+    public var dribbling = 1.0
+    public var tackling = 1.0
+    public var physical = 1.0
+    public var keeping = 1.0
 
     public init() {}
 
-    public enum Key: String, CaseIterable, Codable, Sendable {
+    /// 예전 저장 파일에는 축구 능력치가 없으므로, 없는 값은 기본값으로 둔다.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: Key.self)
+        for key in Key.allCases {
+            if let value = try container.decodeIfPresent(Double.self, forKey: key) { self[key] = value }
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: Key.self)
+        for key in Key.allCases { try container.encode(self[key], forKey: key) }
+    }
+
+    public enum Key: String, CaseIterable, Codable, CodingKey, Sendable {
         case contact, power, eye, speed, fielding, arm, stuff, control, breaking, stamina
+        case shooting, passing, dribbling, tackling, physical, keeping
+
+        /// 종목별로 쓰는 능력치. 야구는 예전 순서 그대로다 (선수를 만들 때 난수를 이 순서로 쓴다).
+        public static func all(for sport: Sport) -> [Key] {
+            switch sport {
+            case .baseball: [.contact, .power, .eye, .speed, .fielding, .arm, .stuff, .control, .breaking, .stamina]
+            case .football: [.shooting, .passing, .dribbling, .tackling, .speed, .physical, .keeping, .stamina]
+            }
+        }
 
         public var label: String {
             switch self {
@@ -66,6 +114,12 @@ public struct Attributes: Codable, Equatable, Sendable {
             case .control: "제구"
             case .breaking: "변화구"
             case .stamina: "체력"
+            case .shooting: "슈팅"
+            case .passing: "패스"
+            case .dribbling: "드리블"
+            case .tackling: "수비"
+            case .physical: "피지컬"
+            case .keeping: "골키핑"
             }
         }
     }
@@ -83,6 +137,12 @@ public struct Attributes: Codable, Equatable, Sendable {
             case .control: control
             case .breaking: breaking
             case .stamina: stamina
+            case .shooting: shooting
+            case .passing: passing
+            case .dribbling: dribbling
+            case .tackling: tackling
+            case .physical: physical
+            case .keeping: keeping
             }
         }
         set {
@@ -97,6 +157,12 @@ public struct Attributes: Codable, Equatable, Sendable {
             case .control: control = newValue
             case .breaking: breaking = newValue
             case .stamina: stamina = newValue
+            case .shooting: shooting = newValue
+            case .passing: passing = newValue
+            case .dribbling: dribbling = newValue
+            case .tackling: tackling = newValue
+            case .physical: physical = newValue
+            case .keeping: keeping = newValue
             }
         }
     }
@@ -112,6 +178,14 @@ public struct Attributes: Codable, Equatable, Sendable {
             [(.contact, 0.24), (.power, 0.18), (.eye, 0.13), (.speed, 0.05), (.fielding, 0.24), (.arm, 0.16)]
         case .designated:
             [(.contact, 0.36), (.power, 0.34), (.eye, 0.22), (.speed, 0.08)]
+        case .goalkeeper:
+            [(.keeping, 0.70), (.physical, 0.15), (.passing, 0.10), (.speed, 0.05)]
+        case .defender:
+            [(.tackling, 0.40), (.physical, 0.20), (.speed, 0.15), (.passing, 0.15), (.stamina, 0.10)]
+        case .midfielder:
+            [(.passing, 0.35), (.dribbling, 0.20), (.tackling, 0.15), (.stamina, 0.15), (.shooting, 0.10), (.speed, 0.05)]
+        case .forward:
+            [(.shooting, 0.40), (.dribbling, 0.20), (.speed, 0.20), (.physical, 0.10), (.passing, 0.10)]
         default:
             [(.contact, 0.28), (.power, 0.22), (.eye, 0.15), (.speed, 0.10), (.fielding, 0.17), (.arm, 0.08)]
         }
@@ -200,8 +274,22 @@ public enum Trait: String, Codable, CaseIterable, Sendable {
     case leftyKiller = "왼손 투수 킬러"
     case ironGlove = "철벽 수비"
     case coolHead = "위기에 강함"
+    // 축구
+    case ironLungs = "강철 체력"
+    case setPiece = "프리킥 장인"
 
     public var forPitcher: Bool { self == .coolHead }
+
+    /// 이 포지션의 선수가 가질 수 있는 특성. 야구 쪽 순서는 예전 그대로다.
+    public static func pool(for position: Position) -> [Trait] {
+        switch position {
+        case .goalkeeper: [.coolHead]
+        case .defender, .midfielder, .forward: [.clutch, .ironGlove, .ironLungs, .setPiece]
+        default:
+            [.clutch, .slowStarter, .leftyKiller, .ironGlove, .coolHead]
+                .filter { $0.forPitcher == position.isPitcher || $0 == .ironGlove && !position.isPitcher }
+        }
+    }
 }
 
 public typealias PlayerID = Int
@@ -232,6 +320,8 @@ public struct Player: Codable, Identifiable, Equatable, Sendable {
     /// 이번 시즌 기록.
     public var batting: BattingLine
     public var pitching: PitchingLine
+    /// 축구 선수의 이번 시즌 기록. 야구 선수는 nil.
+    public var football: FootballLine? = nil
     /// 마지막으로 선발 등판했을 때의 팀 경기 번호.
     public var lastStartGame: Int
     /// 시즌을 시작할 때의 능력 (연봉 인상 계산용).

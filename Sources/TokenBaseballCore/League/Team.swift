@@ -32,13 +32,22 @@ public struct TrainingFocus: Codable, Equatable, Sendable {
     }
 
     /// 세부 능력치별 성장 강조 (기본 방침이면 모두 1).
-    func emphasis(for key: Attributes.Key) -> Double {
+    /// 축구에서는 네 칸을 공격(batting) · 패스(pitching) · 수비(defense) · 체력(running)으로 쓴다.
+    func emphasis(for key: Attributes.Key, sport: Sport = .baseball) -> Double {
         let focus = normalized
+        if sport == .football {
+            switch key {
+            case .shooting, .dribbling: return focus.batting / 0.25
+            case .passing: return focus.pitching / 0.25
+            case .tackling, .keeping: return focus.defense / 0.25
+            default: return focus.running / 0.25
+            }
+        }
         switch key {
         case .contact, .power, .eye: return focus.batting / 0.25
         case .fielding, .arm: return focus.defense / 0.25
         case .speed: return focus.running / 0.25
-        case .stuff, .control, .breaking, .stamina: return focus.pitching / 0.25
+        default: return focus.pitching / 0.25
         }
     }
 }
@@ -71,6 +80,8 @@ public struct Team: Codable, Identifiable, Equatable, Sendable {
     public var starterOverride: PlayerID?
     public var policy: PitchingPolicy
     public var focus: TrainingFocus
+    /// 축구 전술 성향. 야구 구단과 예전 저장 파일에는 없다.
+    public var tactic: Tactic? = nil
     /// 이 구단이 만들어진 시즌.
     public var foundedSeason: Int
 
