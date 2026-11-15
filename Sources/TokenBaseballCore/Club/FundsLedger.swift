@@ -26,6 +26,8 @@ public struct FundsLedger: Codable, Equatable, Sendable {
     public private(set) var seasonExpense: [String: Int] = [:]
     /// 지난 경기 이후 쓴 토큰. 토큰 연동 훈련에 쓰고, 경기가 끝나면 0으로 돌린다.
     public var trainingTokens = 0
+    /// 쉬다가 돌아온 시각. 이보다 앞선 사용량은 세지 않는다. 쉰 적이 없으면 nil.
+    public private(set) var resumedAt: Date?
 
     /// 수입·지출 항목.
     public enum Category: String, CaseIterable, Sendable {
@@ -56,7 +58,15 @@ public struct FundsLedger: Codable, Equatable, Sendable {
 
     /// 다음 반영 때 로그를 어디서부터 읽어야 하는지.
     public var collectSince: Date {
-        max(startedAt, checkpoint.addingTimeInterval(-Self.recentWindow))
+        max(startedAt, resumedAt ?? .distantPast, checkpoint.addingTimeInterval(-Self.recentWindow))
+    }
+
+    /// 쉬는 동안(다른 종목의 구단을 운영하는 동안) 쓴 토큰은 세지 않는다.
+    /// 돌아온 시각 이전의 기록은 다시 읽지 않는다.
+    public mutating func skip(to now: Date) {
+        resumedAt = max(resumedAt ?? .distantPast, now)
+        checkpoint = max(checkpoint, now)
+        recent = [:]
     }
 
     /// 사용량 기록을 자금에 반영하고, 이번에 번 금액을 돌려준다.

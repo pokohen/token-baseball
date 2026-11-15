@@ -58,7 +58,7 @@ struct HomeTab: View {
 
     private var record: String {
         guard let row = game.standings[game.userTier.index].first(where: { $0.teamID == game.userTeamID }) else { return "" }
-        return "\(row.wins)승 \(row.draws)무 \(row.losses)패"
+        return "\(row.wins)승 \(row.draws)무 \(row.losses)패" + (game.sport == .football ? " · 승점 \(row.points)" : "")
     }
 
     @ViewBuilder private var warning: some View {
@@ -92,7 +92,7 @@ struct NextMatchCard: View {
 
     var body: some View {
         Card("다음 경기", trailing: chargeText) {
-            if game.live != nil {
+            if game.isMatchLive {
                 Text("경기가 진행 중입니다.").font(.callout)
                 Button("중계 보기", action: goToMatch)
             } else if let next = game.nextMatch() {
@@ -106,7 +106,7 @@ struct NextMatchCard: View {
                     Spacer()
                     Button("경기 시작") {
                         model.startMatch()
-                        if model.game?.live != nil { goToMatch() }
+                        if model.game?.isMatchLive == true { goToMatch() }
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(game.charges == 0)
@@ -121,7 +121,6 @@ struct NextMatchCard: View {
     }
 
     private var chargeText: String {
-        String(repeating: "⚾", count: game.charges)
-            + String(repeating: "○", count: Balance.maxMatchCharges - game.charges)
+        game.chargeMarks
     }
 }

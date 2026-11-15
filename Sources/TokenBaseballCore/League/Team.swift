@@ -6,6 +6,10 @@ public enum TeamStyle: String, Codable, CaseIterable, Sendable {
     case veteran = "베테랑 선호형"
     case pitching = "투수력 중시형"
     case balanced = "균형형"
+
+    public func label(_ sport: Sport) -> String {
+        self == .pitching && sport == .football ? "수비 중시형" : rawValue
+    }
 }
 
 /// 팀 훈련 방침: 네 가지 비중 (합이 1이 되게 정규화해서 쓴다).

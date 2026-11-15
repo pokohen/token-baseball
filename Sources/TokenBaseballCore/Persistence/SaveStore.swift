@@ -28,6 +28,32 @@ public struct SaveStore: Sendable {
             .appendingPathComponent("save.json")
     }
 
+    /// 같은 폴더에 있는 다른 종목의 저장 파일. 야구는 이 파일 그대로, 축구는 이름 뒤에 `-football`이 붙는다.
+    /// (예: `save.json` → `save-football.json`)
+    public func sibling(for sport: Sport) -> SaveStore {
+        guard sport != .baseball else { return self }
+        let base = fileURL.deletingPathExtension().lastPathComponent
+        let ext = fileURL.pathExtension
+        let name = "\(base)-\(sport.rawValue)" + (ext.isEmpty ? "" : ".\(ext)")
+        return SaveStore(fileURL: fileURL.deletingLastPathComponent().appendingPathComponent(name))
+    }
+
+    public var exists: Bool { FileManager.default.fileExists(atPath: fileURL.path) }
+
+    /// 지금 운영 중인 종목을 적어 두는 파일 (`save.sport`). 없으면 야구다.
+    var activeSportURL: URL { fileURL.deletingPathExtension().appendingPathExtension("sport") }
+
+    public func loadActiveSport() -> Sport {
+        guard let text = try? String(contentsOf: activeSportURL, encoding: .utf8) else { return .baseball }
+        return Sport(rawValue: text.trimmingCharacters(in: .whitespacesAndNewlines)) ?? .baseball
+    }
+
+    public func saveActiveSport(_ sport: Sport) throws {
+        try FileManager.default.createDirectory(
+            at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try sport.rawValue.write(to: activeSportURL, atomically: true, encoding: .utf8)
+    }
+
     /// 저장 파일이 없으면 `nil`. 파일이 깨졌으면 오류를 던진다 (조용히 새 게임으로 덮어쓰지 않기 위해).
     public func load() throws -> GameSave? {
         guard FileManager.default.fileExists(atPath: fileURL.path) else { return nil }

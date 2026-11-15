@@ -31,8 +31,8 @@ struct PlayersTab: View {
     private var roster: some View {
         let all = game.roster(of: game.userTeamID)
         let shown = all.filter { !expiringOnly || game.isExpiring($0) }
-            .sorted { ($0.isPitcher ? 1 : 0, -$0.ability) < ($1.isPitcher ? 1 : 0, -$1.ability) }
-        return Card("선수단", trailing: "\(all.count) / \(Balance.rosterLimit(game.userTier))명") {
+            .sorted { (Self.group($0), -$0.ability) < (Self.group($1), -$1.ability) }
+        return Card("선수단", trailing: "\(all.count) / \(game.rosterLimit(game.userTier))명") {
             Toggle("계약 만료 예정만 보기 (\(all.filter { game.isExpiring($0) }.count)명)", isOn: $expiringOnly)
                 .font(.callout)
             ForEach(shown) { player in
@@ -46,6 +46,14 @@ struct PlayersTab: View {
             }
             Text("⏳ 이번 시즌이 계약 마지막. 재계약하지 않으면 오프시즌이 끝날 때 떠납니다.").note()
         }
+    }
+}
+
+extension PlayersTab {
+    /// 로스터를 묶어 보여줄 순서: 야구는 야수 → 투수, 축구는 골키퍼 → 수비 → 미드필더 → 공격.
+    static func group(_ player: Player) -> Int {
+        if player.position.sport == .football { return Position.football.firstIndex(of: player.position) ?? 0 }
+        return player.isPitcher ? 1 : 0
     }
 }
 
@@ -65,7 +73,7 @@ struct PlayerRow: View {
                     if player.isHot { Image(systemName: "flame.fill").foregroundStyle(Theme.loss).font(.caption2) }
                     if player.isForeign { Text("외").font(.caption2).padding(.horizontal, 3).background(.quaternary, in: Capsule()) }
                 }
-                Text("\(player.age)세 · \(player.throwsHand.rawValue)투\(player.bats.rawValue)타 · \(trailing ?? "연봉 \(Format.money(player.contract.salary))")").note()
+                Text("\(player.age)세 · \(player.position.sport == .football ? player.position.label : "\(player.throwsHand.rawValue)투\(player.bats.rawValue)타") · \(trailing ?? "연봉 \(Format.money(player.contract.salary))")").note()
             }
             Spacer()
             Stars(count: player.scoutStars(scoutLevel: game.userTeam.scoutLevel))
@@ -89,7 +97,13 @@ struct PlayerDetail: View {
                     Text("\(key.label) \(Int(player.attributes[key].rounded()))").font(.caption.monospacedDigit())
                 }
             }
-            if player.isPitcher {
+            if let line = player.football {
+                if player.position == .goalkeeper {
+                    Text("\(line.games)경기 · 무실점 \(line.cleanSheets)경기 · 선방 \(line.saves) · 실점 \(line.conceded) · 경고 \(line.yellowCards) · 퇴장 \(line.redCards)").note()
+                } else {
+                    Text("\(line.games)경기 · \(line.goals)골 \(line.assists)도움 · 슈팅 \(line.shots) (유효 \(line.shotsOnTarget)) · 경고 \(line.yellowCards) · 퇴장 \(line.redCards)").note()
+                }
+            } else if player.isPitcher {
                 Text("\(player.pitching.games)경기 \(player.pitching.wins)승 \(player.pitching.losses)패 \(player.pitching.saves)세 · 평균자책점 \(String(format: "%.2f", player.pitching.era)) · \(player.pitching.innings)이닝 · 탈삼진 \(player.pitching.strikeouts) · \(player.pitching.pitches)구").note()
             } else {
                 Text("\(player.batting.games)경기 타율 \(String(format: "%.3f", player.batting.average)) · \(player.batting.homeRuns)홈런 · \(player.batting.runsBattedIn)타점 · \(player.batting.steals)도루 · OPS \(String(format: "%.3f", player.batting.ops))").note()
@@ -136,6 +150,14 @@ struct LineupView: View {
     let game: Game
 
     var body: some View {
+        if game.sport == .football {
+            FootballLineupView(game: game)
+        } else {
+            baseball
+        }
+    }
+
+    @ViewBuilder private var baseball: some View {
         if let lineup = game.currentLineup {
             let custom = !game.userTeam.lineupOverride.isEmpty
             Card("타순", trailing: custom ? "직접 정함" : "자동") {
@@ -201,6 +223,59 @@ struct LineupView: View {
         var next = ids
         next.swapAt(from, to)
         model.perform { try $0.setLineup(next) }
+    }
+}
+
+/// 축구 선발 11명과 벤치. 경기 전에 정한다.
+struct FootballLineupView: View {
+    @EnvironmentObject var model: AppModel
+    let game: Game
+
+    var body: some View {
+        if let lineup = game.currentFootballLineup {
+            let custom = !game.userTeam.lineupOverride.isEmpty
+            let ids = lineup.starters.map(\.id)
+            let bench = lineup.bench.compactMap { game.players[$0] }
+            Card("선발 11명 (4-4-2)", trailing: custom ? "직접 정함" : "자동") {
+                ForEach(Array(lineup.starters.enumerated()), id: \.element.id) { index, entry in
+                    if let player = game.players[entry.id] {
+                        HStack(spacing: 6) {
+                            Text(entry.slot.rawValue).font(.caption.monospaced()).frame(width: 26, alignment: .leading)
+                                .foregroundStyle(entry.slot == player.position ? Color.primary : Theme.warn)
+                            Text(player.name).font(.callout)
+                            if player.isHot { Image(systemName: "flame.fill").foregroundStyle(Theme.loss).font(.caption2) }
+                            Spacer()
+                            Text("\(Int(player.ability.rounded()))").font(.callout.monospacedDigit())
+                            Menu("교체") {
+                                ForEach(bench) { sub in
+                                    Button("\(sub.position.label) \(sub.name) (\(Int(sub.ability.rounded())))") {
+                                        var next = ids
+                                        next[index] = sub.id
+                                        model.perform { try $0.setLineup(next) }
+                                    }
+                                }
+                            }
+                            .fixedSize()
+                            .disabled(bench.isEmpty)
+                        }
+                        .controlSize(.small)
+                    }
+                }
+                if custom {
+                    Button("자동 구성으로 되돌리기") { model.perform { try $0.setLineup([]) } }.controlSize(.small)
+                }
+                Text("주황색 자리는 제 포지션이 아니라 능력이 깎입니다. 골키퍼는 반드시 1명 들어가야 합니다.").note()
+            }
+            Card("벤치", trailing: "\(bench.count)명") {
+                if bench.isEmpty { Text("벤치에 선수가 없습니다.").note() }
+                ForEach(bench) { player in
+                    KeyValueRow(key: "\(player.position.label) \(player.name)", value: "\(Int(player.ability.rounded()))")
+                }
+                Text("한 경기에 5명까지, 60분 이후 지친 선수부터 같은 포지션의 벤치 선수로 자동 교체됩니다.").note()
+            }
+        } else {
+            Card { Text("골키퍼 1명을 포함해 11명이 있어야 선발을 짤 수 있습니다.").font(.callout) }
+        }
     }
 }
 

@@ -20,12 +20,16 @@ import Testing
         }
     }
 
-    static func run(tier: LeagueTier, seed: UInt64, active: Bool, tokens: Int, seasons: Int) throws {
-        var game = tier == .citizenAmateur
+    static func run(
+        tier: LeagueTier, seed: UInt64, active: Bool, tokens: Int, seasons: Int, sport: Sport = .baseball
+    ) throws {
+        var game = sport == .football
+            ? FootballGame.make(seed: seed)
+            : tier == .citizenAmateur
             ? TestGame.make(seed: seed)
             : UpperLeagueTests.game(in: tier, ability: mid(Balance.abilityRange(tier)), seed: seed)
         var manager = AutoManager(tokensPerMatch: tokens)
-        let label = "\(tier.displayName) 시드 \(seed) \(active ? "적극" : "방치") 토큰 \(tokens)"
+        let label = "\(sport.label) \(tier.displayName) 시드 \(seed) \(active ? "적극" : "방치") 토큰 \(tokens)"
         var refounded = 0
         var resetAt: [TeamID: Int] = [:]
         while game.season <= seasons {
@@ -60,6 +64,14 @@ import Testing
                 #expect(loaded == game, "\(label) 저장·불러오기")
             }
         }
+    }
+
+    /// 축구는 6부에서 시작해 길게 돌린다. 토큰을 많이 쓰는 쪽은 여러 리그를 거쳐 올라간다.
+    @Test(.enabled(if: StressTests.enabled), arguments: [UInt64(1), 2, 3, 4, 5, 6])
+    func 축구도_여러_시드로_돌려도_멈추거나_무너지지_않는다(seed: UInt64) throws {
+        try Self.run(tier: .citizenAmateur, seed: seed, active: false, tokens: 0, seasons: 3, sport: .football)
+        try Self.run(tier: .citizenAmateur, seed: seed &+ 100, active: false, tokens: 30_000_000, seasons: 4, sport: .football)
+        try Self.run(tier: .citizenAmateur, seed: seed &+ 200, active: true, tokens: 300_000_000, seasons: 8, sport: .football)
     }
 
     static func mid(_ range: ClosedRange<Double>) -> Double { (range.lowerBound + range.upperBound) / 2 }

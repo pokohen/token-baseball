@@ -9,6 +9,10 @@ public enum Promotion: String, Codable, CaseIterable, Sendable {
     case youthClinic = "유소년 야구 교실"
     case tv = "TV 광고"
 
+    public func label(_ sport: Sport) -> String {
+        self == .youthClinic && sport == .football ? "유소년 축구 교실" : rawValue
+    }
+
     public var cost: Int {
         switch self {
         case .flyer: 500_000

@@ -98,3 +98,67 @@ enum FootballGame {
         #expect(game.userTier < .citizenAmateur)
     }
 }
+
+@Suite struct SportSwitchTests {
+    static func temporaryStore() -> SaveStore {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("tb-sport-\(UUID().uuidString)", isDirectory: true)
+        return SaveStore(fileURL: directory.appendingPathComponent("save.json"))
+    }
+
+    @Test func 종목별_저장_파일은_같은_폴더에_따로_있다() throws {
+        let store = Self.temporaryStore()
+        #expect(store.sibling(for: .baseball).fileURL == store.fileURL)
+        #expect(store.sibling(for: .football).fileURL.lastPathComponent == "save-football.json")
+        #expect(store.sibling(for: .football).fileURL.deletingLastPathComponent() == store.fileURL.deletingLastPathComponent())
+
+        #expect(store.loadActiveSport() == .baseball)
+        try store.sibling(for: .football).save(GameSave(game: FootballGame.make()))
+        #expect(!store.exists)
+        #expect(try store.load() == nil)
+        #expect(try store.sibling(for: .football).load()?.game.sport == .football)
+        try store.saveActiveSport(.football)
+        #expect(store.loadActiveSport() == .football)
+        try FileManager.default.removeItem(at: store.fileURL.deletingLastPathComponent())
+    }
+
+    @Test func 쉬는_동안_쓴_토큰은_돌아와도_자금이_되지_않는다() {
+        var game = TestGame.make()
+        TestGame.addTokens(&game, 1_000, id: "before", at: TestGame.hours(1))
+        let before = game.funds.balance
+        // 다른 종목을 하는 동안 쓴 토큰 (3시간째), 돌아온 시각 (5시간째)
+        let away = UsageRecord(id: "away", timestamp: TestGame.hours(3), usage: TokenUsage(output: 50_000))
+        let justBefore = UsageRecord(
+            id: "just", timestamp: TestGame.hours(5).addingTimeInterval(-30), usage: TokenUsage(output: 7_000))
+        game.resume(now: TestGame.hours(5))
+        game.collect([away, justBefore], now: TestGame.hours(5).addingTimeInterval(10))
+        #expect(game.funds.balance == before)
+        // 돌아온 뒤에 쓴 토큰은 센다.
+        let after = UsageRecord(id: "after", timestamp: TestGame.hours(5).addingTimeInterval(60), usage: TokenUsage(output: 2_000))
+        game.collect([away, justBefore, after], now: TestGame.hours(6))
+        #expect(game.funds.balance == before + 2_000)
+    }
+
+    @Test func 쉬는_동안에는_경기_기회가_쌓이지_않는다() throws {
+        var game = FootballGame.make()
+        try TestGame.playOne(&game, at: TestGame.hours(0.1))
+        #expect(game.charges == 0)
+        game.resume(now: TestGame.hours(10))
+        game.refreshCharges(now: TestGame.hours(10))
+        #expect(game.charges == 0)
+        game.refreshCharges(now: TestGame.hours(11.01))
+        #expect(game.charges == 1)
+    }
+
+    @Test func 상단바에_축구_점수와_경기_시간이_나온다() throws {
+        var game = FootballGame.make(seed: 9)
+        #expect(game.menuBarTooltip(now: TestGame.start, todayTokens: 0).contains("⚽○○"))
+        try game.startMatch(now: TestGame.hours(1))
+        for _ in 0..<30 { game.stepMatch() }
+        let text = game.menuBarText(now: TestGame.hours(1), todayTokens: 0)
+        #expect(text.hasPrefix("⚽ "))
+        #expect(text.hasSuffix("'"))
+        game.runMatchToEnd()
+        #expect(game.menuBarText(now: TestGame.hours(1), todayTokens: 0).hasPrefix("⚽ 경기 종료"))
+    }
+}

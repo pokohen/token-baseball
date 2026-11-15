@@ -13,11 +13,24 @@ struct SettingsTab: View {
                     ForEach(MenuBarDisplay.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                 }
                 Toggle("훈련 애니메이션", isOn: setting(\.animationEnabled))
-                Toggle("알림 (경기 가능, 득점, 경기 종료)", isOn: setting(\.notificationsEnabled))
+                Toggle(game.sport == .football ? "알림 (경기 가능, 골, 경기 종료)" : "알림 (경기 가능, 득점, 경기 종료)", isOn: setting(\.notificationsEnabled))
                 if !Notifier.isAvailable {
                     Text("알림은 앱 번들(.app)로 실행할 때만 나옵니다.").note()
                 }
                 Text("경기 중과 경기 종료 표시는 이 설정과 상관없이 나옵니다.").note()
+            }
+            .font(.callout)
+
+            Card("종목", trailing: "지금: \(game.sport.label)") {
+                let other: Sport = game.sport == .football ? .baseball : .football
+                HStack {
+                    Text(model.hasSave(for: other)
+                        ? "\(other.label) 구단이 저장되어 있습니다."
+                        : "\(other.label) 구단은 아직 없습니다. 바꾸면 창단 화면이 나옵니다.").font(.callout)
+                    Spacer()
+                    Button("\(other.symbol) \(other.label)로 바꾸기") { model.switchSport(to: other) }
+                }
+                Text("구단은 종목별로 따로 저장됩니다. 쉬는 구단은 그동안 쓴 토큰을 받지 않고, 경기 기회도 쌓이지 않습니다.").note()
             }
             .font(.callout)
 
@@ -61,7 +74,9 @@ struct SettingsTab: View {
             }
 
             Card {
-                Text("Token Baseball은 KBO 및 각 구단과 무관한 비공식 팬 프로젝트입니다. 등장하는 구단과 선수는 모두 가상입니다.").note()
+                Text(game.sport == .football
+                    ? "Token Baseball은 실제 리그·구단과 무관한 비공식 팬 프로젝트입니다. 등장하는 구단과 선수는 모두 가상입니다."
+                    : "Token Baseball은 KBO 및 각 구단과 무관한 비공식 팬 프로젝트입니다. 등장하는 구단과 선수는 모두 가상입니다.").note()
                 Button("앱 종료") {
                     model.save()
                     NSApplication.shared.terminate(nil)
