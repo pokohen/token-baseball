@@ -8,10 +8,10 @@ struct ClubTab: View {
     var body: some View {
         VStack(spacing: 10) {
             Card("시설") {
-                facility(.training, name: Balance.trainingNames[game.userTeam.trainingLevel - 1],
+                facility(.training, name: Balance.trainingNames(game.sport)[game.userTeam.trainingLevel - 1],
                          effect: "성장 ×\(String(format: "%.2f", Balance.trainingMultiplier[game.userTeam.trainingLevel - 1]))")
                 Divider()
-                facility(.stadium, name: Balance.stadiumNames[game.userTeam.stadiumLevel - 1],
+                facility(.stadium, name: Balance.stadiumNames(game.sport)[game.userTeam.stadiumLevel - 1],
                          effect: "수용 \(Balance.stadiumCapacity[game.userTeam.stadiumLevel - 1].formatted())명 · 홈 보정 +\(String(format: "%.1f", Balance.stadiumHomeEdge[game.userTeam.stadiumLevel - 1] * 100))%")
                 Divider()
                 facility(.scout, name: game.userTeam.scoutLevel == 0 ? "없음" : "스카우트 팀",
@@ -23,7 +23,7 @@ struct ClubTab: View {
                     let blocked = game.promotionBlockedReason(promotion)
                     HStack {
                         VStack(alignment: .leading) {
-                            Text(promotion.rawValue).font(.callout)
+                            Text(promotion.label(game.sport)).font(.callout)
                             Text(blocked ?? (promotion.note.isEmpty ? "인지도 +\(Int(game.promotionEffect(promotion)))" : "인지도 +\(Int(game.promotionEffect(promotion))) · \(promotion.note)")).note()
                         }
                         Spacer()
@@ -37,11 +37,19 @@ struct ClubTab: View {
             }
 
             Card("훈련 방침") {
-                focusSlider("타격", \.batting)
-                focusSlider("투구", \.pitching)
-                focusSlider("수비", \.defense)
-                focusSlider("주루", \.running)
-                Text("비중대로 경험치가 나뉩니다. 토큰을 쓰는 동안에는 선수들이 조금 더 빨리 큽니다.").note()
+                if game.sport == .football {
+                    focusSlider("공격", \.batting)
+                    focusSlider("패스", \.pitching)
+                    focusSlider("수비", \.defense)
+                    focusSlider("체력", \.running)
+                    Text("비중이 큰 쪽의 능력치가 더 많이 오릅니다 (공격: 슈팅·드리블, 수비: 수비·골키핑, 체력: 스피드·피지컬·체력). 토큰을 쓰는 동안에는 선수들이 조금 더 빨리 큽니다.").note()
+                } else {
+                    focusSlider("타격", \.batting)
+                    focusSlider("투구", \.pitching)
+                    focusSlider("수비", \.defense)
+                    focusSlider("주루", \.running)
+                    Text("비중대로 경험치가 나뉩니다. 토큰을 쓰는 동안에는 선수들이 조금 더 빨리 큽니다.").note()
+                }
             }
 
             finance

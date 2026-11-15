@@ -4,10 +4,10 @@ import TokenBaseballCore
 enum AppTab: String, CaseIterable {
     case home = "홈", match = "경기", league = "리그", club = "구단", players = "선수", settings = "설정"
 
-    var icon: String {
+    func icon(_ sport: Sport) -> String {
         switch self {
         case .home: "house.fill"
-        case .match: "baseball.fill"
+        case .match: sport == .football ? "soccerball" : "baseball.fill"
         case .league: "list.number"
         case .club: "building.2.fill"
         case .players: "person.3.fill"
@@ -50,7 +50,7 @@ struct RootView: View {
                         model.message = nil
                     } label: {
                         VStack(spacing: 2) {
-                            Image(systemName: item.icon).font(.system(size: 14))
+                            Image(systemName: item.icon(game.sport)).font(.system(size: 14))
                             Text(item.rawValue).font(.caption2)
                         }
                         .frame(maxWidth: .infinity)

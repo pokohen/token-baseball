@@ -87,11 +87,18 @@ public enum Balance {
 
     // MARK: 로스터
 
-    public static func rosterLimit(_ tier: LeagueTier) -> Int {
+    public static func rosterLimit(_ tier: LeagueTier, sport: Sport = .baseball) -> Int {
+        if sport == .football {
+            switch tier {
+            case .pro: return 28
+            case .semiPro, .amateur: return 24
+            default: return 20
+            }
+        }
         switch tier {
-        case .pro: 28
-        case .semiPro, .amateur: 22
-        default: 18
+        case .pro: return 28
+        case .semiPro, .amateur: return 22
+        default: return 18
         }
     }
 
@@ -103,6 +110,22 @@ public enum Balance {
         default: (9, 3, 2)
         }
     }
+
+    /// 축구 CPU 구단의 포지션별 인원.
+    public static func footballShape(
+        _ tier: LeagueTier
+    ) -> (keepers: Int, defenders: Int, midfielders: Int, forwards: Int) {
+        switch tier {
+        case .pro: (3, 8, 9, 6)
+        case .semiPro, .amateur: (3, 7, 7, 5)
+        default: (2, 5, 5, 4)
+        }
+    }
+
+    /// 축구: 이 인원 아래로 내려가면 빈자리를 자동으로 채운다.
+    public static let footballMinSquad = 14
+    public static let footballStarters = 11
+    public static let footballMaxSubs = 5
 
     public static let minBatters = 9
     public static let minPitchers = 5
@@ -128,6 +151,21 @@ public enum Balance {
         "동네 야구장", "간이 관중석", "구립 야구장", "시립 야구장", "외야석 증축",
         "조명탑 설치", "종합운동장 야구장", "전용 야구장", "신축 야구장", "돔구장",
     ]
+    public static let footballTrainingNames = [
+        "동네 풋살장", "학교 운동장 대여", "인조잔디 연습장", "전용 훈련장", "웨이트장 추가",
+        "비디오 분석실", "2군 전용 구장", "재활·회복 센터", "데이터 랩", "첨단 퍼포먼스 센터",
+    ]
+    public static let footballStadiumNames = [
+        "동네 운동장", "간이 관중석", "구립 축구장", "시립 축구장", "관중석 증축",
+        "조명탑 설치", "종합운동장", "전용 축구 경기장", "신축 경기장", "대형 전용 구장",
+    ]
+    public static func trainingNames(_ sport: Sport) -> [String] {
+        sport == .football ? footballTrainingNames : trainingNames
+    }
+    public static func stadiumNames(_ sport: Sport) -> [String] {
+        sport == .football ? footballStadiumNames : stadiumNames
+    }
+
     public static let stadiumCapacity = [100, 500, 2_000, 5_000, 8_000, 12_000, 15_000, 18_000, 22_000, 25_000]
     /// 홈 보정 (0.01 = +1%).
     public static let stadiumHomeEdge = [0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.045, 0.0475, 0.05]

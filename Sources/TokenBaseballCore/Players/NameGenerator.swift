@@ -45,10 +45,23 @@ public enum NameGenerator {
         "유소년 야구 교실 출신", "입단 테스트 출신", "지역 리그 MVP 출신",
     ]
 
-    public static func playerName(_ rng: inout SeededRNG) -> String {
+    /// 축구에서 걸러낼 이름: 널리 알려진 축구 선수와 겹치는 이름.
+    static let blockedFootball: Set<String> = [
+        "손흥민", "박지성", "이강인", "김민재", "차범근", "황희찬", "기성용", "이청용", "홍명보", "안정환",
+        "조규성", "황의조", "이승우", "구자철", "박주영", "이동국", "김영권", "조현우", "김승규", "이재성",
+        "황인범", "설영우", "정우영", "백승호", "양민혁", "배준호", "오현규", "주민규", "엄원상", "김진수",
+        "이영표", "송종국", "유상철", "황선홍", "최용수", "김남일", "이천수", "이운재", "김병지", "고종수",
+        "차두리", "박주호", "권창훈", "나상호", "송민규", "김문환", "정승현", "조유민", "홍현석", "이기제",
+    ]
+    static let footballOrigins = [
+        "고교 축구부 출신", "대학 축구부 출신", "실업팀 출신", "하부 리그 출신", "유소년 클럽 출신",
+        "풋살 리그 출신", "입단 테스트 출신", "지역 리그 득점왕 출신",
+    ]
+
+    public static func playerName(_ rng: inout SeededRNG, sport: Sport = .baseball) -> String {
         while true {
             let name = rng.pick(surnames) + rng.pick(givenFirst) + rng.pick(givenSecond)
-            if !blocked.contains(name) { return name }
+            if !(sport == .football ? blockedFootball : blocked).contains(name) { return name }
         }
     }
 
@@ -56,11 +69,11 @@ public enum NameGenerator {
         rng.pick(foreignNames)
     }
 
-    public static func origin(tier: LeagueTier, _ rng: inout SeededRNG) -> String {
+    public static func origin(tier: LeagueTier, sport: Sport = .baseball, _ rng: inout SeededRNG) -> String {
         if tier.isCitizen {
             return "\(rng.pick(neighborhoods)) \(rng.pick(jobs))"
         }
-        return rng.pick(proOrigins)
+        return rng.pick(sport == .football ? footballOrigins : proOrigins)
     }
 
     // MARK: 구단
@@ -71,6 +84,17 @@ public enum NameGenerator {
         ("서울 잠실", "잠실 곰"), ("서울 잠실", "서울 쌍둥이"), ("서울 고척", "고척 영웅"),
         ("인천", "인천 상륙단"), ("수원", "수원 마법사"), ("창원", "창원 공룡"),
     ]
+
+    /// 축구 1부 10팀: 연고지 + 우리말 애칭. 실제 구단을 떠올리게 하는 조합은 피했다.
+    public static let footballProTeams: [(city: String, name: String)] = [
+        ("서울", "서울 한강 FC"), ("부산", "부산 등대"), ("인천", "인천 파도"), ("대구", "대구 태양"),
+        ("광주", "광주 무등"), ("대전", "대전 한밭 FC"), ("울산", "울산 고래"), ("수원", "수원 성곽"),
+        ("전주", "전주 한옥 FC"), ("강릉", "강릉 솔바람"),
+    ]
+
+    public static func proTeams(_ sport: Sport) -> [(city: String, name: String)] {
+        sport == .football ? footballProTeams : proTeams
+    }
 
     /// 구단을 만들 때 고를 수 있는 연고지.
     public static let userCities = [
@@ -94,9 +118,33 @@ public enum NameGenerator {
 
     /// 하위 리그 AI 구단 이름. `taken`에 없는 이름이 나올 때까지 만든다.
     public static func cpuTeam(
-        tier: LeagueTier, taken: Set<String>, _ rng: inout SeededRNG
+        tier: LeagueTier, taken: Set<String>, sport: Sport = .baseball, _ rng: inout SeededRNG
     ) -> (city: String, name: String) {
         let shortTaken = Set(taken.map(shortName))
+        if sport == .football {
+            for attempt in 0..<500 {
+                let city = rng.pick(cpuCities)
+                let name: String
+                switch tier {
+                case .pro, .semiPro:
+                    name = rng.chance(0.5) ? "\(city) \(rng.pick(mascots))" : "\(city) \(rng.pick(mascots)) FC"
+                case .amateur:
+                    name = rng.chance(0.5)
+                        ? "\(rng.pick(schoolWords))대학교"
+                        : "\(city) \(rng.pick(industryWords)) 축구단"
+                case .citizenPro:
+                    name = rng.chance(0.6) ? "\(city) 시민 FC" : "\(city) \(rng.pick(mascots)) 클럽"
+                case .citizenSemiPro:
+                    name = rng.chance(0.6) ? "\(city) 시민 FC" : "\(city) 축구 동호회"
+                case .citizenAmateur:
+                    name = rng.chance(0.5) ? "\(city) 시민 FC" : "\(city) \(rng.pick(jobsClubs)) 축구회"
+                }
+                if !taken.contains(name), !shortTaken.contains(shortName(name)) || attempt > 300 {
+                    return (city, name)
+                }
+            }
+            return ("", "제\(taken.count + 1) 시민 FC")
+        }
         for attempt in 0..<500 {
             let city = rng.pick(cpuCities)
             let name: String

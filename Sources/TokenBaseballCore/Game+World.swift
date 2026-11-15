@@ -45,7 +45,7 @@ extension Game {
     /// 맞춰주기: 이 CPU 팀의 성장 속도 배율.
     func rubberBandFactor(team: Team, userStrength: Double, leagueAverage: Double) -> Double {
         let range = Balance.strengthRange(team.tier)
-        let current = LineupBuilder.strength(team: team, players: players)
+        let current = strength(of: team.id)
         // 리그별 강도 범위는 어떤 설정에서도 지킨다.
         if current >= range.upperBound { return 0 }
         let band = settings.rubberBand
@@ -94,7 +94,10 @@ extension Game {
 
         // 훈련 방침: 비중만큼 타자와 투수에게 경험치가 나뉜다.
         let normalized = focus.normalized
-        if player.isPitcher {
+        let isFootball = player.position.sport == .football
+        if isFootball {
+            // 축구는 포지션별로 경험치를 나누지 않는다. 방침은 세부 능력치의 비중만 바꾼다.
+        } else if player.isPitcher {
             points *= normalized.pitching / 0.25
         } else {
             points *= (1 - normalized.pitching) / 0.75
@@ -104,7 +107,9 @@ extension Game {
 
         // 포지션 가중치와 방침에 따라 세부 능력치에 나눈다. 능력(CA)은 정확히 points만큼 오른다.
         let weights = Attributes.weights(for: player.position)
-        let emphasis = weights.map { player.isPitcher ? 1.0 : focus.emphasis(for: $0.0) }
+        let emphasis = weights.map {
+            isFootball ? focus.emphasis(for: $0.0, sport: .football) : player.isPitcher ? 1.0 : focus.emphasis(for: $0.0)
+        }
         let scale = zip(weights, emphasis).reduce(0) { $0 + $1.0.1 * $1.1 }
         guard scale > 0 else { return }
         for (index, (key, _)) in weights.enumerated() {
@@ -127,7 +132,7 @@ extension Game {
                     teams[index].funds -= cost
                     teams[index].trainingLevel += 1
                     if tier == userTier || rng.chance(0.2) {
-                        post("\(tier.displayName) \(teams[index].name), \(Balance.trainingNames[teams[index].trainingLevel - 1]) 완공")
+                        post("\(tier.displayName) \(teams[index].name), \(Balance.trainingNames(sport)[teams[index].trainingLevel - 1]) 완공")
                     }
                 }
             } else if teams[index].stadiumLevel < cap {
@@ -146,7 +151,8 @@ extension Game {
             let team = rng.pick(rivals)
             let young = roster(of: team.id).filter { $0.age <= 22 && $0.potential - $0.ability > 8 }
             if let player = young.max(by: { ($0.potential, $0.id) < ($1.potential, $1.id) }) {
-                let what = player.isPitcher ? "구속이 눈에 띄게 올랐습니다" : "타격이 눈에 띄게 늘었습니다"
+                let what = sport == .football ? "기량이 눈에 띄게 늘었습니다"
+                    : player.isPitcher ? "구속이 눈에 띄게 올랐습니다" : "타격이 눈에 띄게 늘었습니다"
                 post("\(team.name) \(player.age)세 \(player.position.label) \(player.name), \(what)")
             }
         }
@@ -201,7 +207,7 @@ extension Game {
     /// 끝나면 로스터가 정원 이하가 되어 빈자리를 모두 채울 수 있다.
     mutating func trimCPURosterToShape(_ id: TeamID) {
         guard !teams[id].isUser else { return }
-        let shape = PlayerFactory.rosterPositions(teams[id].tier)
+        let shape = rosterPositions(teams[id].tier)
         for position in Position.allCases {
             let quota = shape.filter { $0 == position }.count
             let same = roster(of: id).filter { $0.position == position }
@@ -212,6 +218,7 @@ extension Game {
 
     /// 팀 강도를 정하는 선수들: 야수 상위 9명과 선발 투수.
     func coreRoster(_ id: TeamID) -> [Player] {
+        if sport == .football { return FootballLineupBuilder.core(team: teams[id], players: players) }
         let all = roster(of: id)
         let batters = all.filter { !$0.isPitcher }.sorted { ($0.ability, -$0.id) > ($1.ability, -$1.id) }.prefix(9)
         return Array(batters) + all.filter { $0.position == .starter }

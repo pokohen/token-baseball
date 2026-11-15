@@ -1,9 +1,10 @@
 # Token Baseball
 
-AI 코딩 도구에서 쓴 토큰이 **구단 자금**이 되는 macOS 메뉴바 야구단 육성 게임.
-시민 야구단으로 시작해 6부 리그의 최상위 프로 리그까지 올라가는 것이 목표다.
+AI 코딩 도구에서 쓴 토큰이 **구단 자금**이 되는 macOS 메뉴바 구단 육성 게임.
+시민 구단으로 시작해 6부 리그의 최상위 프로 리그까지 올라가는 것이 목표다.
+구단을 만들 때 **야구단**과 **축구단** 중에 고른다.
 
-> Token Baseball은 **KBO 및 각 구단과 무관한 비공식 팬 프로젝트**입니다. 등장하는 구단과 선수는 모두 가상입니다.
+> Token Baseball은 **KBO를 비롯한 실제 리그·구단과 무관한 비공식 팬 프로젝트**입니다. 등장하는 구단과 선수는 모두 가상입니다.
 
 ## 설치
 
@@ -65,13 +66,15 @@ Scripts/make-app.sh
 - 구단을 만든 뒤에 쓴 토큰만 자금이 된다. 20초마다 반영된다.
 - 게임은 `~/Library/Application Support/TokenBaseball/save.json`에 저장된다. 이 파일을 복사해 두면 백업이 된다.
 - 경기 기회는 1시간에 하나씩, 최대 3개까지 쌓인다. 경기 한 번은 실시간으로 15분쯤 걸리고 건너뛸 수 없다.
+- 야구 구단과 축구 구단은 따로 저장된다 (축구는 같은 폴더의 `save-football.json`). 설정 탭에서 종목을 바꾸면 그 종목의 구단으로 넘어가고, 없으면 새로 만든다.
+- 한 번에 한 구단만 운영한다. 쉬는 구단은 그동안 쓴 토큰을 받지 않고 경기 기회도 쌓이지 않는다.
 
 ## 개발
 
 ```sh
 swift run TokenBaseball        # 앱 번들 없이 바로 실행 (알림은 나오지 않음)
 swift test                     # 테스트
-TB_STRESS=1 swift test --filter StressTests   # 여러 시드 장기 시뮬레이션 (6분쯤)
+TB_STRESS=1 swift test --filter StressTests   # 여러 시드 장기 시뮬레이션 (야구 6분, 축구 9분쯤)
 ```
 
 진짜 구단을 건드리지 않고 시험하려면 저장 위치를 바꿔 실행한다.
@@ -87,7 +90,7 @@ Sources/
   TokenBaseballCore/   게임 로직 (UI 의존 없음)
     Usage/             로컬 로그에서 토큰 사용량 읽기
     League/            리그, 팀, 일정, 순위
-    Match/             투구 단위 경기 시뮬레이션
+    Match/             경기 시뮬레이션 (야구는 투구 단위, 축구는 20초 단위)
     Players/           선수 생성, 능력·잠재력
     Club/              자금 장부
     Persistence/       저장
@@ -104,5 +107,5 @@ Tests/
 
 | 변수 | 내용 |
 |---|---|
-| `TOKEN_BASEBALL_SAVE` | 저장 파일 위치를 바꾼다 |
-| `TOKEN_BASEBALL_SNAPSHOT` | 각 화면을 이 폴더에 PNG로 그리고 끝낸다 (임시 게임 사용) |
+| `TOKEN_BASEBALL_SAVE` | 저장 파일 위치를 바꾼다 (축구 저장 파일과 종목 표시 파일도 같은 폴더에 생긴다) |
+| `TOKEN_BASEBALL_SNAPSHOT` | 각 화면을 이 폴더에 PNG로 그리고 끝낸다 (임시 게임 사용, 축구 화면은 `football/` 아래) |

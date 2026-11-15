@@ -7,10 +7,18 @@ import TokenBaseballCore
 @MainActor
 enum Snapshot {
     static func renderAll(model: AppModel, to directory: URL) {
+        renderAll(model: model, to: directory, sport: .baseball)
+        renderAll(model: model, to: directory.appendingPathComponent("football", isDirectory: true), sport: .football)
+    }
+
+    static func renderAll(model: AppModel, to directory: URL, sport: Sport) {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let now = Date()
         var game = Game.newGame(
-            setup: .init(city: "서울", name: "서울 시민 야구단", colorIndex: 0, emblemIndex: 1), now: now, seed: 7)
+            setup: .init(
+                city: "서울", name: sport == .football ? "서울 시민 FC" : "서울 시민 야구단",
+                colorIndex: sport == .football ? 3 : 0, emblemIndex: 1),
+            now: now, seed: 7, sport: sport)
         game.collect([UsageRecord(id: "demo", timestamp: now, usage: TokenUsage(output: 60_000_000))], now: now)
         try? game.upgrade(.training)
         try? game.upgrade(.scout)
@@ -25,6 +33,7 @@ enum Snapshot {
         model.todayTokens = 60_000_000
 
         render(OnboardingView(bankrupt: false), model, directory, "00-onboarding")
+        render(OnboardingView(bankrupt: false, step: 1), model, directory, "01-onboarding-종목")
         for tab in AppTab.allCases {
             render(TabContent(tab: tab, game: game).padding(12), model, directory, "1-\(tab.rawValue)")
         }
@@ -38,7 +47,7 @@ enum Snapshot {
         render(TabContent(tab: .match, game: game).padding(12), model, directory, "3-중계")
         render(
             HStack(spacing: 4) {
-                Image(nsImage: Sprites.image(.batting, frame: 0))
+                Image(nsImage: Sprites.image(sport == .football ? .shooting : .batting, frame: 0))
                 Text(model.menuBarText)
                 ForEach(Array(Sprites.Drill.allCases.enumerated()), id: \.offset) { _, drill in
                     Image(nsImage: Sprites.image(drill, frame: 0))

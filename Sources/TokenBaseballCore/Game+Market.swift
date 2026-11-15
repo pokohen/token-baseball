@@ -76,8 +76,8 @@ extension Game {
     }
 
     func checkRosterRoom() throws {
-        guard userTeam.roster.count < Balance.rosterLimit(userTier) else {
-            throw GameError("로스터가 가득 찼습니다 (\(Balance.rosterLimit(userTier))명). 선수를 내보내야 영입할 수 있습니다.")
+        guard userTeam.roster.count < rosterLimit(userTier) else {
+            throw GameError("로스터가 가득 찼습니다 (\(rosterLimit(userTier))명). 선수를 내보내야 영입할 수 있습니다.")
         }
     }
 
@@ -108,7 +108,7 @@ extension Game {
         let count = rng.int(3...5) + (youthBoost > 0 ? 2 : 0)
         for _ in 0..<count {
             var spec = PlayerFactory.Spec(
-                position: rng.pick(PlayerFactory.rosterPositions(tier)), tier: tier, season: season)
+                position: rng.pick(rosterPositions(tier)), tier: tier, season: season)
             // 싸고 능력치가 낮지만, 잠재력이 높은 선수가 가끔 섞여 있다.
             spec.ability = range.lowerBound...(range.lowerBound + (range.upperBound - range.lowerBound) * 0.6)
             if rng.chance(youthBoost > 0 ? 0.35 : 0.15) {
@@ -151,7 +151,7 @@ extension Game {
         let lift: Double = trip.region == .local ? 0 : trip.region == .national ? 4 : 8
         for _ in 0..<count {
             var spec = PlayerFactory.Spec(
-                position: rng.pick(PlayerFactory.rosterPositions(tier)), tier: tier, season: season)
+                position: rng.pick(rosterPositions(tier)), tier: tier, season: season)
             let low = range.lowerBound + lift + Double(level)
             spec.ability = low...(range.upperBound + lift)
             spec.foreign = trip.region == .overseas
@@ -193,12 +193,11 @@ extension Game {
         guard let player = players[id], player.teamID == userTeamID else {
             throw GameError("내 팀 선수가 아닙니다.")
         }
-        guard live == nil else { throw GameError("경기 중에는 방출할 수 없습니다.") }
-        let mates = roster(of: userTeamID).filter { $0.id != id }
-        guard mates.filter({ !$0.isPitcher }).count >= Balance.minBatters,
-              mates.filter({ $0.isPitcher }).count >= Balance.minPitchers
-        else {
-            throw GameError("야수 \(Balance.minBatters)명, 투수 \(Balance.minPitchers)명은 남아 있어야 합니다.")
+        guard !isMatchLive else { throw GameError("경기 중에는 방출할 수 없습니다.") }
+        guard canSpare(id) else {
+            throw GameError(sport == .football
+                ? "골키퍼 1명을 포함해 \(Balance.footballStarters)명은 남아 있어야 합니다."
+                : "야수 \(Balance.minBatters)명, 투수 \(Balance.minPitchers)명은 남아 있어야 합니다.")
         }
         moveToFreeAgency(id)
         offers.removeAll { $0.playerID == id }
@@ -218,7 +217,9 @@ extension Game {
     /// 선수가 재계약 조건으로 요구하는 연봉과 기간.
     public func renewalDemand(_ player: Player) -> (salary: Int, years: Int) {
         let market = Balance.marketSalary(ability: player.ability)
-        let performance = player.isPitcher
+        let performance = player.position.sport == .football
+            ? Self.footballPerformance(player)
+            : player.isPitcher
             ? Double(player.pitching.wins + player.pitching.saves) / 20
             : max(0, player.batting.ops - 0.7) * 0.5
         let asked = max(Double(player.contract.salary) * 1.08, Double(market) * (1 + min(0.3, performance)))
@@ -344,13 +345,10 @@ extension Game {
                 post("\(buyer.name)이(가) \(player.name) 오퍼를 거두었습니다.")
             }
         case .accept:
-            guard live == nil else { throw GameError("경기 중에는 선수를 보낼 수 없습니다.") }
+            guard !isMatchLive else { throw GameError("경기 중에는 선수를 보낼 수 없습니다.") }
             if offer.swapPlayerID == nil {
                 // 선수를 팔고 나서도 경기를 치를 인원은 남아야 한다.
-                let mates = roster(of: userTeamID).filter { $0.id != player.id }
-                guard mates.filter({ !$0.isPitcher }).count >= Balance.minBatters,
-                      mates.filter({ $0.isPitcher }).count >= Balance.minPitchers
-                else { throw GameError("이 선수를 보내면 경기를 치를 인원이 모자랍니다.") }
+                guard canSpare(player.id) else { throw GameError("이 선수를 보내면 경기를 치를 인원이 모자랍니다.") }
             }
             offers.remove(at: index)
             add(player.id, to: buyer.id)
@@ -434,10 +432,12 @@ extension Game {
         case .renewal:
             guard player.teamID == userTeamID else { return }
             let demand = renewalDemand(player)
-            let starter = currentLineup.map { lineup in
-                lineup.batters.contains { $0.id == player.id } || lineup.starter == player.id
-                    || lineup.bullpen.contains(player.id)
-            } ?? true
+            let starter = sport == .football
+                ? (currentFootballLineup.map { lineup in lineup.starters.contains { $0.id == player.id } } ?? true)
+                : currentLineup.map { lineup in
+                    lineup.batters.contains { $0.id == player.id } || lineup.starter == player.id
+                        || lineup.bullpen.contains(player.id)
+                } ?? true
             var chance = proposal.salary >= demand.salary
                 ? 0.9 : 0.55 + (Double(proposal.salary) / Double(demand.salary) - 1) * 1.5
             if relegatedThisOffseason { chance -= 0.3 }
@@ -462,7 +462,7 @@ extension Game {
                 post("FA \(player.name)은(는) 이미 다른 팀과 계약했습니다.")
                 return
             }
-            let full = userTeam.roster.count >= Balance.rosterLimit(userTier)
+            let full = userTeam.roster.count >= rosterLimit(userTier)
             let foreignOK = (try? checkForeignLimit(player)) != nil
             if !full, foreignOK, crisisMatchesLeft == nil, rng.chance(joinChance(player, salary: proposal.salary)) {
                 add(player.id, to: userTeamID)
@@ -475,7 +475,7 @@ extension Game {
         case .transfer:
             guard let seller = player.teamID, seller != userTeamID else { return }
             let asking = Double(value(of: player)) * rng.double(1.1...1.5)
-            let full = userTeam.roster.count >= Balance.rosterLimit(userTier)
+            let full = userTeam.roster.count >= rosterLimit(userTier)
             let affordable = funds.balance >= proposal.fee && crisisMatchesLeft == nil
             let foreignOK = (try? checkForeignLimit(player)) != nil
             if !full, affordable, foreignOK, Double(proposal.fee) >= asking,
@@ -511,7 +511,10 @@ extension Game {
             var swap: PlayerID?
             if phase == .regular, rng.chance(0.4) {
                 swap = roster(of: buyer.id)
-                    .filter { $0.isPitcher == player.isPitcher && abs($0.ability - player.ability) <= 6 }
+                    .filter {
+                        (sport == .football ? $0.position == player.position : $0.isPitcher == player.isPitcher)
+                            && abs($0.ability - player.ability) <= 6
+                    }
                     .min { (abs($0.ability - player.ability), $0.id) < (abs($1.ability - player.ability), $1.id) }?.id
             }
             offers.append(TransferOffer(

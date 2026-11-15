@@ -49,8 +49,11 @@ extension Game {
             let theirs = live.userIsHome ? live.state.away.runs : live.state.home.runs
             return "⚾ \(mine):\(theirs) \(live.state.inningLabel)"
         }
+        if let liveFootball, let score = liveScore {
+            return "⚽ \(score.mine):\(score.theirs) \(liveFootball.state.clockLabel)"
+        }
         if let lastResult, !lastResult.acknowledged {
-            return "⚾ 경기 종료 \(lastResult.label)"
+            return "\(sport.symbol) 경기 종료 \(lastResult.label)"
         }
         let ready = charges > 0 && nextMatch() != nil
         switch settings.menuBarDisplay {
@@ -68,8 +71,7 @@ extension Game {
     /// 상단바 툴팁: 자금, 오늘 사용량, 다음 경기를 모두 보여준다.
     public func menuBarTooltip(now: Date, todayTokens: Int) -> String {
         var lines = ["구단 자금 \(Format.money(funds.balance))", "오늘 사용량 \(Format.tokens(todayTokens))"]
-        let marks = String(repeating: "⚾", count: charges)
-            + String(repeating: "○", count: Balance.maxMatchCharges - charges)
+        let marks = chargeMarks
         if let wait = timeToNextCharge(now: now) {
             lines.append("경기 기회 \(marks) (다음 \(Format.countdown(wait)))")
         } else {
@@ -81,6 +83,33 @@ extension Game {
         default: break
         }
         return lines.joined(separator: "\n")
+    }
+
+    /// 남은 경기 기회 표시 (예: ⚾⚾○).
+    public var chargeMarks: String {
+        String(repeating: sport.symbol, count: charges)
+            + String(repeating: "○", count: Balance.maxMatchCharges - charges)
+    }
+
+    /// 진행 중인 내 경기의 점수.
+    public var liveScore: (mine: Int, theirs: Int)? {
+        if let live {
+            return live.userIsHome
+                ? (live.state.home.runs, live.state.away.runs) : (live.state.away.runs, live.state.home.runs)
+        }
+        if let liveFootball {
+            return liveFootball.userIsHome
+                ? (liveFootball.state.home.goals, liveFootball.state.away.goals)
+                : (liveFootball.state.away.goals, liveFootball.state.home.goals)
+        }
+        return nil
+    }
+
+    /// 다른 종목의 구단을 운영하다가 이 구단으로 돌아왔다.
+    /// 쉬는 동안 쓴 토큰과 흐른 시간은 세지 않는다.
+    public mutating func resume(now: Date) {
+        funds.skip(to: now)
+        chargeAnchor = now
     }
 
     /// 팝오버를 열어 경기 결과를 확인했다.

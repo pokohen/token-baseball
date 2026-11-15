@@ -56,12 +56,33 @@ public struct StandingRow: Codable, Equatable, Sendable {
     public var winRate: Double {
         wins + losses == 0 ? 0 : Double(wins) / Double(wins + losses)
     }
+    /// 축구: 승 3점, 무 1점.
+    public var points: Int { wins * 3 + draws }
+    public var goalDifference: Int { runsFor - runsAgainst }
     public var battingAverage: Double { atBats == 0 ? 0 : Double(hits) / Double(atBats) }
     public var era: Double { pitchingOuts == 0 ? 0 : Double(earnedRuns) * 27 / Double(pitchingOuts) }
 }
 
 public enum Standings {
     /// KBO 방식: 승률 → 동률 팀끼리의 상대 전적 → 다득점.
+    public static func ranked(_ rows: [StandingRow], sport: Sport) -> [StandingRow] {
+        sport == .football ? rankedByPoints(rows) : ranked(rows)
+    }
+
+    /// 축구: 승점 → 골득실 → 다득점 → 동률 팀끼리의 상대 전적.
+    public static func rankedByPoints(_ rows: [StandingRow]) -> [StandingRow] {
+        func key(_ row: StandingRow) -> [Int] { [row.points, row.goalDifference, row.runsFor] }
+        let groups = Dictionary(grouping: rows, by: key)
+        func headToHead(_ row: StandingRow) -> Int {
+            (groups[key(row)] ?? []).reduce(0) { $0 + (row.winsAgainst[$1.teamID] ?? 0) }
+        }
+        return rows.sorted { a, b in
+            let ka = key(a), kb = key(b)
+            if ka != kb { return kb.lexicographicallyPrecedes(ka) }
+            return (headToHead(a), -a.teamID) > (headToHead(b), -b.teamID)
+        }
+    }
+
     public static func ranked(_ rows: [StandingRow]) -> [StandingRow] {
         let byRate = rows.sorted { ($0.winRate, -$0.teamID) > ($1.winRate, -$1.teamID) }
         var result: [StandingRow] = []
