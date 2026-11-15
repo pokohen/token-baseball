@@ -11,6 +11,6 @@ let package = Package(
     targets: [
         .target(name: "TokenBaseballCore"),
         .executableTarget(name: "TokenBaseball", dependencies: ["TokenBaseballCore"]),
-        .testTarget(name: "TokenBaseballCoreTests", dependencies: ["TokenBaseballCore"]),
+        .testTarget(name: "TokenBaseballCoreTests", dependencies: ["TokenBaseballCore"], exclude: ["Fixtures"]),
     ]
 )
