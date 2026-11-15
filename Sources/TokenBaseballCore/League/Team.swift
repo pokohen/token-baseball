@@ -86,6 +86,8 @@ public struct Team: Codable, Identifiable, Equatable, Sendable {
     public var focus: TrainingFocus
     /// 축구 전술 성향. 야구 구단과 예전 저장 파일에는 없다.
     public var tactic: Tactic? = nil
+    /// 축구 포메이션. nil이면 4-4-2.
+    public var formation: Formation? = nil
     /// 이 구단이 만들어진 시즌.
     public var foundedSeason: Int
 
