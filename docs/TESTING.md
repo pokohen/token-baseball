@@ -113,7 +113,7 @@ TB_STRESS=1 swift test --filter StressTests   # 여러 시드 장기 시뮬레�
 - [ ] 30세부터 오프시즌에 "은퇴" 버튼이 나온다
 - [ ] 은퇴하면 기록 화면이 나오고, 새 선수를 만들면 같은 세계에서 다시 시작한다
 
-빨리 보려면 테스트 코드의 `CareerAuto`로 저장 파일을 원하는 시점까지 돌려 만든 뒤 그 파일로 앱을 띄운다. 화면 그림만 필요하면 다음으로 뽑는다 (버튼과 입력 칸은 그림에 나오지 않는다).
+빨리 보려면 테스트 코드의 `CareerAuto`(`Tests/TokenBaseballCoreTests/CareerTestSupport.swift`)로 저장 파일을 원하는 시점까지 돌려 만든 뒤 그 파일로 앱을 띄운다. 화면 그림만 필요하면 다음으로 뽑는다 (버튼과 입력 칸은 그림에 나오지 않는다).
 
 ```sh
 TOKEN_BASEBALL_SAVE=/tmp/tb-test/save.json TOKEN_BASEBALL_SNAPSHOT=/tmp/tb-snap swift run TokenBaseball

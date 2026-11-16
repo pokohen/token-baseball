@@ -110,11 +110,12 @@ Sources/
     Match/             경기 시뮬레이션 (야구는 투구 단위, 축구는 20초 단위)
     Players/           선수 생성, 능력·잠재력
     Club/              자금 장부
-    Career/            선수 모드의 상태 (내 선수, 제안, 시즌 기록)
+    Career/            선수 모드 (내 선수, 훈련, 평점, 계약, 시즌 흐름)
     Persistence/       저장
-    Game*.swift        게임 전체 상태와 명령 (경기, 세계 시뮬레이션, 시즌, 구단, 이적 시장, 선수 모드)
+    Game*.swift        게임 전체 상태와 명령 (경기, 세계 시뮬레이션, 시즌, 구단, 이적 시장)
     Balance.swift      조정할 수 있는 수치 모음
   TokenBaseball/       macOS 앱 (상단바, 팝오버, 설정)
+    Views/Career/      선수 모드 화면 (선수 만들기, 홈, 훈련, 커리어)
 Tests/
   TokenBaseballCoreTests/
 ```
