@@ -7,13 +7,16 @@ import Testing
 /// 난수를 부르는 순서가 하나만 바뀌어도 지문이 달라진다.
 ///
 /// 야구 동작을 일부러 바꿨다면 `TB_RECORD_GOLDEN=1 swift test --filter GoldenTests`로
-/// 저장 파일을 다시 만들고, 출력된 지문으로 아래 값을 고친다.
+/// 지문을 출력해 아래 값을 고친다. 저장 파일(fixture)은 예전 것을 그대로 둔다.
 @Suite struct GoldenTests {
     static let fixture = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().appendingPathComponent("Fixtures/baseball-v2-save.json")
 
-    static let midSeason = "6ef3c215f702e2fa"
-    static let nextSeason = "7c2c2febdbb4e401"
+    static let midSeason = "55d0ee2da0a1395c"
+    static let nextSeason = "699a848f3ba71e71"
+    /// 예전 엔진으로 만들어 둔 저장 파일의 지문 (파일 내용이 그대로인지), 그리고 그 파일을 지금 코드로 이어 갔을 때의 지문.
+    static let fixtureMidSeason = "6ef3c215f702e2fa"
+    static let fixtureNextSeason = "5b20d9f9e1ba4154"
 
     static func fingerprint(_ game: Game) -> String {
         var text = "\(game.rng.state)|\(game.season)|\(game.round)|\(game.phase)|\(game.funds.balance)|\(game.players.count)"
@@ -58,9 +61,8 @@ import Testing
     @Test func 같은_시드면_예전과_똑같이_흘러간다() throws {
         var (game, manager) = try Self.midSeasonGame()
         if ProcessInfo.processInfo.environment["TB_RECORD_GOLDEN"] == "1" {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.sortedKeys]
-            try encoder.encode(GameSave(game: game)).write(to: Self.fixture)
+            // 저장 파일(fixture)은 다시 만들지 않는다. 예전에 만든 파일을 그대로 두어야
+            // "예전 저장 파일을 지금 코드로 읽을 수 있는지"를 확인할 수 있다.
             print("GOLDEN midSeason \(Self.fingerprint(game))")
         }
         #expect(Self.fingerprint(game) == Self.midSeason)
@@ -76,12 +78,15 @@ import Testing
         let save = try JSONDecoder().decode(GameSave.self, from: Data(contentsOf: Self.fixture))
         var game = save.game
         #expect(game.live != nil)
-        #expect(Self.fingerprint(game) == Self.midSeason)
+        #expect(Self.fingerprint(game) == Self.fixtureMidSeason)
         // 자동 운영자의 시계와 토큰 번호를 저장 시점에 맞춘다.
         var manager = AutoManager(tokensPerMatch: 40_000_000)
         manager.clock = TestGame.start.addingTimeInterval(11 * 3600)
         manager.tokenID = 10
         try Self.continueToNextSeason(&game, &manager)
-        #expect(Self.fingerprint(game) == Self.nextSeason)
+        if ProcessInfo.processInfo.environment["TB_RECORD_GOLDEN"] == "1" {
+            print("GOLDEN fixtureNextSeason \(Self.fingerprint(game))")
+        }
+        #expect(Self.fingerprint(game) == Self.fixtureNextSeason)
     }
 }

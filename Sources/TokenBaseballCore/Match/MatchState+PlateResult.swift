@@ -42,7 +42,12 @@ extension MatchState {
         let batterRunner = Runner(batterIndex: batterIndex, pitcherIndex: pitcherIndex, earned: true)
 
         // 홈런
-        let homeRunChance = clamp(0.034 * exp((power - 50) / 30) * (1 - (stuff - 50) * 0.006), 0.002, 0.15)
+        // 타자 파워와 투수 구위의 "차이"로 정한다. (예전에는 파워에만 지수로 반응해 능력치가 높은
+        // 리그일수록 홈런이 쏟아졌다.) 제구가 좋은 투수는 장타를 덜 맞는다.
+        let control = fielding.pitchers[pitcherIndex].control
+        let homeRunChance = clamp(
+            0.032 * exp(clamp(power - stuff, -30, 30) / 40) * (0.8 + power / 250) * (1 - (control - 50) * 0.004),
+            0.002, 0.09)
         if rng.chance(homeRunChance) {
             let runnersOn = bases.compactMap { $0 }.count
             events.append(MatchEvent(.play, "\(lead) 쳤습니다! \(batter.name)의 \(runnersOn == 3 ? "만루 " : "")홈런!"))
@@ -53,7 +58,7 @@ extension MatchState {
             return
         }
 
-        let type: BallType = [.ground, .fly, .line][rng.weighted([0.44, 0.33, 0.23])]
+        let type: BallType = [.ground, .fly, .line][rng.weighted([0.44, 0.33, clamp(0.23 - (control - 50) * 0.0008, 0.15, 0.3)])]
         let position: Position
         switch type {
         case .ground: position = rng.pick(Position.infield)
@@ -66,9 +71,10 @@ extension MatchState {
 
         var hitChance: Double
         switch type {
-        case .ground: hitChance = 0.235 + advantage * 0.0015 - (defense - 50) * 0.002 + (speed - 50) * 0.0012
-        case .line: hitChance = 0.66 + advantage * 0.0015 - (defense - 50) * 0.0015
-        case .fly: hitChance = 0.13 + advantage * 0.001 - (defense - 50) * 0.002 + (power - 50) * 0.001
+        // 수비는 타자의 발·힘과 견주어 본다. 능력치가 다 같이 높은 리그라고 안타가 줄지 않는다.
+        case .ground: hitChance = 0.245 + advantage * 0.0015 - (defense - speed) * 0.0014
+        case .line: hitChance = 0.67 + advantage * 0.0015 - (defense - contact) * 0.001
+        case .fly: hitChance = 0.14 + advantage * 0.001 - (defense - power) * 0.0012
         }
 
         if rng.chance(clamp(hitChance, 0.03, 0.9)) {

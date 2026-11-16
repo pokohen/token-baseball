@@ -159,7 +159,17 @@ extension MatchState {
         if let leaderIsHome {
             var winner = leaderIsHome ? home : away
             var loser = leaderIsHome ? away : home
-            if let winPitcherIndex { winner.pitchers[winPitcherIndex].line.wins += 1 }
+            if var index = winPitcherIndex {
+                // 선발이 승리 투수가 되려면 5이닝(콜드게임은 4이닝)을 던져야 한다.
+                // 못 채웠으면 뒤이어 나온 첫 구원 투수에게 준다.
+                let needed = inning < 9 ? 12 : 15
+                if index == 0, winner.pitchers[0].line.outs < needed,
+                   let relief = winner.pitchers.indices.dropFirst().first(where: { winner.pitchers[$0].hasEntered }) {
+                    index = relief
+                    winPitcherIndex = relief
+                }
+                winner.pitchers[index].line.wins += 1
+            }
             if let lossPitcherIndex { loser.pitchers[lossPitcherIndex].line.losses += 1 }
             let last = winner.pitcherIndex
             if last != winPitcherIndex, (1...3).contains(winner.pitchers[last].leadOnEntry) {

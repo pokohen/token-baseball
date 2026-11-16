@@ -33,67 +33,28 @@ extension Game {
         }
 
         // 승강: 리그 경계마다 자동 승격·강등과 플레이오프를 정한다.
-        series = []
-        pendingMoves = []
-        for upper in LeagueTier.allCases {
-            guard let lower = upper.lower else { continue }
-            let upperRanked = rankedStandings(upper).map(\.teamID)
-            let eligible = rankedStandings(lower).map(\.teamID).filter { canPromote($0) }
-            guard upperRanked.count >= 2 else { continue }
-            let tenth = upperRanked[upperRanked.count - 1]
-            let ninth = upperRanked[upperRanked.count - 2]
+        setUpPlayoffs()
 
-            if let champion = eligible.first {
-                // 상위 리그 10위는 자동 강등, 하위 리그 1위 자리는 자동 승격
-                pendingMoves.append(TierMove(team: tenth, to: lower))
-                pendingMoves.append(TierMove(team: champion, to: upper))
-            }
-            if eligible.count >= 2 {
-                series.append(PlayoffSeries(upperTier: upper, upperTeam: ninth, lowerTeam: eligible[1]))
-            }
+        if !isCareer, !isBankrupt, userTier != .pro, !canPromote(userTeamID), myRank <= (sport == .football ? 5 : 3) {
+            post(sport == .football
+                ? "구장 등급이 모자라 승격 자격이 다음 순위 팀으로 넘어갔습니다. 경기장을 Lv\(Balance.promotionStadiumLevel(from: userTier))까지 올려야 합니다."
+                : "승강 플레이오프를 신청하지 않아 승격 자격이 다음 순위 팀으로 넘어갔습니다.")
         }
 
-        if !isCareer, !isBankrupt, !appliedForPromotion, myRank <= 2, userTier != .pro {
-            post("승강 플레이오프를 신청하지 않아 승격 자격이 다음 순위 팀으로 넘어갔습니다.")
-        }
+        // 내 팀이 없는 대진은 바로 치른다.
+        resolveCPUSeries()
 
-        // 내 팀이 없는 시리즈는 바로 치른다.
-        // (구단이 해체된 상태면 그 자리를 이어받은 CPU 구단의 시리즈도 바로 치른다.)
-        for index in series.indices
-        where isBankrupt || (series[index].upperTeam != userTeamID && series[index].lowerTeam != userTeamID) {
-            while !series[index].isDecided {
-                let home = series[index].nextHome
-                let away = series[index].nextAway
-                ensurePlayable(home)
-                ensurePlayable(away)
-                guard let homeWon = homeWinsCPUMatch(
-                    home: home, away: away, kind: .playoff, tier: series[index].upperTier)
-                else { series[index].upperWins = 2; break }
-                let winner = homeWon ? home : away
-                if winner == series[index].upperTeam { series[index].upperWins += 1 } else { series[index].lowerWins += 1 }
-            }
-        }
-
-        if series.contains(where: { !$0.isDecided }) {
+        if let mine = series.first(where: { !$0.isDecided && $0.involves(userTeamID) }), !isBankrupt {
             phase = .playoff
-            post("승강 플레이오프에 나갑니다. 3전 2선승입니다.")
+            post("\(mine.nextLabel.replacingOccurrences(of: " 1차전", with: ""))에 나갑니다.")
         } else {
-            finishPlayoffs()
+            phase = .playoff
+            advancePlayoffs()
         }
     }
 
-    /// 승격 자격: CPU 팀은 항상 신청한 것으로 본다. 내 팀은 신청해야 한다.
-    func canPromote(_ id: TeamID) -> Bool {
-        teams[id].isUser ? appliedForPromotion : true
-    }
-
+    /// 플레이오프가 모두 끝났다: 정해진 승격·강등을 적용하고 오프시즌으로 넘어간다.
     mutating func finishPlayoffs() {
-        for entry in series {
-            if entry.lowerWins > entry.upperWins, let lower = entry.upperTier.lower {
-                pendingMoves.append(TierMove(team: entry.lowerTeam, to: entry.upperTier))
-                pendingMoves.append(TierMove(team: entry.upperTeam, to: lower))
-            }
-        }
         series = []
         relegatedThisOffseason = false
 

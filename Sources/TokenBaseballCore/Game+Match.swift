@@ -25,14 +25,12 @@ extension Game {
                 userIsHome: fixture.home == userTeamID,
                 label: "\(round + 1)라운드")
         case .playoff:
-            guard let mine = series.first(where: {
-                !$0.isDecided && ($0.upperTeam == userTeamID || $0.lowerTeam == userTeamID)
-            }) else { return nil }
+            guard let mine = series.first(where: { !$0.isDecided && $0.involves(userTeamID) }) else { return nil }
             let home = mine.nextHome
             return NextMatch(
                 kind: .playoff, opponent: home == userTeamID ? mine.nextAway : home,
                 userIsHome: home == userTeamID,
-                label: "승강 플레이오프 \(mine.gamesPlayed + 1)차전")
+                label: mine.nextLabel)
         case .offseason:
             guard friendliesPlayed < Balance.friendliesPerOffseason else { return nil }
             return NextMatch(
@@ -177,11 +175,9 @@ extension Game {
             round += 1
         case .playoff:
             apply(state, tier: userTier, countsForStandings: false)
-            if let index = series.firstIndex(where: {
-                !$0.isDecided && ($0.upperTeam == userTeamID || $0.lowerTeam == userTeamID)
-            }) {
-                let winner = state.home.runs > state.away.runs ? state.home.teamID : state.away.teamID
-                if winner == series[index].upperTeam { series[index].upperWins += 1 } else { series[index].lowerWins += 1 }
+            if let index = series.firstIndex(where: { !$0.isDecided && $0.involves(userTeamID) }) {
+                recordPlayoffGame(
+                    index, home: state.home.teamID, homeScore: state.home.runs, awayScore: state.away.runs)
             }
             summary += settleUserMatch(
                 kind: .playoff, myScore: mine.runs, theirScore: theirs.runs, opponent: theirs.teamID, userIsHome: userIsHome)
@@ -216,7 +212,14 @@ extension Game {
                 guard var player = players[pitcher.playerID] else { continue }
                 if countsForStandings { player.pitching += pitcher.line }
                 player.isHot = pitcher.line.outs >= 15 && pitcher.line.runs <= 2
-                if index == 0 { player.lastStartGame = teams[teamID].gamesPlayed }
+                if index == 0 {
+                    player.lastStartGame = teams[teamID].gamesPlayed
+                } else {
+                    let game = teams[teamID].gamesPlayed
+                    player.reliefStreak = player.lastReliefGame == game - 1 ? (player.reliefStreak ?? 1) + 1 : 1
+                    player.lastReliefGame = game
+                    player.lastReliefPitches = pitcher.line.pitches
+                }
                 players[player.id] = player
                 playedFactor[player.id] = index == 0 ? Balance.playFactorStarter : Balance.playFactorSub
             }

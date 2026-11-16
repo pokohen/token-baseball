@@ -16,7 +16,9 @@ import Testing
         let balance = game.funds.balance
         try game.trainCareer(.contact)
         let after = try #require(game.myPlayer)
-        #expect(after.attributes.contact == before.attributes.contact + 1)
+        // 어떤 훈련이든 능력이 같은 양만큼 오른다.
+        #expect(abs(after.ability - before.ability - Balance.careerTrainingStep) < 0.0001)
+        #expect(after.attributes.contact > before.attributes.contact + 0.5)
         #expect(after.ability > before.ability)
         #expect(game.funds.balance == balance - cost)
         #expect(game.funds.seasonExpense[FundsLedger.Category.training.rawValue] == cost)

@@ -96,6 +96,7 @@ struct CareerHomeTab: View {
 
     private func appearanceNote(_ me: Player) -> String? {
         guard game.nextMatch() != nil, !game.isMatchLive else { return nil }
+        if (me.suspendedMatches ?? 0) > 0 { return "출장 정지로 다음 리그 경기에 나서지 못합니다." }
         if let plan = game.careerFootballPlan {
             if plan.starts { return "다음 경기에 선발로 나섭니다." }
             if let minute = plan.subMinute { return "다음 경기는 벤치에서 시작합니다. \(minute)분쯤 교체로 들어갑니다." }

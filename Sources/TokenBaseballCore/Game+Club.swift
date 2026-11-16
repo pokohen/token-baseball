@@ -257,6 +257,9 @@ extension Game {
     }
 
     public mutating func applyForPromotion() throws {
+        guard sport != .football else {
+            throw GameError("축구는 신청이 필요 없습니다. 순위와 구장 등급으로 승격이 정해집니다.")
+        }
         guard let requirement = promotionRequirement else { throw GameError("이미 최상위 리그입니다.") }
         guard phase == .regular else { throw GameError("정규시즌 중에만 신청할 수 있습니다.") }
         guard !appliedForPromotion else { throw GameError("이미 신청했습니다.") }

@@ -5,7 +5,8 @@ extension FootballMatch {
     // MARK: 전·후반 끝
 
     mutating func endPeriod(_ events: inout [MatchEvent]) {
-        let tied = home.goals == away.goals
+        // 두 경기 합산이면 1차전 골을 더해서 비교한다.
+        let tied = home.goals + (rules.firstLegHome ?? 0) == away.goals + (rules.firstLegAway ?? 0)
         switch period {
         case .firstHalf:
             say(&events, .inning, "전반 종료. \(scoreText)")

@@ -85,7 +85,7 @@ struct MarketView: View {
                             HStack {
                                 PlayerRow(
                                     game: game, player: player,
-                                    trailing: "\(candidate.source.rawValue) · 연봉 \(Format.money(player.contract.salary))")
+                                    trailing: "\(candidate.source == .draft && game.sport == .football ? "유소년 승급" : candidate.source.rawValue) · 연봉 \(Format.money(player.contract.salary))")
                                 Button(candidate.fee > 0 ? "계약 \(Format.money(game.price(candidate.fee)))" : "계약") {
                                     model.perform { try $0.sign(candidate: candidate.id) }
                                 }

@@ -47,23 +47,26 @@ struct CareerTrainingTab: View {
         return HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 1) {
                 Text(CareerDrill.name(key, sport: game.sport)).font(.callout.weight(.medium))
-                Text("\(key.label) \(Int(value))").note()
+                Text("\(key.label) \(String(format: "%.1f", value))").note()
             }
             .frame(width: 118, alignment: .leading)
             Bar(fraction: value / 99, color: .accentColor)
-            Button("+1 · \(Format.tokens(game.careerTrainingCost(key))) P") {
+            Button("+\(String(format: "%.1f", game.careerTrainingGain(key))) · \(Format.tokens(game.careerTrainingCost(key))) P") {
                 model.perform { try $0.trainCareer(key) }
             }
             .disabled(blocked != nil)
-            .help(blocked ?? "\(key.label) +1")
+            .help(blocked ?? "\(key.label) +\(String(format: "%.1f", game.careerTrainingGain(key)))")
         }
     }
 
     private func trainingNote(_ career: Career, _ me: Player) -> String {
-        if me.age >= Balance.careerTrainingAgeLimit {
-            return "\(Balance.careerTrainingAgeLimit)세부터는 훈련으로 능력치를 올릴 수 없습니다."
+        if me.age >= Balance.careerTrainingAgeLimit(me.position) {
+            return "\(Balance.careerTrainingAgeLimit(me.position))세부터는 훈련으로 능력치를 올릴 수 없습니다."
+        }
+        if let ceiling = game.careerLeagueCeiling, me.ability >= ceiling {
+            return "지금 리그에서 배울 수 있는 만큼 다 배웠습니다 (능력 \(Int(ceiling))). 윗 리그 구단으로 옮기거나 구단이 승격하면 다시 훈련할 수 있습니다."
         }
         if career.sessionsLeft <= 0 { return "오늘 훈련을 마쳤습니다. 다음 경기를 치르면 다시 \(Balance.careerSessionsPerMatch)번 훈련할 수 있습니다." }
-        return "경기와 경기 사이에 \(Balance.careerSessionsPerMatch)번까지 훈련합니다. 능력치가 높을수록 포인트가 많이 듭니다. 쓰지 않은 포인트는 그대로 남습니다."
+        return "경기와 경기 사이에 \(Balance.careerSessionsPerMatch)번까지 훈련합니다. 어떤 훈련이든 능력이 \(Balance.careerTrainingStep)씩 오르고, 그 능력치가 높을수록 포인트가 많이 듭니다. 쓰지 않은 포인트는 그대로 남습니다."
     }
 }

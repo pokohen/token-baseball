@@ -155,7 +155,7 @@ public struct FootballSide: Codable, Equatable, Sendable {
     }
 
     /// 퇴장으로 모자란 인원만큼 깎이는 값.
-    var shortHanded: Double { Double(max(0, 11 - onPitchCount)) * 4 }
+    var shortHanded: Double { Double(max(0, 11 - onPitchCount)) * 8 }
 
     var keeperIndex: Int? { players.firstIndex { $0.isOnPitch && $0.slot == .goalkeeper } }
 }
@@ -165,6 +165,11 @@ public struct FootballRules: Codable, Equatable, Sendable {
     public var mustHaveWinner = false
     /// 홈 보정 (0.02 = +2%).
     public var homeEdge = 0.02
+    /// 중립 구장 (승격 플레이오프 결승): 홈 이점이 없다.
+    public var neutral: Bool? = nil
+    /// 두 경기 합산의 2차전: 1차전에서 이 경기의 (홈 팀, 원정 팀)이 넣은 골. 합산이 같으면 연장으로 간다.
+    public var firstLegHome: Int? = nil
+    public var firstLegAway: Int? = nil
 
     public init(mustHaveWinner: Bool = false, homeEdge: Double = 0.02) {
         self.mustHaveWinner = mustHaveWinner

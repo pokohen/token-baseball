@@ -37,7 +37,7 @@ extension Game {
             }
             if round >= Balance.roundsPerSeason { endRegularSeason() }
         case .playoff:
-            if series.allSatisfy(\.isDecided) { finishPlayoffs() }
+            advancePlayoffs()
         case .friendly:
             if friendliesPlayed == Balance.draftAfterFriendly, !draftDone { runDraft() }
             if friendliesPlayed >= Balance.friendliesPerOffseason { endOffseason() }
@@ -96,7 +96,7 @@ extension Game {
         let ability = player.ability
         guard player.potential > ability else { return }
         let room = (player.potential - ability) / player.potential
-        var points = Balance.growthBase * Balance.ageGrowthFactor(player.age) * room * teamFactor * playFactor
+        var points = Balance.growthBase * Balance.ageGrowthFactor(player.age, position: player.position) * room * teamFactor * playFactor
 
         // 훈련 방침: 비중만큼 타자와 투수에게 경험치가 나뉜다.
         let normalized = focus.normalized
@@ -104,9 +104,9 @@ extension Game {
         if isFootball {
             // 축구는 포지션별로 경험치를 나누지 않는다. 방침은 세부 능력치의 비중만 바꾼다.
         } else if player.isPitcher {
-            points *= normalized.pitching / 0.25
+            points *= clamp(normalized.pitching / 0.25, 0.5, 2)
         } else {
-            points *= (1 - normalized.pitching) / 0.75
+            points *= clamp((1 - normalized.pitching) / 0.75, 0.5, 1.25)
         }
         points = min(points, player.potential - ability)
         guard points > 0 else { return }

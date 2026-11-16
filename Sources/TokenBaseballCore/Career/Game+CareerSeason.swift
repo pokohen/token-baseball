@@ -22,7 +22,7 @@ extension Game {
         let tier = teams[userTeamID].tier
         switch me.position {
         case .starter:
-            career.goal = CareerGoal(kind: .wins, target: tier.isCitizen ? 4 : 3)
+            career.goal = CareerGoal(kind: .wins, target: tier.isCitizen ? 3 : 2)
         case .reliever, .closer:
             career.goal = CareerGoal(kind: .appearances, target: 18)
         case .forward:
@@ -94,7 +94,7 @@ extension Game {
         career.fame *= 1 - Balance.fameSeasonDecay
         self.career = career
 
-        if me.age >= Balance.careerForcedRetirementAge {
+        if me.age >= Balance.careerForcedRetirementAge(me.position) {
             finishCareer()
             return
         }

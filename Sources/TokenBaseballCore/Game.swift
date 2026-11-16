@@ -132,8 +132,14 @@ public struct Game: Codable, Equatable, Sendable {
         phase == .offseason ? player.contract.seasonsLeft <= 0 : player.contract.seasonsLeft <= 1
     }
 
+    /// 이적 기간. 야구는 오프시즌과 시즌 중 트레이드 마감 전, 축구는 여름과 겨울 두 번이다.
     public var tradeWindowOpen: Bool {
-        phase == .offseason || (phase == .regular && round < Balance.tradeDeadlineRound)
+        if phase == .offseason { return true }
+        guard phase == .regular else { return false }
+        if sport == .football {
+            return round < Balance.footballSummerWindowRounds || Balance.footballWinterWindow.contains(round)
+        }
+        return round < Balance.tradeDeadlineRound
     }
 
     // MARK: 소식

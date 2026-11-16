@@ -135,7 +135,7 @@ public struct FootballMatch: Codable, Equatable, Sendable {
 
         if period == .shootout {
             takeShootoutKick(&events)
-        } else if clock >= period.length + added {
+        } else if clock >= period.length + added, pending != .penalty {
             endPeriod(&events)
         } else {
             if clock >= period.length, !announcedAdded {
@@ -170,7 +170,8 @@ public struct FootballMatch: Codable, Equatable, Sendable {
 
     // MARK: 능력 비교
 
-    var edgePoints: Double { 2.0 + rules.homeEdge * 100 }
+    /// 홈 이점. 중립 구장이면 없다.
+    var edgePoints: Double { rules.neutral == true ? 0 : 1.3 + rules.homeEdge * 110 }
 
     func bonus(home isHome: Bool) -> Double { isHome ? edgePoints : 0 }
 
@@ -237,7 +238,7 @@ public struct FootballMatch: Codable, Equatable, Sendable {
                 defending.mean([.defender]) { $0.tackling * 0.6 + $0.physical * 0.2 + $0.speed * 0.2 }
                     + defending.shape.defenseShift)
             let shot = clamp(0.21 * m, 0.07, 0.5)
-            let penalty = clamp(0.006 * m, 0.002, 0.015)
+            let penalty = clamp(0.003 * m, 0.001, 0.008)
             let offside = 0.035
             let lose = clamp(0.33 / m, 0.12, 0.6)
             if roll < shot {
@@ -253,7 +254,7 @@ public struct FootballMatch: Codable, Equatable, Sendable {
                 let kind = rng.unit()
                 if kind < 0.22 {
                     foul(dangerous: true, &events)
-                } else if kind < 0.36 {
+                } else if kind < 0.44 {
                     say(&events, .play, "\(defending.shortName) \(name(of: defending, in: [.defender], credit: \.clearances)), 크로스를 걷어내 코너킥")
                     awardCorner()
                 } else {
@@ -281,17 +282,18 @@ public struct FootballMatch: Codable, Equatable, Sendable {
         let fitting = onPitch.filter { slots.contains(side.players[$0].slot) }
         let pool = fitting.isEmpty ? onPitch : fitting
         guard !pool.isEmpty else { return side.shortName }
-        var index = rng.pick(pool)
-        // 수비 장면: 플레이 스타일을 고른 선수는 더 자주(또는 덜) 나선다. 난수는 더 쓰지 않는다.
-        if credit == \.tackles || credit == \.clearances,
-           let styled = pool.first(where: { side.players[$0].style != nil }),
-           let weight = side.players[styled].style?.defenseWeight, weight != 1 {
-            let slotOrder = pool.firstIndex(of: index) ?? 0
-            let mine = pool.firstIndex(of: styled) ?? 0
-            if weight > 1, (slotOrder + clock / Self.secondsPerStep) % 3 == 0 { index = styled }
-            if weight < 1, index == styled, pool.count > 1, (clock / Self.secondsPerStep) % 2 == 0 {
-                index = pool[(mine + 1) % pool.count]
-            }
+        let index: Int
+        if let credit, pool.contains(where: { side.players[$0].detail != nil }) {
+            // 선수 모드: 내 선수가 있는 팀은 능력치가 좋은 선수가 더 자주 그 일을 한다.
+            // (그래야 수비·패스를 훈련한 만큼 평점에 돌아온다.)
+            let defensive = credit == \.tackles || credit == \.clearances
+            index = pool[rng.weighted(pool.map { slot in
+                let player = side.players[slot]
+                let skill = defensive ? player.tackling : (player.passing + player.dribbling) / 2
+                return (0.5 + skill / 100) * (defensive ? player.style?.defenseWeight ?? 1 : 1)
+            })]
+        } else {
+            index = rng.pick(pool)
         }
         if let credit {
             if side.teamID == home.teamID {

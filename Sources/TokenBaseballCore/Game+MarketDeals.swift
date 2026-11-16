@@ -45,7 +45,10 @@ extension Game {
     }
 
     public mutating func proposeFreeAgent(_ id: PlayerID, salary: Int, years: Int) throws {
-        guard phase == .offseason else { throw GameError("FA 영입은 오프시즌 이적 시장에서만 할 수 있습니다.") }
+        // 축구의 무소속 선수는 이적 기간 밖에도 계약할 수 있다.
+        guard phase == .offseason || sport == .football else {
+            throw GameError("FA 영입은 오프시즌 이적 시장에서만 할 수 있습니다.")
+        }
         guard let player = players[id], player.teamID == nil, freeAgents.contains(id) else {
             throw GameError("FA 선수가 아닙니다.")
         }

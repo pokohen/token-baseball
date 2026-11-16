@@ -68,7 +68,8 @@ extension Game {
             let role = careerRole(on: team.id)
             if role != .prospect {
                 options.append((team.id, role))
-            } else if team.tier < myTier, me.age <= 23, career.fame >= Balance.careerFameCap(myTier) * 0.8 {
+            } else if team.tier < myTier, me.age <= 23, career.fame >= Balance.careerFameCap(myTier) * 0.8,
+                      me.ability >= Balance.abilityRange(team.tier).lowerBound - 8 {
                 // 이름이 알려진 어린 선수는 윗 리그에서 유망주로 데려가려 한다.
                 options.append((team.id, role))
             }

@@ -18,17 +18,29 @@ extension Game {
             for id in team.roster {
                 guard var player = players[id] else { continue }
                 player.age += 1
-                if player.age >= Balance.declineStartAge {
+                if player.age >= Balance.declineStartAge(player.position) {
                     // 체력·주력부터 떨어진다.
                     for key in Attributes.Key.all(for: player.position.sport) {
                         let drop = key == .stamina || key == .speed ? rng.double(2.5...5) : rng.double(0.5...2)
                         player.attributes[key] = max(1, player.attributes[key] - drop)
                     }
                     player.potential = max(player.ability, player.potential - 2)
+                } else if player.age >= Balance.earlyDeclineAge(player.position) {
+                    // 본격적인 하락 전: 몸으로 하는 능력치만 조금 내려가고, 눈과 제구는 오히려 는다.
+                    for key in Attributes.Key.all(for: player.position.sport) {
+                        switch key {
+                        case .speed, .stamina, .fielding, .stuff:
+                            player.attributes[key] = max(1, player.attributes[key] - rng.double(0.5...1.5))
+                        case .eye, .control:
+                            player.attributes[key] = min(99, player.attributes[key] + rng.double(0...0.5))
+                        default:
+                            break
+                        }
+                    }
                 }
                 players[id] = player
 
-                let start = Balance.retirementAge(team.tier)
+                let start = Balance.retirementAge(team.tier, position: player.position)
                 // 선수 모드의 내 선수는 스스로 은퇴를 정한다.
                 if player.age >= start, !isMyPlayer(id), rng.chance(min(1, 0.12 * Double(player.age - start + 1))) {
                     if team.isUser { retired.append(player.name) }
@@ -49,7 +61,10 @@ extension Game {
                     ? Double(player.pitching.wins + player.pitching.saves) / 15
                     : max(0, player.batting.ops - 0.7)
                 let bonus = min(Balance.raiseMaxBonus, improvement * 0.02 + performance * 0.15)
-                player.contract.salary = Int(Double(player.contract.salary) * (1 + rng.double(Balance.raiseBase) + bonus))
+                // 축구는 계약 기간 동안 연봉이 그대로다 (재계약할 때 오른다). 야구는 시즌마다 연봉 협상을 한다.
+                if player.position.sport != .football {
+                    player.contract.salary = Int(Double(player.contract.salary) * (1 + rng.double(Balance.raiseBase) + bonus))
+                }
                 player.contract.seasonsLeft -= 1
                 players[id] = player
             }
@@ -99,9 +114,39 @@ extension Game {
         careerStartOffseason()
     }
 
+    /// 축구에는 드래프트가 없다. 대신 오프시즌에 모든 구단이 자기 유소년 팀에서 선수를 올린다.
+    /// 훈련소가 좋을수록 잠재력 높은 선수가 나온다. 내 구단은 후보 세 명 중 한 명을 고른다.
+    mutating func runYouthIntake() {
+        for team in teams {
+            let tier = team.tier
+            let range = Balance.abilityRange(tier)
+            let academy = Double(team.trainingLevel)
+            func youth() -> PlayerID {
+                var spec = PlayerFactory.Spec(position: rng.pick(rosterPositions(tier)), tier: tier, season: season)
+                spec.age = 16...18
+                spec.ability = (range.lowerBound - 10)...(range.lowerBound + 2)
+                spec.potential = (range.lowerBound + 4 + academy)...(range.upperBound + academy)
+                return makePlayer(spec).id
+            }
+            if team.isUser {
+                let board = (0..<3).map { _ in youth() }
+                candidates += board.map {
+                    Candidate(id: newMarketID(), playerID: $0, fee: 0, matchesLeft: 99, source: .draft)
+                }
+                post("유소년 승급: 유소년 팀에서 후보 \(board.count)명이 올라왔습니다. 선수 탭에서 한 명을 고르세요.")
+            } else if teams[team.id].roster.count < rosterLimit(tier) {
+                add(youth(), to: team.id)
+            }
+        }
+    }
+
     /// 신인 드래프트 (3부 이상): 지난 시즌 순위 역순으로 지명한다.
     mutating func runDraft() {
         draftDone = true
+        if sport == .football {
+            runYouthIntake()
+            return
+        }
         for tier in [LeagueTier.pro, .semiPro, .amateur] {
             let range = Balance.abilityRange(tier)
             var pool: [PlayerID] = []
@@ -189,6 +234,7 @@ extension Game {
                 player.batting = BattingLine()
                 player.pitching = PitchingLine()
                 if player.position.sport == .football { player.football = FootballLine() }
+                player.suspendedMatches = nil
                 player.abilityAtSeasonStart = player.ability
                 player.isHot = false
                 players[id] = player

@@ -17,7 +17,8 @@ extension FootballMatch {
             }
         }
         let shooter = attacking.players[shooterIndex]
-        let power = shootingValue(shooter)
+        // 욕심내기: 무리한 슈팅이 섞여 정확도가 떨어진다.
+        let power = shootingValue(shooter) - (shooter.style == .greedy ? 5 : 0)
         attacking.shots += 1
         attacking.players[shooterIndex].line.shots += 1
 
@@ -41,7 +42,7 @@ extension FootballMatch {
         attacking.shotsOnTarget += 1
         attacking.players[shooterIndex].line.shotsOnTarget += 1
         let keeping = keepingValue()
-        if rng.chance(clamp(0.335 * exp((power - keeping) / 90), 0.06, 0.6)) {
+        if rng.chance(clamp(0.36 * exp((power - keeping) / 90), 0.06, 0.6)) {
             score(shooterIndex, assist: assistIndex, how: rng.pick(Self.goalLines), &events)
         } else {
             saved(by: shooter.name, &events)

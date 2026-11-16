@@ -35,6 +35,10 @@ extension Game {
 
     public mutating func setNextStarter(_ id: PlayerID?) throws {
         if let id {
+            if let player = players[id], player.teamID == userTeamID, player.position == .starter,
+               userTeam.gamesPlayed - player.lastStartGame <= Balance.starterRest(userTier) {
+                throw GameError("\(player.name)은(는) 아직 쉬어야 합니다. 선발은 등판 뒤 \(Balance.starterRest(userTier))경기를 쉽니다.")
+            }
             guard let player = players[id], player.teamID == userTeamID, player.isPitcher else {
                 throw GameError("내 팀 투수를 골라야 합니다.")
             }

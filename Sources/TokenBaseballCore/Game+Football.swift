@@ -19,14 +19,17 @@ extension Game {
         return FootballLineupBuilder.fitted(team: team, players: players, season: season)
     }
 
-    func makeFootballMatch(home: TeamID, away: TeamID, kind: MatchKind, seed: UInt64) -> FootballMatch? {
+    func makeFootballMatch(
+        home: TeamID, away: TeamID, kind: MatchKind, seed: UInt64, rules: FootballRules? = nil
+    ) -> FootballMatch? {
         var homeTeam = teams[home], awayTeam = teams[away]
         homeTeam.formation = formation(of: home)
         awayTeam.formation = formation(of: away)
         guard let homeSide = FootballLineupBuilder.side(team: homeTeam, players: players),
               let awaySide = FootballLineupBuilder.side(team: awayTeam, players: players)
         else { return nil }
-        return FootballMatch(away: awaySide, home: homeSide, rules: footballRules(for: kind, home: home), seed: seed)
+        return FootballMatch(
+            away: awaySide, home: homeSide, rules: rules ?? footballRules(for: kind, home: home), seed: seed)
     }
 
     /// 화면 없이 한 경기를 끝까지 치르고 홈 팀이 이겼는지 돌려준다 (승부가 나야 하는 경기용).
@@ -48,7 +51,13 @@ extension Game {
     mutating func startFootballMatch(
         _ next: NextMatch, home: TeamID, away: TeamID, tier: LeagueTier, now: Date
     ) throws {
-        guard var state = makeFootballMatch(home: home, away: away, kind: next.kind, seed: rng.next()) else {
+        // 플레이오프는 대진 형식에 따라 규칙이 다르다 (합산 2차전, 중립 결승).
+        let playoffRules = next.kind == .playoff
+            ? series.first { !$0.isDecided && $0.involves(userTeamID) }.map { footballPlayoffRules($0, home: home) }
+            : nil
+        guard var state = makeFootballMatch(
+            home: home, away: away, kind: next.kind, seed: rng.next(), rules: playoffRules)
+        else {
             throw GameError("경기를 시작할 수 없습니다.")
         }
         if isCareer { decorateCareerFootball(&state, userIsHome: next.userIsHome) }
@@ -126,11 +135,10 @@ extension Game {
             round += 1
         case .playoff:
             applyFootball(state, tier: userTier, countsForStandings: false)
-            if let index = series.firstIndex(where: {
-                !$0.isDecided && ($0.upperTeam == userTeamID || $0.lowerTeam == userTeamID)
-            }) {
-                let winner = state.result == .homeWin ? state.home.teamID : state.away.teamID
-                if winner == series[index].upperTeam { series[index].upperWins += 1 } else { series[index].lowerWins += 1 }
+            if let index = series.firstIndex(where: { !$0.isDecided && $0.involves(userTeamID) }) {
+                recordPlayoffGame(
+                    index, home: state.home.teamID, homeScore: state.home.goals, awayScore: state.away.goals,
+                    shootoutHomeWon: state.wentToShootout ? state.result == .homeWin : nil)
             }
             summary += settle(.playoff)
         case .friendly:
@@ -152,12 +160,27 @@ extension Game {
     mutating func applyFootball(_ state: FootballMatch, tier: LeagueTier, countsForStandings: Bool) {
         for (side, opponent) in [(state.home, state.away), (state.away, state.home)] {
             let teamID = side.teamID
+            if countsForStandings {
+                // 이 경기를 쉬며 출장 정지를 채운 선수들.
+                for id in teams[teamID].roster {
+                    if let left = players[id]?.suspendedMatches, left > 0 {
+                        players[id]?.suspendedMatches = left > 1 ? left - 1 : nil
+                    }
+                }
+            }
             for (index, entry) in side.players.enumerated() where entry.hasPlayed {
                 guard var player = players[entry.playerID] else { continue }
                 if countsForStandings {
                     var line = player.football ?? FootballLine()
+                    let yellowsBefore = line.yellowCards
                     line += entry.line
                     player.football = line
+                    // 출장 정지: 퇴장은 다음 리그 한 경기, 시즌 경고 다섯 장마다 한 경기.
+                    if entry.line.redCards > 0 {
+                        player.suspendedMatches = Balance.footballRedCardBan
+                    } else if line.yellowCards / Balance.footballYellowsPerBan > yellowsBefore / Balance.footballYellowsPerBan {
+                        player.suspendedMatches = 1
+                    }
                 }
                 player.isHot = entry.line.goals >= 1 || entry.line.assists >= 2
                     || (entry.line.cleanSheets >= 1 && entry.line.saves >= 3)

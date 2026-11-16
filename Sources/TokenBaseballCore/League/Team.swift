@@ -181,6 +181,11 @@ public enum LineupBuilder {
         if let first = team.firstReliever, let index = relievers.firstIndex(where: { $0.id == first }) {
             relievers.insert(relievers.remove(at: index), at: 0)
         }
+        // 직전 경기에 많이 던졌거나 연투한 불펜은 맨 뒤로 보낸다 (꼭 필요할 때만 나온다).
+        let tired = relievers.filter { $0.needsReliefRest(game: team.gamesPlayed) }
+        if !tired.isEmpty, tired.count < relievers.count {
+            relievers = relievers.filter { !$0.needsReliefRest(game: team.gamesPlayed) } + tired
+        }
         let closers = pitchers.filter { $0.id != starter.id && $0.position == .closer }
         var bullpen = relievers.map(\.id) + closers.prefix(1).map(\.id)
         if bullpen.isEmpty {

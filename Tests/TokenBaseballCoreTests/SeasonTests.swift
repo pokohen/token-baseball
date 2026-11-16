@@ -215,7 +215,7 @@ enum Invariants {
         #expect(game.offers.count >= 3)
     }
 
-    @Test func 승강_플레이오프는_3전_2선승이고_이기면_올라간다() throws {
+    @Test func 이위는_와일드카드를_거쳐_3전_2선승_승강_플레이오프를_치르고_이기면_올라간다() throws {
         var game = TestGame.make(seed: 24)
         for id in game.userTeam.roster {
             for key in Attributes.Key.allCases { game.players[id]?.attributes[key] = 55 }
@@ -242,23 +242,33 @@ enum Invariants {
         game.endRegularSeason()
 
         #expect(game.phase == .playoff)
-        let mine = try #require(game.series.first { $0.lowerTeam == game.userTeamID })
-        #expect(mine.upperTier == .citizenSemiPro)
-        // 1차전은 상위 리그 팀 홈
+        // 먼저 3위와 승격 와일드카드: 2위인 내 구단의 홈이고, 한 번만 이기면 된다.
+        let wildcard = try #require(game.series.first { $0.involves(game.userTeamID) })
+        #expect(wildcard.kind == .wildcard)
+        #expect(wildcard.upperTeam == game.userTeamID)
+        #expect(wildcard.upperTier == .citizenSemiPro)
         #expect(game.nextMatch()?.kind == .playoff)
-        #expect(game.nextMatch()?.userIsHome == false)
+        #expect(game.nextMatch()?.userIsHome == true)
+        #expect(game.nextMatch()?.label == "승격 와일드카드 1차전")
 
         var clock = TestGame.start
         var games = 0
+        var sawPromotionSeries = false
         while game.phase == .playoff {
             clock = clock.addingTimeInterval(3600)
-            if games == 1 { #expect(game.nextMatch()?.userIsHome == true) }
+            if let mine = game.series.first(where: { $0.involves(game.userTeamID) }), mine.kind == .bestOfThree {
+                // 승강 플레이오프: 윗 리그 9위가 1·3차전 홈.
+                sawPromotionSeries = true
+                #expect(mine.lowerTeam == game.userTeamID)
+                #expect(game.nextMatch()?.userIsHome == (mine.played == 1))
+            }
             try game.startMatch(now: clock)
             #expect(game.live?.state.rules.maxInnings == nil)
             game.runMatchToEnd()
             games += 1
         }
-        #expect((2...3).contains(games))
+        #expect(sawPromotionSeries)
+        #expect((3...5).contains(games))
         #expect(game.phase == .offseason)
         let promoted = game.news.contains { $0.text.hasPrefix("승격!") }
         #expect(game.userTier == (promoted ? .citizenSemiPro : .citizenAmateur))
@@ -884,10 +894,11 @@ enum Invariants {
         #expect(game.sponsorPenaltySeasons == 1)
 
         // 정규시즌 첫 경기의 스폰서 수입이 절반이다.
-        let expected = Int(game.userTeam.fame) * Balance.sponsorPerFame(game.userTier) / 2
-        #expect(expected > 0)
         try game.startMatch(now: manager.clock.addingTimeInterval(3600))
         game.runMatchToEnd()
+        // 스폰서 수입은 경기 결과로 인지도가 바뀐 뒤에 계산된다.
+        let expected = Int(game.userTeam.fame) * Balance.sponsorPerFame(game.userTier) / 2
+        #expect(expected > 0)
         #expect(game.funds.seasonIncome["스폰서"] == expected)
 
         while game.phase == .regular { try manager.playOne(&game) }

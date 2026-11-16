@@ -54,19 +54,39 @@ public enum SeasonPhase: String, Codable, Sendable {
     case regular, playoff, offseason
 }
 
-/// 승강 플레이오프 한 시리즈 (3전 2선승, 상위 리그 팀 홈에서 1·3차전).
+/// 플레이오프의 한 대진. 형식에 따라 한 경기일 수도, 여러 경기일 수도 있다.
+/// (형식과 단계가 없는 예전 저장 파일은 3전 2선승의 승강 플레이오프로 읽는다.)
 public struct PlayoffSeries: Codable, Equatable, Sendable {
+    public enum Format: String, Codable, Sendable {
+        /// 3전 2선승 (1·3차전은 `upperTeam` 홈).
+        case bestOfThree
+        /// 승격 와일드카드: 순위가 높은 팀(`upperTeam`) 홈에서, 그 팀은 1승·상대는 2연승이 필요하다.
+        case wildcard
+        /// 홈·원정 두 경기 합산 (1차전은 `lowerTeam` 홈).
+        case twoLegs
+        /// 중립 구장 단판.
+        case single
+    }
+
+    public enum Stage: String, Codable, Sendable {
+        case wildcard, semi, final, promotion
+    }
+
+    /// 이 대진이 걸린 리그 경계의 윗 리그.
     public var upperTier: LeagueTier
+    /// 승강 플레이오프에서는 윗 리그 팀, 그 밖에는 정규시즌 순위가 높은 팀.
     public var upperTeam: TeamID
     public var lowerTeam: TeamID
     public var upperWins = 0
     public var lowerWins = 0
+    public var format: Format? = nil
+    public var stage: Stage? = nil
+    /// 두 경기 합산: 지금까지의 골과 치른 경기 수.
+    public var upperGoals: Int? = nil
+    public var lowerGoals: Int? = nil
+    public var legs: Int? = nil
 
     public var gamesPlayed: Int { upperWins + lowerWins }
-    public var isDecided: Bool { upperWins >= 2 || lowerWins >= 2 }
-    /// 다음 경기의 홈 팀: 1·3차전은 상위 리그 팀.
-    public var nextHome: TeamID { gamesPlayed == 1 ? lowerTeam : upperTeam }
-    public var nextAway: TeamID { gamesPlayed == 1 ? upperTeam : lowerTeam }
 }
 
 /// 리그 이동 예정.

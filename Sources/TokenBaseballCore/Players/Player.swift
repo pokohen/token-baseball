@@ -185,7 +185,7 @@ public struct Attributes: Codable, Equatable, Sendable {
         case .midfielder:
             [(.passing, 0.35), (.dribbling, 0.20), (.tackling, 0.15), (.stamina, 0.15), (.shooting, 0.10), (.speed, 0.05)]
         case .forward:
-            [(.shooting, 0.40), (.dribbling, 0.20), (.speed, 0.20), (.physical, 0.10), (.passing, 0.10)]
+            [(.shooting, 0.38), (.dribbling, 0.20), (.speed, 0.17), (.physical, 0.10), (.passing, 0.08), (.stamina, 0.07)]
         default:
             [(.contact, 0.28), (.power, 0.22), (.eye, 0.15), (.speed, 0.10), (.fielding, 0.17), (.arm, 0.08)]
         }
@@ -328,6 +328,19 @@ public struct Player: Codable, Identifiable, Equatable, Sendable {
     public var abilityAtSeasonStart: Double
     /// 직전 경기에서 활약해 "컨디션 좋음" 상태인지.
     public var isHot: Bool
+    /// 마지막으로 구원 등판한 팀 경기 번호와 그때 던진 공 수 (불펜 휴식 계산용). 예전 저장 파일에는 없다.
+    public var lastReliefGame: Int? = nil
+    public var lastReliefPitches: Int? = nil
+    /// 연달아 구원 등판한 경기 수.
+    public var reliefStreak: Int? = nil
+    /// 축구: 남은 출장 정지 경기 수.
+    public var suspendedMatches: Int? = nil
+
+    /// 이 불펜 투수가 다음 팀 경기(번호 `game`)에 쉬어야 하는지: 직전 경기에 25구 넘게 던졌거나 이틀 연속 나왔을 때.
+    public func needsReliefRest(game: Int) -> Bool {
+        guard let last = lastReliefGame, last == game - 1 else { return false }
+        return (lastReliefPitches ?? 0) >= 25 || (reliefStreak ?? 0) >= 2
+    }
 
     public var isPitcher: Bool { position.isPitcher }
 

@@ -25,7 +25,7 @@ extension FootballMatch {
         if roll < (penalty ? 0.02 : 0.001) {
             sentOff = true
             text += ". 곧바로 퇴장!"
-        } else if roll < (dangerous ? 0.24 : 0.13) {
+        } else if roll < (dangerous ? 0.24 : 0.13) * (fouler.line.yellowCards > 0 ? 0.5 : 1) {
             defending.yellowCards += 1
             defending.players[index].line.yellowCards += 1
             if defending.players[index].line.yellowCards >= 2 {

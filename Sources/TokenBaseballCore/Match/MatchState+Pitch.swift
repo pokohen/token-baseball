@@ -72,7 +72,7 @@ extension MatchState {
         let velocity = Int((108 + stuff * 0.48 - type.speedDrop + rng.gaussian() * 2).rounded())
 
         // 코스: 볼카운트가 불리하면 존 안쪽을 노린다.
-        var intent = 0.50 + Double(balls - strikes) * 0.07
+        var intent = 0.45 + Double(balls - strikes) * 0.07
         if balls == 3 { intent += 0.12 }
         if strikes == 2, balls < 2 { intent -= 0.12 }
         intent = clamp(intent, 0.25, 0.85)
@@ -122,7 +122,7 @@ extension MatchState {
 
         // 맞히기
         var contactChance = (inZone ? 0.84 : 0.60) + (contact - stuff) * 0.004
-        if isBreaking { contactChance -= 0.03 + (pitcher.breaking - 50) * 0.001 }
+        if isBreaking { contactChance -= 0.03 + (pitcher.breaking - eye) * 0.001 }
         if !rng.chance(clamp(contactChance, 0.3, 0.97)) {
             strikes += 1
             if strikes >= 3 {

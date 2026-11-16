@@ -168,7 +168,8 @@ public enum Balance {
 
     public static let stadiumCapacity = [100, 500, 2_000, 5_000, 8_000, 12_000, 15_000, 18_000, 22_000, 25_000]
     /// 홈 보정 (0.01 = +1%).
-    public static let stadiumHomeEdge = [0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.045, 0.0475, 0.05]
+    /// 가장 큰 경기장에서 같은 전력끼리 홈 승률이 54~55%가 되는 수준이다.
+    public static let stadiumHomeEdge = [0.005, 0.007, 0.009, 0.011, 0.013, 0.016, 0.019, 0.021, 0.023, 0.025]
     public static let stadiumCost = [
         15_000_000, 50_000_000, 150_000_000, 300_000_000, 600_000_000,
         1_200_000_000, 2_500_000_000, 5_000_000_000, 10_000_000_000,
@@ -297,6 +298,60 @@ public enum Balance {
     public static func retirementAge(_ tier: LeagueTier) -> Int { tier.isCitizen ? 42 : 34 }
     public static let declineStartAge = 34
 
+    /// 포지션까지 본 성장 계수. 축구 필드 선수는 전성기가 조금 이르고, 골키퍼는 늦게까지 큰다.
+    public static func ageGrowthFactor(_ age: Int, position: Position) -> Double {
+        guard position.sport == .football else { return ageGrowthFactor(age) }
+        if position == .goalkeeper {
+            switch age {
+            case ...23: return 1.5
+            case 24...28: return 1.0
+            case 29...31: return 0.4
+            default: return 0
+            }
+        }
+        switch age {
+        case ...21: return 1.5
+        case 22...25: return 1.0
+        case 26...28: return 0.4
+        default: return 0
+        }
+    }
+
+    /// 능력치가 본격적으로 떨어지기 시작하는 나이. 축구 골키퍼는 늦다.
+    public static func declineStartAge(_ position: Position) -> Int {
+        position == .goalkeeper ? 35 : position.sport == .football ? 33 : declineStartAge
+    }
+
+    /// 그보다 앞서, 몸으로 하는 능력치만 조금씩 내려가기 시작하는 나이.
+    public static func earlyDeclineAge(_ position: Position) -> Int {
+        position == .goalkeeper ? 33 : position.sport == .football ? 30 : 31
+    }
+
+    /// 은퇴를 생각하기 시작하는 나이. 골키퍼는 3년 늦다.
+    public static func retirementAge(_ tier: LeagueTier, position: Position) -> Int {
+        retirementAge(tier) + (position == .goalkeeper && !tier.isCitizen ? 3 : 0)
+    }
+
+    /// 축구 출장 정지: 퇴장이면 쉬는 리그 경기 수, 그리고 시즌 경고 몇 장마다 한 경기를 쉬는지.
+    public static let footballRedCardBan = 1
+    public static let footballYellowsPerBan = 5
+
+    /// 축구 이적 기간: 여름(오프시즌과 개막 직후 세 라운드)과 겨울(시즌 중반 네 라운드).
+    public static let footballSummerWindowRounds = 3
+    public static let footballWinterWindow = 16...19
+
+    /// 축구: 승격에 필요한 구장 등급(경기장 레벨). 잉글랜드 리그의 구장 등급 심사를 본떴다.
+    public static func promotionStadiumLevel(from tier: LeagueTier) -> Int {
+        switch tier {
+        case .citizenAmateur: 2
+        case .citizenSemiPro: 3
+        case .citizenPro: 4
+        case .amateur: 5
+        case .semiPro: 6
+        case .pro: 0
+        }
+    }
+
     // MARK: 선수 모드
 
     public static let careerStartAge = 16
@@ -309,6 +364,13 @@ public enum Balance {
     public static let careerSessionsPerMatch = 2
     /// 이 나이부터는 훈련으로 능력치를 올릴 수 없다.
     public static let careerTrainingAgeLimit = 31
+    /// 포지션별 훈련 한도 나이: 성장이 멈추는 나이와 같다.
+    public static func careerTrainingAgeLimit(_ position: Position) -> Int {
+        position == .goalkeeper ? 32 : position.sport == .football ? 29 : careerTrainingAgeLimit
+    }
+    public static func careerForcedRetirementAge(_ position: Position) -> Int {
+        careerForcedRetirementAge + (position == .goalkeeper ? 3 : 0)
+    }
     public static let careerVoluntaryRetirementAge = 30
     public static let careerForcedRetirementAge = 38
     /// 잠재력까지 남은 여유가 이 값 이하면 훈련 비용이 두 배가 된다.
@@ -323,10 +385,10 @@ public enum Balance {
     /// 축구 평점의 포지션별 기준 보정. 시뮬레이션으로 맞춘다.
     public static func careerFootballBaseline(_ position: Position) -> Double {
         switch position {
-        case .goalkeeper: 0.2
-        case .defender: 0.1
-        case .midfielder: 0.2
-        default: 0.1
+        case .goalkeeper: 0.1
+        case .defender: 0.0
+        case .midfielder: -0.1
+        default: 0.2
         }
     }
     /// 축구: 주전이 아닌 골키퍼는 이 경기 수마다 한 번 선발로 나온다.
@@ -337,11 +399,15 @@ public enum Balance {
     }
     /// 훈련하지 않아도 저절로 크는 정도 (다른 선수의 성장에 곱하는 값).
     public static let careerNaturalGrowth = 0.3
+    /// 훈련 한 번에 오르는 능력(CA).
+    public static let careerTrainingStep = 0.25
+    /// 훈련으로는 지금 리그 강도 범위의 위쪽 끝 + 이 값까지만 오른다.
+    public static let careerLeagueHeadroom = 5.0
 
     /// 능력치 하나를 +1 올리는 데 드는 훈련 포인트.
     /// 훈련할 때마다 그 능력치의 다음 비용이 6%쯤 오른다 (25에서 25만, 50에서 116만, 70에서 397만, 85에서 1,000만).
     public static func careerTrainingCost(value: Double) -> Int {
-        let cost = 250_000 * exp((value.rounded(.down) - 25) * 0.0615)
+        let cost = 250_000 * exp((value - 25) * 0.0615)
         return max(100_000, Int(cost / 10_000) * 10_000)
     }
 

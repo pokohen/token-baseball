@@ -7,6 +7,8 @@ extension Game {
     public struct CareerPerformance: Equatable, Sendable {
         public var rating: Double
         public var line: String
+        /// 축구: 뛴 시간(분). 야구는 nil.
+        public var minutes: Int? = nil
     }
 
     /// 이 경기에서 내 선수가 한 일과 평점 (1.0~10.0, 6.0이 "무난했다"). 나오지 않았으면 nil.
@@ -18,7 +20,7 @@ extension Game {
             guard line.plateAppearances > 0 else { return nil }
             let singles = line.hits - line.doubles - line.triples - line.homeRuns
             let quietOuts = max(0, line.atBats - line.hits - line.strikeouts)
-            var rating = 6.0
+            var rating = 6.1
             rating += Double(singles) * 0.55 + Double(line.doubles) * 0.8
             rating += Double(line.triples) * 1.0 + Double(line.homeRuns) * 1.4
             rating += Double(line.runsBattedIn) * 0.3 + Double(line.runs) * 0.2
@@ -37,7 +39,7 @@ extension Game {
             var rating = 6.0
             if index == 0 {
                 // 선발은 점수를 주는 것이 보통이라 기준을 조금 높게 잡는다.
-                rating += 0.3
+                rating += 0.2
                 rating += Double(line.outs) * 0.12 - Double(line.earnedRuns) * 0.45 - Double(unearned) * 0.2
                 rating += Double(line.strikeouts) * 0.08 - Double(line.walks) * 0.12
                 rating -= Double(line.hits) * 0.06 + Double(line.homeRuns) * 0.2
@@ -57,7 +59,11 @@ extension Game {
     }
 
     /// 평점에 따른 감독 신뢰 변화: 7.0 이상이면 오르고 6.0 아래면 내린다.
-    static func careerTrustChange(rating: Double) -> Double {
+    /// 축구에서 30분도 못 뛴 교체 출전은 평점이 6점 근처에 몰리므로 기준을 따로 둔다.
+    static func careerTrustChange(rating: Double, minutes: Int? = nil) -> Double {
+        if let minutes, minutes < 30 {
+            return rating >= 6.5 ? 0.5 : rating < 5.7 ? -0.5 : 0
+        }
         if rating >= 7 { return min(6, 1 + (rating - 7) * 3) }
         if rating < 6 { return max(-6, -1 - (6 - rating) * 3) }
         return 0
@@ -105,7 +111,8 @@ extension Game {
         guard var career, !career.retired, let me = players[career.playerID] else { return [] }
         var lines: [String] = []
 
-        career.sessionsLeft = Balance.careerSessionsPerMatch
+        // 선발 투수는 등판하지 않는 날에 훈련을 한 번 더 한다.
+        career.sessionsLeft = Balance.careerSessionsPerMatch + (me.position == .starter && performance == nil ? 1 : 0)
         career.matchesAtClub += 1
         career.subMinute = nil
         career.lastRating = performance?.rating
@@ -115,7 +122,9 @@ extension Game {
             // 친선 경기는 절반만 반영한다.
             let weight = kind == .friendly ? 0.5 : 1.0
             let before = career.trust
-            career.trust = clamp(career.trust + Self.careerTrustChange(rating: performance.rating) * weight, 0, 100)
+            career.trust = clamp(
+                career.trust + Self.careerTrustChange(rating: performance.rating, minutes: performance.minutes) * weight,
+                0, 100)
             let moved = Int((career.trust - before).rounded())
             if moved != 0 { lines.append("감독 신뢰 \(moved > 0 ? "+" : "")\(moved)") }
             if kind != .friendly {
@@ -159,7 +168,8 @@ extension Game {
         let detail = entry.detail ?? FootballDetail()
         let minutes = min(120, max(1, detail.minutes))
         var delta = 0.0
-        delta += Double(line.goals) * 1.0 + Double(line.assists) * 0.6
+        // 연계 스타일은 도움 하나가 더 크게 평가된다.
+        delta += Double(line.goals) * 1.0 + Double(line.assists) * (entry.style == .link ? 0.8 : 0.6)
         delta += Double(line.shotsOnTarget) * 0.15
         delta += Double(detail.advances) * 0.05 + Double(detail.tackles) * 0.12 + Double(detail.clearances) * 0.12
         delta -= Double(detail.fouls) * 0.1 + Double(line.yellowCards) * 0.3 + Double(line.redCards) * 1.5
@@ -183,6 +193,6 @@ extension Game {
             if detail.tackles + detail.clearances > 0 { text += " 수비 \(detail.tackles + detail.clearances)" }
         }
         if line.redCards > 0 { text += " 퇴장" } else if line.yellowCards > 0 { text += " 경고" }
-        return CareerPerformance(rating: clamp(6 + delta * weight, 1, 10), line: text)
+        return CareerPerformance(rating: clamp(6 + delta * weight, 1, 10), line: text, minutes: minutes)
     }
 }

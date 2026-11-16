@@ -129,7 +129,7 @@ public struct MatchState: Codable, Equatable, Sendable {
             } else if current.role == .closer {
                 pull = current.line.pitches >= 45
             } else {
-                pull = current.line.pitches >= 38 || current.line.runs >= 4
+                pull = current.line.pitches >= 28 || current.line.runs >= 4
             }
             if pull {
                 next = team.pitchers.firstIndex { !$0.hasEntered && $0.role != .closer }
@@ -154,9 +154,11 @@ public struct MatchState: Codable, Equatable, Sendable {
         // 도루: 1루 주자, 2루가 비어 있을 때
         if let runner = bases[0], bases[1] == nil {
             let stealer = batting.batters[runner.batterIndex]
-            let attempt = max(0, stealer.speed - 50) * 0.0012
+            // 주자의 발과 포수 어깨의 차이로 뛴다. 포수 어깨가 약한 하위 리그에서도 도루가 나온다.
+            let catcherArm = fielding.batters.first { $0.position == .catcher }?.arm ?? 40
+            let attempt = clamp(
+                0.012 + (stealer.speed - catcherArm) * 0.0008 + (stealer.speed - 50) * 0.0001, 0, 0.04)
             if rng.chance(attempt) {
-                let catcherArm = fielding.batters.first { $0.position == .catcher }?.arm ?? 40
                 let success = clamp(0.62 + (stealer.speed - catcherArm) * 0.006, 0.3, 0.92)
                 if rng.chance(success) {
                     bases[1] = runner
