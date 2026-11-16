@@ -297,6 +297,51 @@ public enum Balance {
     public static func retirementAge(_ tier: LeagueTier) -> Int { tier.isCitizen ? 42 : 34 }
     public static let declineStartAge = 34
 
+    // MARK: 선수 모드
+
+    public static let careerStartAge = 16
+    /// 내 선수의 잠재력. 숨겨져 있다.
+    public static let careerPotential = 75.0...90.0
+    /// 6부 리그 열 구단 중 몇 번째 구단에 입단하는지 (0이 가장 강한 구단).
+    public static let careerStartSlot = 5
+    public static let careerStartTrust = 40.0
+    /// 경기와 경기 사이에 할 수 있는 훈련 횟수.
+    public static let careerSessionsPerMatch = 2
+    /// 이 나이부터는 훈련으로 능력치를 올릴 수 없다.
+    public static let careerTrainingAgeLimit = 31
+    public static let careerVoluntaryRetirementAge = 30
+    public static let careerForcedRetirementAge = 38
+    /// 잠재력까지 남은 여유가 이 값 이하면 훈련 비용이 두 배가 된다.
+    public static let careerNearPotentialRoom = 10.0
+    /// 감독 신뢰가 이 값 이상이어야 구단이 재계약을 제안한다.
+    public static let careerRenewalTrust = 30.0
+    public static let careerFameAward = 8.0
+    /// 한계 돌파 훈련: 잠재력을 +1 올리는 데 드는 훈련 포인트.
+    public static let careerBreakthroughCost = 30_000_000
+    /// 구단을 옮긴 뒤 이 경기 수가 지나야 다른 구단의 제안이 다시 온다.
+    public static let careerOfferCooldown = 10
+    /// 훈련하지 않아도 저절로 크는 정도 (다른 선수의 성장에 곱하는 값).
+    public static let careerNaturalGrowth = 0.3
+
+    /// 능력치 하나를 +1 올리는 데 드는 훈련 포인트.
+    /// 훈련할 때마다 그 능력치의 다음 비용이 6%쯤 오른다 (25에서 25만, 50에서 116만, 70에서 397만, 85에서 1,000만).
+    public static func careerTrainingCost(value: Double) -> Int {
+        let cost = 250_000 * exp((value.rounded(.down) - 25) * 0.0615)
+        return max(100_000, Int(cost / 10_000) * 10_000)
+    }
+
+    /// 그 리그에서 뛰는 동안 명성이 오를 수 있는 한도.
+    public static func careerFameCap(_ tier: LeagueTier) -> Double {
+        switch tier {
+        case .citizenAmateur: 20
+        case .citizenSemiPro: 30
+        case .citizenPro: 40
+        case .amateur: 55
+        case .semiPro: 75
+        case .pro: 100
+        }
+    }
+
     // MARK: 재정 위기
 
     public static let bankruptcyGraceMatches = 5

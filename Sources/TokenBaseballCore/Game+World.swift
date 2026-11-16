@@ -12,8 +12,12 @@ extension Game {
         if kind == .regular { runCPUClubs() }
         // 5. 맞춰주기는 성장 계산 안에서 한다.
         // 6. 이적 시장 소식
-        resolveMarketAfterMatch()
-        updateFinancialState()
+        if isCareer {
+            resolveCareerMarketAfterMatch()
+        } else {
+            resolveMarketAfterMatch()
+            updateFinancialState()
+        }
         if isBankrupt, phase == .playoff {
             // 해체된 구단의 플레이오프는 상대의 부전승으로 끝낸다.
             for index in series.indices where !series[index].isDecided {
@@ -24,7 +28,7 @@ extension Game {
         // 시즌 흐름
         switch kind {
         case .regular:
-            if round == Balance.applicationDeadlineRound, !expiryNoticeSent {
+            if !isCareer, round == Balance.applicationDeadlineRound, !expiryNoticeSent {
                 expiryNoticeSent = true
                 let leaving = roster(of: userTeamID).filter { isExpiring($0) }.map(\.name)
                 if !leaving.isEmpty {
@@ -48,7 +52,7 @@ extension Game {
         let current = strength(of: team.id)
         // 리그별 강도 범위는 어떤 설정에서도 지킨다.
         if current >= range.upperBound { return 0 }
-        let band = settings.rubberBand
+        let band = effectiveRubberBand
         guard band != .off else { return 1 }
 
         let leagueTarget = clamp(userStrength, range.lowerBound, range.upperBound)
@@ -79,7 +83,9 @@ extension Game {
             for id in team.roster {
                 guard var player = players[id] else { continue }
                 let play = playedFactor[id] ?? Balance.playFactorBench
-                Self.grow(&player, teamFactor: factor, playFactor: play, focus: team.focus)
+                // 선수 모드의 내 선수는 저절로는 조금만 크고, 나머지는 훈련으로 올린다.
+                let mine = isMyPlayer(id) ? Balance.careerNaturalGrowth : 1
+                Self.grow(&player, teamFactor: factor * mine, playFactor: play, focus: team.focus)
                 players[id] = player
             }
         }
@@ -163,7 +169,7 @@ extension Game {
     /// 맞춰주기: 오프시즌 영입으로 맞출 리그 목표 평균. 끄기면 nil.
     /// 내 팀 강도를 리그 범위 안으로 자른 값을 향해, 시즌당 한도만큼만 움직인다.
     func leagueTargetAverage(_ tier: LeagueTier) -> Double? {
-        let band = settings.rubberBand
+        let band = effectiveRubberBand
         guard band != .off else { return nil }
         let range = Balance.strengthRange(tier)
         let desired = clamp(strength(of: userTeamID), range.lowerBound, range.upperBound)
@@ -192,7 +198,8 @@ extension Game {
         // 강도가 범위나 목표를 벗어나면 주축 선수를 바꾼다.
         for _ in 0..<60 {
             let current = strength(of: id)
-            let core = coreRoster(id)
+            // 선수 모드의 내 선수는 구단이 마음대로 내보내지 않는다.
+            let core = coreRoster(id).filter { !isMyPlayer($0.id) }
             if current < floor, let weakest = core.min(by: { ($0.ability, $0.id) < ($1.ability, $1.id) }) {
                 replace(weakest, in: id, ability: clamp(max(target, weakest.ability) + 4, ability.lowerBound, 99))
             } else if current > ceiling, let strongest = core.max(by: { ($0.ability, $0.id) < ($1.ability, $1.id) }) {
@@ -212,7 +219,7 @@ extension Game {
             let quota = shape.filter { $0 == position }.count
             let same = roster(of: id).filter { $0.position == position }
                 .sorted { ($0.ability - Double($0.age) * 0.3, -$0.id) > ($1.ability - Double($1.age) * 0.3, -$1.id) }
-            for extra in same.dropFirst(quota) { moveToFreeAgency(extra.id) }
+            for extra in same.dropFirst(quota) where !isMyPlayer(extra.id) { moveToFreeAgency(extra.id) }
         }
     }
 

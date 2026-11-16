@@ -12,6 +12,7 @@ extension Game {
             }
         }
         giveAwards()
+        closeCareerSeason()
         // 강등 뒤 스폰서 감소는 한 시즌 동안 이어지고 여기서 끝난다.
         if sponsorPenaltySeasons > 0 { sponsorPenaltySeasons -= 1 }
 
@@ -19,10 +20,10 @@ extension Game {
         let myRank = rank(of: userTeamID)
         let myGames = standings[userTier.index].first { $0.teamID == userTeamID }.map { $0.wins + $0.losses + $0.draws } ?? 0
         let fullSeason = myGames >= Balance.roundsPerSeason / 2
-        let prize = isBankrupt || !fullSeason ? 0 : Balance.prizeMoney(userTier, rank: myRank)
+        let prize = isCareer || isBankrupt || !fullSeason ? 0 : Balance.prizeMoney(userTier, rank: myRank)
         if !isBankrupt {
             post("정규시즌 종료. \(userTeam.name)은(는) \(userTier.displayName) \(myRank)위로 마쳤습니다.")
-            if !fullSeason, Balance.prizeMoney(userTier, rank: myRank) > 0 {
+            if !isCareer, !fullSeason, Balance.prizeMoney(userTier, rank: myRank) > 0 {
                 post("시즌 도중에 창단해 이번 시즌 순위 상금은 없습니다.")
             }
         }
@@ -52,7 +53,7 @@ extension Game {
             }
         }
 
-        if !isBankrupt, !appliedForPromotion, myRank <= 2, userTier != .pro {
+        if !isCareer, !isBankrupt, !appliedForPromotion, myRank <= 2, userTier != .pro {
             post("승강 플레이오프를 신청하지 않아 승격 자격이 다음 순위 팀으로 넘어갔습니다.")
         }
 
@@ -99,6 +100,7 @@ extension Game {
         for move in pendingMoves {
             let from = teams[move.team].tier
             teams[move.team].tier = move.to
+            if isCareer, move.team == userTeamID { careerClubMoved(from: from, to: move.to) }
             guard teams[move.team].isUser else { continue }
             if move.to < from {
                 userPromoted(to: move.to)
@@ -185,7 +187,8 @@ extension Game {
                 guard let player, let teamID = player.teamID else { return nil }
                 awards.append(AwardRecord(
                     season: season, tier: tier, title: title, playerName: player.name,
-                    teamName: teams[teamID].name, detail: detail(player), isMine: teamID == userTeamID))
+                    teamName: teams[teamID].name, detail: detail(player),
+                    isMine: isCareer ? isMyPlayer(player.id) : teamID == userTeamID))
                 return player
             }
 
@@ -214,7 +217,8 @@ extension Game {
                 players[player.id] = player
             }
         }
-        let mine = awards.filter { $0.season == season && $0.isMine }
+        // 선수 모드의 수상은 시즌 기록을 정리할 때 다룬다.
+        let mine = isCareer ? [] : awards.filter { $0.season == season && $0.isMine }
         for award in mine {
             teams[userTeamID].fame += Balance.fameAward
             post("\(award.tier.displayName) \(award.title): \(award.playerName) (\(award.detail)). 인지도 +\(Int(Balance.fameAward)).")
@@ -248,7 +252,8 @@ extension Game {
                 players[id] = player
 
                 let start = Balance.retirementAge(team.tier)
-                if player.age >= start, rng.chance(min(1, 0.12 * Double(player.age - start + 1))) {
+                // 선수 모드의 내 선수는 스스로 은퇴를 정한다.
+                if player.age >= start, !isMyPlayer(id), rng.chance(min(1, 0.12 * Double(player.age - start + 1))) {
                     if team.isUser { retired.append(player.name) }
                     removePlayer(id)
                 }
@@ -275,7 +280,7 @@ extension Game {
 
         // CPU 구단: 계약이 끝난 선수는 대부분 재계약하고, 나머지는 FA로 나온다.
         for team in teams where !team.isUser {
-            for player in roster(of: team.id) where player.contract.seasonsLeft <= 0 {
+            for player in roster(of: team.id) where player.contract.seasonsLeft <= 0 && !isMyPlayer(player.id) {
                 if rng.chance(0.75) {
                     players[player.id]?.contract.seasonsLeft = rng.int(1...3)
                 } else {
@@ -306,7 +311,7 @@ extension Game {
             }
         }
 
-        let leaving = roster(of: userTeamID).filter { isExpiring($0) }.map(\.name)
+        let leaving = isCareer ? [] : roster(of: userTeamID).filter { isExpiring($0) }.map(\.name)
         post("오프시즌 시작. 친선 경기 \(Balance.friendliesPerOffseason)경기 동안 이적 시장이 열립니다.")
         if !leaving.isEmpty {
             post("계약 만료: \(leaving.joined(separator: ", ")). 오프시즌이 끝나기 전에 재계약하지 않으면 떠납니다.")
@@ -314,6 +319,7 @@ extension Game {
         if relegatedThisOffseason { generateIncomingOffers(count: 3) }
         // 은퇴나 강등 조항으로 인원이 모자라면 친선 경기를 치를 수 있게 채운다.
         fillUserMinimumRoster()
+        careerStartOffseason()
     }
 
     /// 신인 드래프트 (3부 이상): 지난 시즌 순위 역순으로 지명한다.
@@ -358,6 +364,8 @@ extension Game {
     }
 
     mutating func endOffseason() {
+        // 선수 모드: 계약이 없는 내 선수는 여기서 무소속이 된다 (아래의 구단 모드 정리에 걸리지 않게 먼저 한다).
+        careerEndOffseason()
         // 재계약하지 않은 계약 만료 선수는 떠난다.
         // 역제안에 아직 답하지 않은 선수는 다음 경기가 끝날 때까지 기다려 준다
         // (마지막 친선 경기 뒤에 온 역제안은 답할 틈이 없기 때문이다).
@@ -411,6 +419,7 @@ extension Game {
         }
         startSeasonSchedules()
         post("\(season)번째 시즌 시작! \(userTier.displayName) 리그.")
+        careerStartSeason()
     }
 
     /// CPU 구단이 FA 시장에서 가장 약한 자리를 한 명 보강한다.
@@ -432,6 +441,8 @@ extension Game {
 
     /// 내 팀에 경기를 치를 최소 인원이 없으면 임시 선수를 데려온다.
     mutating func fillUserMinimumRoster() {
+        // 선수 모드의 내 구단은 CPU 구단이라 CPU 방식으로 채운다.
+        guard !isCareer else { return }
         if sport == .football {
             fillUserMinimumSquad()
             return

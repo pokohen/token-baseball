@@ -218,6 +218,11 @@ public struct Game: Codable, Equatable, Sendable {
     var draftDone = false
     var expiryNoticeSent = false
 
+    // 선수 모드. 구단 모드와 예전 저장 파일에는 없다.
+    public internal(set) var career: Career?
+    /// 은퇴한 내 선수들의 기록실.
+    public internal(set) var careerHall: [CareerRecord]?
+
     // MARK: 읽기
 
     public var sport: Sport { sportChoice ?? .baseball }

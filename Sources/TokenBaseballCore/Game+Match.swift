@@ -13,6 +13,8 @@ extension Game {
     /// 다음에 치를 내 경기. 없으면 nil.
     public func nextMatch() -> NextMatch? {
         guard !isBankrupt else { return nil }
+        // 선수 모드: 은퇴했거나 무소속이면 치를 경기가 없다.
+        if let career, career.retired || career.isFreeAgent { return nil }
         switch phase {
         case .regular:
             guard round < Balance.roundsPerSeason,
@@ -72,7 +74,15 @@ extension Game {
         guard !isBankrupt else { throw GameError("구단이 해체되었습니다. 새 구단을 만들어 주세요.") }
         guard !isMatchLive else { throw GameError("진행 중인 경기가 끝나야 다음 경기를 시작할 수 있습니다.") }
         guard charges > 0 else { throw GameError("아직 경기 기회가 없습니다.") }
+        if let career {
+            guard !career.retired else { throw GameError("은퇴했습니다. 새 선수를 만들어 주세요.") }
+            guard !career.isFreeAgent else { throw GameError("무소속입니다. 입단할 구단을 먼저 골라 주세요.") }
+        }
         guard let next = nextMatch() else { throw GameError("지금은 치를 경기가 없습니다.") }
+        if isCareer {
+            ensurePlayable(userTeamID)
+            prepareCareerLineup()
+        }
         guard canField(userTeam) else {
             throw GameError(sport == .football
                 ? "골키퍼 1명을 포함해 11명이 있어야 경기를 할 수 있습니다."
@@ -182,6 +192,8 @@ extension Game {
             friendliesPlayed += 1
         }
 
+        if isCareer { summary += settleCareerMatch(kind: match.kind, state: state, userIsHome: userIsHome) }
+
         lastResult = LastResult(
             kind: match.kind, myRuns: mine.runs, theirRuns: theirs.runs,
             opponent: theirs.name, wasHome: userIsHome, summary: summary)
@@ -247,6 +259,8 @@ extension Game {
         kind: MatchKind, myScore: Int, theirScore: Int, opponent: TeamID, userIsHome: Bool,
         shootoutWon: Bool? = nil
     ) -> [String] {
+        // 선수 모드에는 구단 재정이 없다. 내 선수의 정산은 따로 한다.
+        guard !isCareer else { return [] }
         var lines: [String] = []
         let tier = userTier
         let won = shootoutWon ?? (myScore > theirScore)

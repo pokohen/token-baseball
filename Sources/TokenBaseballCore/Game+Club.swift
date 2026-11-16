@@ -361,7 +361,7 @@ extension Game {
             list.prefix(count).map {
                 Leader(
                     playerName: $0.name, teamName: $0.teamID.map { teams[$0].name } ?? "",
-                    value: text($0), isMine: $0.teamID == userTeamID)
+                    value: text($0), isMine: isCareer ? isMyPlayer($0.id) : $0.teamID == userTeamID)
             }
         }
         return [

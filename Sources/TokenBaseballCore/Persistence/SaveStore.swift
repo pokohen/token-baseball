@@ -13,6 +13,28 @@ public struct GameSave: Codable, Equatable, Sendable {
     }
 }
 
+/// 저장 칸: 종목과 모드마다 저장 파일을 따로 둔다. 한 번에 하나만 진행한다.
+public enum SaveSlot: String, CaseIterable, Sendable {
+    case baseball
+    case football
+    /// 야구 선수 모드.
+    case baseballPlayer = "baseball-player"
+
+    public var sport: Sport { self == .football ? .football : .baseball }
+    /// 구단이 아니라 선수 한 명을 키우는 모드인지.
+    public var isCareer: Bool { self == .baseballPlayer }
+
+    public var label: String {
+        switch self {
+        case .baseball: "야구 구단"
+        case .football: "축구 구단"
+        case .baseballPlayer: "야구 선수"
+        }
+    }
+
+    public init(sport: Sport) { self = sport == .football ? .football : .baseball }
+}
+
 /// 게임 상태를 로컬 JSON 파일로 저장한다. 서버로 보내지 않는다.
 public struct SaveStore: Sendable {
     public let fileURL: URL
@@ -30,11 +52,15 @@ public struct SaveStore: Sendable {
 
     /// 같은 폴더에 있는 다른 종목의 저장 파일. 야구는 이 파일 그대로, 축구는 이름 뒤에 `-football`이 붙는다.
     /// (예: `save.json` → `save-football.json`)
-    public func sibling(for sport: Sport) -> SaveStore {
-        guard sport != .baseball else { return self }
+    public func sibling(for sport: Sport) -> SaveStore { sibling(slot: SaveSlot(sport: sport)) }
+
+    /// 같은 폴더에 있는 다른 저장 칸의 파일. 야구 구단은 이 파일 그대로, 나머지는 이름 뒤에 칸 이름이 붙는다.
+    /// (예: `save.json` → `save-football.json`, `save-baseball-player.json`)
+    public func sibling(slot: SaveSlot) -> SaveStore {
+        guard slot != .baseball else { return self }
         let base = fileURL.deletingPathExtension().lastPathComponent
         let ext = fileURL.pathExtension
-        let name = "\(base)-\(sport.rawValue)" + (ext.isEmpty ? "" : ".\(ext)")
+        let name = "\(base)-\(slot.rawValue)" + (ext.isEmpty ? "" : ".\(ext)")
         return SaveStore(fileURL: fileURL.deletingLastPathComponent().appendingPathComponent(name))
     }
 
@@ -43,15 +69,20 @@ public struct SaveStore: Sendable {
     /// 지금 운영 중인 종목을 적어 두는 파일 (`save.sport`). 없으면 야구다.
     var activeSportURL: URL { fileURL.deletingPathExtension().appendingPathExtension("sport") }
 
-    public func loadActiveSport() -> Sport {
+    public func loadActiveSport() -> Sport { loadActiveSlot().sport }
+
+    public func saveActiveSport(_ sport: Sport) throws { try saveActiveSlot(SaveSlot(sport: sport)) }
+
+    /// 지금 진행 중인 저장 칸. 같은 파일(`save.sport`)에 적고, 예전에 적어 둔 종목 이름도 그대로 읽힌다.
+    public func loadActiveSlot() -> SaveSlot {
         guard let text = try? String(contentsOf: activeSportURL, encoding: .utf8) else { return .baseball }
-        return Sport(rawValue: text.trimmingCharacters(in: .whitespacesAndNewlines)) ?? .baseball
+        return SaveSlot(rawValue: text.trimmingCharacters(in: .whitespacesAndNewlines)) ?? .baseball
     }
 
-    public func saveActiveSport(_ sport: Sport) throws {
+    public func saveActiveSlot(_ slot: SaveSlot) throws {
         try FileManager.default.createDirectory(
             at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try sport.rawValue.write(to: activeSportURL, atomically: true, encoding: .utf8)
+        try slot.rawValue.write(to: activeSportURL, atomically: true, encoding: .utf8)
     }
 
     /// 저장 파일이 없으면 `nil`. 파일이 깨졌으면 오류를 던진다 (조용히 새 게임으로 덮어쓰지 않기 위해).

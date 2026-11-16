@@ -58,6 +58,7 @@ extension Game {
         let ready = charges > 0 && nextMatch() != nil
         switch settings.menuBarDisplay {
         case .funds:
+            if isCareer { return "\(Format.tokens(funds.balance)) P" + (ready ? " •" : "") }
             return Format.money(funds.balance) + (ready ? " •" : "")
         case .today:
             return Format.tokens(todayTokens) + (ready ? " •" : "")
@@ -70,12 +71,21 @@ extension Game {
 
     /// 상단바 툴팁: 자금, 오늘 사용량, 다음 경기를 모두 보여준다.
     public func menuBarTooltip(now: Date, todayTokens: Int) -> String {
-        var lines = ["구단 자금 \(Format.money(funds.balance))", "오늘 사용량 \(Format.tokens(todayTokens))"]
+        var lines = [
+            isCareer ? "훈련 포인트 \(Format.tokens(funds.balance)) P" : "구단 자금 \(Format.money(funds.balance))",
+            "오늘 사용량 \(Format.tokens(todayTokens))",
+        ]
         let marks = chargeMarks
         if let wait = timeToNextCharge(now: now) {
             lines.append("경기 기회 \(marks) (다음 \(Format.countdown(wait)))")
         } else {
             lines.append("경기 기회 \(marks)")
+        }
+        if let career {
+            if career.retired { lines.append("은퇴했습니다. 새 선수를 만들 수 있습니다") }
+            if career.isFreeAgent { lines.append("무소속: 입단할 구단을 골라 주세요") }
+            if !career.offers.isEmpty, !career.isFreeAgent { lines.append("답할 계약 제안 \(career.offers.count)건") }
+            return lines.joined(separator: "\n")
         }
         switch financialState {
         case .warning: lines.append("재정 경고: 자금이 다음 5경기 연봉보다 적습니다")

@@ -1,0 +1,192 @@
+import Foundation
+
+/// 선수 모드에서 내 선수를 만들 때 정하는 것.
+public struct CareerSetup: Equatable, Sendable {
+    public var name: String
+    public var position: Position
+    public var bats: Hand
+    public var throwsHand: Hand
+    /// 출신 도시. 선수 소개에만 쓴다.
+    public var hometown: String
+
+    public init(
+        name: String, position: Position, bats: Hand = .right, throwsHand: Hand = .right, hometown: String = "서울"
+    ) {
+        self.name = name
+        self.position = position
+        self.bats = bats
+        self.throwsHand = throwsHand
+        self.hometown = hometown
+    }
+
+    /// 선수 모드에서 고를 수 있는 포지션. 마무리는 세이브 상황에만 나와서 뺐다.
+    public static let batterPositions: [Position] = Position.fieldPositions + [.designated]
+    public static let pitcherPositions: [Position] = [.starter, .reliever]
+}
+
+/// 다른 구단이 본 내 입지.
+public enum CareerRole: String, Codable, Sendable {
+    case starter = "주전", rotation = "주전 경쟁", prospect = "유망주"
+}
+
+/// 내 선수에게 온 계약 제안.
+public struct CareerOffer: Codable, Equatable, Identifiable, Sendable {
+    public enum Kind: String, Codable, Sendable {
+        /// 다른 구단의 이적 제안.
+        case transfer
+        /// 지금 구단의 재계약 제안.
+        case renewal
+        /// 무소속일 때 받는 입단 제안.
+        case tryout
+    }
+
+    public var id: Int
+    public var kind: Kind
+    public var teamID: TeamID
+    public var salary: Int
+    public var years: Int
+    public var role: CareerRole
+    /// 이 경기 수가 지나면 사라진다.
+    public var matchesLeft: Int
+    /// 연봉을 올려 달라고 이미 한 번 말했는지.
+    public var negotiated = false
+}
+
+/// 감독이 시즌을 시작할 때 주는 목표.
+public struct CareerGoal: Codable, Equatable, Sendable {
+    public enum Kind: String, Codable, Sendable {
+        case hits, homeRuns, wins, strikeouts, appearances
+    }
+
+    public var kind: Kind
+    public var target: Int
+    /// 시즌이 끝나고 채웠는지. 시즌 중에는 nil.
+    public var achieved: Bool?
+
+    public var label: String {
+        switch kind {
+        case .hits: "안타 \(target)개"
+        case .homeRuns: "홈런 \(target)개"
+        case .wins: "\(target)승"
+        case .strikeouts: "탈삼진 \(target)개"
+        case .appearances: "\(target)경기 등판"
+        }
+    }
+
+    public func progress(of player: Player) -> Int {
+        switch kind {
+        case .hits: player.batting.hits
+        case .homeRuns: player.batting.homeRuns
+        case .wins: player.pitching.wins
+        case .strikeouts: player.pitching.strikeouts
+        case .appearances: player.pitching.games
+        }
+    }
+}
+
+/// 끝난 시즌 하나의 기록.
+public struct CareerSeason: Codable, Equatable, Sendable {
+    public var season: Int
+    public var age: Int
+    public var teamName: String
+    public var tier: LeagueTier
+    public var batting: BattingLine
+    public var pitching: PitchingLine
+    /// 평점이 매겨진 경기 수와 평점 합.
+    public var ratedGames: Int
+    public var ratingTotal: Double
+    public var awards: [String]
+
+    public var averageRating: Double? { ratedGames == 0 ? nil : ratingTotal / Double(ratedGames) }
+}
+
+/// 은퇴한 선수의 커리어 기록 (기록실).
+public struct CareerRecord: Codable, Equatable, Sendable {
+    public var name: String
+    public var position: Position
+    public var firstSeason: Int
+    public var lastSeason: Int
+    public var retiredAge: Int
+    public var clubs: [String]
+    public var batting: BattingLine
+    public var pitching: PitchingLine
+    public var ratedGames: Int
+    public var ratingTotal: Double
+    public var awards: [String]
+    public var peakAbility: Double
+    public var bestTier: LeagueTier
+    public var earnings: Int
+
+    public var averageRating: Double? { ratedGames == 0 ? nil : ratingTotal / Double(ratedGames) }
+}
+
+/// 선수 모드의 상태. 구단 모드에서는 `Game.career`가 nil이다.
+public struct Career: Codable, Equatable, Sendable {
+    public var playerID: PlayerID
+    /// 감독 신뢰 (0~100).
+    public var trust: Double
+    /// 명성 (0~100).
+    public var fame = 0.0
+    /// 다음 경기까지 남은 훈련 횟수.
+    public var sessionsLeft: Int
+    /// 받은 연봉의 합.
+    public var earnings = 0
+    public var trainingCount = 0
+    /// 지금 구단에 온 뒤 치른 경기 수.
+    public var matchesAtClub = 0
+
+    /// 직전 경기 평점과 한 줄 기록. 나오지 않았으면 nil.
+    public var lastRating: Double?
+    public var lastLine: String?
+    /// 이번 시즌 평점 (정규시즌만).
+    public var seasonRatedGames = 0
+    public var seasonRatingTotal = 0.0
+    /// 이번 시즌 기록을 `history`에 옮겼는지 (정규시즌이 끝나면 true, 새 시즌이 시작되면 false).
+    public var seasonClosed = false
+
+    public var history: [CareerSeason] = []
+    public var clubs: [String] = []
+    public var awards: [String] = []
+    public var firstSeason: Int
+    public var peakAbility = 0.0
+    public var bestTier = LeagueTier.citizenAmateur
+
+    public var offers: [CareerOffer] = []
+    var nextOfferID = 1
+    /// 이번 이적 기간에 이적을 요청했는지.
+    public var transferRequested = false
+    /// 무소속: 입단 제안 중 하나를 골라야 경기를 할 수 있다.
+    public var isFreeAgent = false
+    public var retired = false
+    public var goal: CareerGoal?
+
+    init(playerID: PlayerID, season: Int) {
+        self.playerID = playerID
+        self.trust = Balance.careerStartTrust
+        self.sessionsLeft = Balance.careerSessionsPerMatch
+        self.firstSeason = season
+    }
+
+    public var seasonAverageRating: Double? {
+        seasonRatedGames == 0 ? nil : seasonRatingTotal / Double(seasonRatedGames)
+    }
+}
+
+/// 능력치 하나를 올리는 훈련.
+public enum CareerDrill {
+    public static func name(_ key: Attributes.Key) -> String {
+        switch key {
+        case .contact: "티 배팅"
+        case .power: "웨이트 트레이닝"
+        case .eye: "선구안 훈련"
+        case .speed: "주루 훈련"
+        case .fielding: "펑고"
+        case .arm: "롱토스"
+        case .stuff: "불펜 피칭"
+        case .control: "제구 훈련"
+        case .breaking: "변화구 연마"
+        case .stamina: "러닝"
+        default: key.label
+        }
+    }
+}
