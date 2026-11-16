@@ -35,7 +35,7 @@ struct CareerTrainingTab: View {
                     KeyValueRow(key: "시즌 시작 때보다", value: String(format: "%+.1f", me.ability - me.abilityAtSeasonStart))
                     KeyValueRow(key: "최고 능력", value: "\(Int(career.peakAbility))")
                     KeyValueRow(key: "지금까지 훈련", value: "\(career.trainingCount)회")
-                    Text("능력은 포지션에 중요한 능력치일수록 크게 반영됩니다. 훈련하지 않아도 경기를 뛰면 조금씩 큽니다. 34세부터는 시즌마다 능력치가 떨어집니다.").note()
+                    Text("어떤 훈련이든 능력은 같은 양만큼 오릅니다. 훈련하지 않아도 경기를 뛰면 조금씩 큽니다. \(Balance.declineStartAge(me.position))세부터는 시즌마다 능력치가 크게 떨어집니다.").note()
                 }
             }
         }
@@ -47,7 +47,7 @@ struct CareerTrainingTab: View {
         return HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 1) {
                 Text(CareerDrill.name(key, sport: game.sport)).font(.callout.weight(.medium))
-                Text("\(key.label) \(String(format: "%.1f", value))").note()
+                Text("\(label(key)) \(String(format: "%.1f", value))").note()
             }
             .frame(width: 118, alignment: .leading)
             Bar(fraction: value / 99, color: .accentColor)
@@ -55,8 +55,13 @@ struct CareerTrainingTab: View {
                 model.perform { try $0.trainCareer(key) }
             }
             .disabled(blocked != nil)
-            .help(blocked ?? "\(key.label) +\(String(format: "%.1f", game.careerTrainingGain(key)))")
+            .help(blocked ?? "\(label(key)) +\(String(format: "%.1f", game.careerTrainingGain(key)))")
         }
+    }
+
+    /// 주력과 스피드는 같은 능력치다. 종목에 맞는 이름으로 보여 준다.
+    private func label(_ key: Attributes.Key) -> String {
+        game.sport == .football && key == .speed ? "스피드" : key.label
     }
 
     private func trainingNote(_ career: Career, _ me: Player) -> String {

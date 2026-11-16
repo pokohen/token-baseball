@@ -25,8 +25,9 @@ extension Game {
         var homeTeam = teams[home], awayTeam = teams[away]
         homeTeam.formation = formation(of: home)
         awayTeam.formation = formation(of: away)
-        guard let homeSide = FootballLineupBuilder.side(team: homeTeam, players: players),
-              let awaySide = FootballLineupBuilder.side(team: awayTeam, players: players)
+        let friendly = kind == .friendly
+        guard let homeSide = FootballLineupBuilder.side(team: homeTeam, players: players, ignoreSuspensions: friendly),
+              let awaySide = FootballLineupBuilder.side(team: awayTeam, players: players, ignoreSuspensions: friendly)
         else { return nil }
         return FootballMatch(
             away: awaySide, home: homeSide, rules: rules ?? footballRules(for: kind, home: home), seed: seed)
@@ -134,7 +135,7 @@ extension Game {
             summary += settle(.regular)
             round += 1
         case .playoff:
-            applyFootball(state, tier: userTier, countsForStandings: false)
+            applyFootball(state, tier: userTier, countsForStandings: false, competitive: true)
             if let index = series.firstIndex(where: { !$0.isDecided && $0.involves(userTeamID) }) {
                 recordPlayoffGame(
                     index, home: state.home.teamID, homeScore: state.home.goals, awayScore: state.away.goals,
@@ -157,10 +158,13 @@ extension Game {
     }
 
     /// 경기 결과를 선수 기록·순위표에 반영한다.
-    mutating func applyFootball(_ state: FootballMatch, tier: LeagueTier, countsForStandings: Bool) {
+    /// `competitive`: 출장 정지를 채우는 경기인지 (리그 경기와 플레이오프). 친선 경기는 아니다.
+    mutating func applyFootball(
+        _ state: FootballMatch, tier: LeagueTier, countsForStandings: Bool, competitive: Bool? = nil
+    ) {
         for (side, opponent) in [(state.home, state.away), (state.away, state.home)] {
             let teamID = side.teamID
-            if countsForStandings {
+            if competitive ?? countsForStandings {
                 // 이 경기를 쉬며 출장 정지를 채운 선수들.
                 for id in teams[teamID].roster {
                     if let left = players[id]?.suspendedMatches, left > 0 {

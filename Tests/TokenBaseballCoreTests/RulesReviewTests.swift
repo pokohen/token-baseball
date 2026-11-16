@@ -315,3 +315,46 @@ enum ReviewGame {
         }
     }
 }
+
+@Suite struct FootballReviewFollowUpTests {
+    @Test func 합산_이차전은_그날_점수가_달라도_승부차기_승자가_이긴다() throws {
+        // 1차전에서 원정 팀이 2:1로 이긴 뒤의 2차전: 홈 팀이 1:0으로 이기면 합산 2:2라 승부차기로 간다.
+        let game = ReviewGame.football(seed: 91)
+        let home = game.teams(in: .citizenAmateur)[0].id, away = game.teams(in: .citizenAmateur)[1].id
+        var rules = FootballRules(mustHaveWinner: true, homeEdge: 0.01)
+        rules.firstLegHome = 1
+        rules.firstLegAway = 2
+        var sawAwayShootoutWin = false, sawUnequalScoreShootout = false
+        for seed in 1...400 as ClosedRange<UInt64> {
+            guard var match = game.makeFootballMatch(home: home, away: away, kind: .playoff, seed: seed, rules: rules)
+            else { continue }
+            match.runToEnd()
+            guard match.wentToShootout else { continue }
+            // 승부차기는 합산이 같을 때만 간다.
+            #expect(match.home.goals + 1 == match.away.goals + 2)
+            sawUnequalScoreShootout = true
+            let shootoutHome = match.home.shootoutGoals > match.away.shootoutGoals
+            #expect(match.result == (shootoutHome ? .homeWin : .awayWin))
+            if !shootoutHome { sawAwayShootoutWin = true }
+        }
+        #expect(sawUnequalScoreShootout)
+        #expect(sawAwayShootoutWin)
+    }
+
+    @Test func 출장_정지는_친선_경기에_적용되지_않고_플레이오프에서도_채워진다() throws {
+        var game = ReviewGame.football(seed: 92)
+        let lineup = try #require(FootballLineupBuilder.build(team: game.userTeam, players: game.players))
+        let banned = lineup.starters[3].id
+        game.players[banned]?.suspendedMatches = 1
+        let friendly = try #require(FootballLineupBuilder.build(
+            team: game.userTeam, players: game.players, ignoreSuspensions: true))
+        #expect(friendly.starters.contains { $0.id == banned })
+
+        // 플레이오프 경기도 정지를 채운다.
+        let other = game.teams(in: .citizenAmateur).first { $0.id != game.userTeamID }!.id
+        var match = try #require(game.makeFootballMatch(home: game.userTeamID, away: other, kind: .playoff, seed: 3))
+        match.runToEnd()
+        game.applyFootball(match, tier: .citizenAmateur, countsForStandings: false, competitive: true)
+        #expect(game.players[banned]?.suspendedMatches == nil)
+    }
+}

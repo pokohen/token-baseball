@@ -73,6 +73,7 @@ struct LeagueTab: View {
             Text(game.sport == .football
                 ? "팀을 누르면 선수단을 볼 수 있습니다. 1위는 자동 승격, 2~5위는 승격 플레이오프(한 팀 승격), 9위와 10위는 자동 강등."
                 : "팀을 누르면 선수단을 볼 수 있습니다. 1위는 자동 승격, 2위와 3위는 와일드카드를 거쳐 윗 리그 9위와 승강 플레이오프, 10위는 자동 강등.").note()
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }

@@ -191,7 +191,7 @@ extension Game {
                         rules: footballPlayoffRules(entry, home: home))
                     else { series[index].upperWins = 2; break }
                     match.runToEnd()
-                    applyFootball(match, tier: entry.upperTier, countsForStandings: false)
+                    applyFootball(match, tier: entry.upperTier, countsForStandings: false, competitive: true)
                     recordPlayoffGame(
                         index, home: home, homeScore: match.home.goals, awayScore: match.away.goals,
                         shootoutHomeWon: match.wentToShootout ? match.result == .homeWin : nil)

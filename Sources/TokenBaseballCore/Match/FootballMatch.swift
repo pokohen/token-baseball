@@ -63,10 +63,12 @@ public struct FootballMatch: Codable, Equatable, Sendable {
 
     public var result: MatchResult? {
         guard isFinished else { return nil }
-        if home.goals != away.goals { return home.goals > away.goals ? .homeWin : .awayWin }
-        if home.shootoutGoals != away.shootoutGoals {
+        // 승부차기까지 갔으면 승부차기로 정한다. 두 경기 합산의 2차전은 그날 점수가 달라도
+        // 합산이 같아 승부차기로 갈 수 있으므로, 점수보다 먼저 본다.
+        if wentToShootout, home.shootoutGoals != away.shootoutGoals {
             return home.shootoutGoals > away.shootoutGoals ? .homeWin : .awayWin
         }
+        if home.goals != away.goals { return home.goals > away.goals ? .homeWin : .awayWin }
         return .draw
     }
 

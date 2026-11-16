@@ -117,7 +117,7 @@ extension Game {
     func careerFootballStarts(kind: MatchKind) -> Bool {
         guard let career, let me = players[career.playerID], let teamID = me.teamID else { return false }
         // 출장 정지 중에는 리그 경기에 나서지 못한다.
-        if kind == .regular, (me.suspendedMatches ?? 0) > 0 { return false }
+        if kind != .friendly, (me.suspendedMatches ?? 0) > 0 { return false }
         let team = teams[teamID]
         let quota = formation(of: teamID).slots.filter { $0 == me.position }.count
         let peers = roster(of: teamID).filter { $0.position == me.position && $0.id != me.id }
@@ -148,7 +148,9 @@ extension Game {
         team.lineupOverride = []
         team.formation = formation(of: userTeamID)
         self.career?.subMinute = nil
-        guard let auto = FootballLineupBuilder.build(team: team, players: players) else { return }
+        guard let auto = FootballLineupBuilder.build(
+            team: team, players: players, ignoreSuspensions: kind == .friendly)
+        else { return }
         var ids = auto.starters.map(\.id)
         if starts, !ids.contains(me.id) {
             let same = ids.indices.filter { players[ids[$0]]?.position == me.position }
@@ -165,7 +167,7 @@ extension Game {
             }
         }
         teams[userTeamID].lineupOverride = ids == auto.starters.map(\.id) ? [] : ids
-        let banned = kind == .regular && (me.suspendedMatches ?? 0) > 0
+        let banned = kind != .friendly && (me.suspendedMatches ?? 0) > 0
         if !ids.contains(me.id), me.position != .goalkeeper, !banned {
             self.career?.subMinute = Balance.careerSubMinute(trust: career.trust)
         }
