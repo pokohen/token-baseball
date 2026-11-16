@@ -10,6 +10,20 @@ enum CareerText {
         "\(line.games)경기 \(line.wins)승 \(line.losses)패 \(line.saves)세 평균자책점 \(String(format: "%.2f", line.era))"
     }
 
+    static func football(_ line: FootballLine, keeper: Bool) -> String {
+        keeper
+            ? "\(line.games)경기 무실점 \(line.cleanSheets)경기 선방 \(line.saves) 실점 \(line.conceded)"
+            : "\(line.games)경기 \(line.goals)골 \(line.assists)도움 슈팅 \(line.shots)"
+    }
+
+    /// 종목과 포지션에 맞는 기록 한 줄.
+    static func record(_ me: Player, batting: BattingLine, pitching: PitchingLine, football: FootballLine?) -> String {
+        if me.position.sport == .football {
+            return CareerText.football(football ?? FootballLine(), keeper: me.position == .goalkeeper)
+        }
+        return me.isPitcher ? CareerText.pitching(pitching) : CareerText.batting(batting)
+    }
+
     static func rating(_ value: Double?) -> String { value.map { String(format: "%.2f", $0) } ?? "—" }
 
     static func phase(_ game: Game) -> String {

@@ -283,11 +283,12 @@ final class AppModel: ObservableObject {
             perform { try $0.startNewCareer(setup: setup, now: Date()) }
         } else {
             // 이미 있는 선수를 덮어쓰지 않는다.
-            guard !hasSave(slot: .baseballPlayer) else {
-                switchSlot(to: .baseballPlayer)
+            let target = SaveSlot.career(for: setup.sport)
+            guard !hasSave(slot: target) else {
+                switchSlot(to: target)
                 return
             }
-            guard activate(.baseballPlayer) else { return }
+            guard activate(target) else { return }
             game = Game.newCareer(setup: setup, now: Date(), seed: UInt64.random(in: 1...UInt64.max))
             message = nil
             save()
@@ -378,7 +379,9 @@ final class AppModel: ObservableObject {
         if now.timeIntervalSince(lastTokenAt ?? launchedAt) > 600 { return .rest }
         if let me = game.myPlayer {
             // 선수 모드: 내 선수가 하는 훈련만 보여 준다.
-            let mine: [Sprites.Drill] = me.isPitcher ? [.pitching, .running, .weights] : [.batting, .fielding, .running, .weights]
+            let mine: [Sprites.Drill] = me.position == .goalkeeper ? [.keeping, .running, .weights]
+                : me.position.sport == .football ? [.dribbling, .shooting, .running, .weights]
+                : me.isPitcher ? [.pitching, .running, .weights] : [.batting, .fielding, .running, .weights]
             return mine[(Int(now.timeIntervalSince1970) / 8) % mine.count]
         }
         var drills: [Sprites.Drill] = game.sport == .football

@@ -11,7 +11,7 @@ struct MatchTab: View {
                 LiveMatchView(
                     live: live, myName: game.myPlayer?.name, myPerformance: game.careerLivePerformance)
             } else if let live = game.liveFootball {
-                FootballLiveView(live: live)
+                FootballLiveView(live: live, myName: game.myPlayer?.name, myPerformance: game.careerLivePerformance)
             } else {
                 if let result = game.lastResult {
                     Card("지난 경기", trailing: result.kind.label) {
@@ -25,7 +25,9 @@ struct MatchTab: View {
                 }
                 NextMatchCard(game: game)
                 schedule
-                if game.sport == .football {
+                if game.sport == .football, game.isCareer {
+                    PlayStyleCard(game: game)
+                } else if game.sport == .football {
                     TacticCard(game: game)
                 } else if game.isCareer {
                     Text("선수 모드에서는 라인업과 투수 운용을 감독이 정합니다. 경기 중에는 개입하지 않습니다.").note()
@@ -120,6 +122,32 @@ struct TacticCard: View {
             .labelsHidden()
             Text("공격적이면 슈팅 기회가 늘지만 실점 위험도 커집니다. 수비적이면 그 반대입니다.").note()
             Text("경기 중에는 개입하지 않습니다. 선발 11명은 선수 탭에서 정합니다. 지친 선수는 60분 이후 자동으로 교체됩니다.").note()
+        }
+        .font(.callout)
+    }
+}
+
+/// 축구 선수 모드: 경기 전에 플레이 스타일을 고른다.
+struct PlayStyleCard: View {
+    @EnvironmentObject var model: AppModel
+    let game: Game
+
+    var body: some View {
+        let style = game.career?.style ?? .balanced
+        Card("플레이 스타일", trailing: game.myPlayer?.position.label) {
+            if game.myPlayer?.position == .goalkeeper {
+                Text("골키퍼는 플레이 스타일이 없습니다.").note()
+            } else {
+                Picker("플레이 스타일", selection: Binding(
+                    get: { style },
+                    set: { value in model.perform { $0.setCareerStyle(value) } })) {
+                    ForEach(PlayStyle.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                Text(style.summary).note()
+            }
+            Text("포메이션, 전술, 선발 11명은 감독이 정합니다. 경기 중에는 개입하지 않습니다.").note()
         }
         .font(.callout)
     }

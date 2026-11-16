@@ -1,5 +1,62 @@
 import Foundation
 
+/// 선수 모드에서 평점을 매기려고 내 선수에게만 남기는 세부 기록.
+public struct FootballDetail: Codable, Equatable, Sendable {
+    /// 경기장에 있던 틱 수 (한 틱 = 경기 시간 20초).
+    public var ticks = 0
+    /// 공을 앞으로 운반한 횟수 (우리 진영 → 중원, 중원 → 상대 진영).
+    public var advances = 0
+    /// 공을 뺏어낸 횟수.
+    public var tackles = 0
+    /// 걷어내거나 슈팅을 몸으로 막은 횟수.
+    public var clearances = 0
+    public var fouls = 0
+
+    public init() {}
+
+    public var minutes: Int { ticks * FootballMatch.secondsPerStep / 60 }
+}
+
+/// 선수 모드에서 경기 전에 고르는 플레이 스타일.
+public enum PlayStyle: String, Codable, CaseIterable, Sendable {
+    case balanced = "균형", greedy = "욕심내기", link = "연계", defensive = "수비 가담"
+
+    /// 슈팅을 가져갈 가능성에 곱하는 값.
+    var shotWeight: Double {
+        switch self {
+        case .greedy: 1.7
+        case .link: 0.65
+        case .defensive: 0.75
+        case .balanced: 1
+        }
+    }
+
+    /// 도움을 줄 가능성에 곱하는 값.
+    var assistWeight: Double {
+        switch self {
+        case .greedy: 0.55
+        case .link: 1.7
+        case .defensive: 0.9
+        case .balanced: 1
+        }
+    }
+
+    /// 공을 뺏거나 걷어내는 장면에 나설 가능성에 곱하는 값.
+    var defenseWeight: Double { self == .defensive ? 2 : self == .greedy ? 0.6 : 1 }
+
+    /// 체력이 줄어드는 속도에 곱하는 값.
+    var drain: Double { self == .defensive ? 1.2 : 1 }
+
+    public var summary: String {
+        switch self {
+        case .balanced: "특별한 효과가 없습니다."
+        case .greedy: "슈팅을 더 많이 가져갑니다. 도움과 수비 가담이 줄어듭니다."
+        case .link: "도움 기회가 늘고 슈팅이 줄어듭니다."
+        case .defensive: "공을 뺏고 걷어내는 장면이 늘지만 체력이 빨리 줄고 슈팅이 줄어듭니다."
+        }
+    }
+}
+
 /// 축구 경기에 나선 선수 한 명. 능력치는 경기를 시작할 때의 값이고, 체력(`energy`)에 따라 깎여 쓰인다.
 public struct FootballPlayerState: Codable, Equatable, Sendable {
     public var playerID: PlayerID
@@ -17,6 +74,9 @@ public struct FootballPlayerState: Codable, Equatable, Sendable {
     public var hasPlayed: Bool
     public var sentOff = false
     public var line = FootballLine()
+    /// 선수 모드의 내 선수에게만 있다.
+    public var detail: FootballDetail? = nil
+    public var style: PlayStyle? = nil
 
     public init(
         playerID: PlayerID, name: String, natural: Position, slot: Position,
@@ -62,6 +122,9 @@ public struct FootballSide: Codable, Equatable, Sendable {
     public var possession = 0
     public var subsUsed = 0
     public var shootoutGoals = 0, shootoutKicks = 0
+    /// 선수 모드: 이 시간(분)이 되면 반드시 교체로 들어갈 벤치 선수.
+    public var guaranteedSub: PlayerID? = nil
+    public var guaranteedMinute: Int? = nil
 
     public init(teamID: TeamID, name: String, shortName: String, players: [FootballPlayerState], tactic: Tactic,
         formation: Formation? = nil

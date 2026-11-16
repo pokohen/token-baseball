@@ -79,7 +79,7 @@ struct OnboardingView: View {
                 }
             } else {
                 Text("Token Baseball").font(.title2.bold())
-                Text("평소처럼 AI 코딩을 하면 쓴 토큰이 구단 자금으로 쌓입니다. 그 돈으로 시민 구단을 프로 구단으로 키워 보세요. 야구단과 축구단 중에 고를 수 있고, 야구 선수 한 명이 되어 토큰으로 훈련하며 커리어를 보낼 수도 있습니다.")
+                Text("평소처럼 AI 코딩을 하면 쓴 토큰이 구단 자금으로 쌓입니다. 그 돈으로 시민 구단을 프로 구단으로 키워 보세요. 야구단과 축구단 중에 고를 수 있고, 야구 선수나 축구 선수 한 명이 되어 토큰으로 훈련하며 커리어를 보낼 수도 있습니다.")
                 Card("토큰 사용량을 읽는 곳") {
                     Text(model.sources.claudeCode.root.path).font(.caption.monospaced()).textSelection(.enabled)
                     Text(model.sources.codex.root.path).font(.caption.monospaced()).textSelection(.enabled)
@@ -99,15 +99,17 @@ struct OnboardingView: View {
                 : ["", "무엇을 할지 골라 주세요", "연고지를 골라 주세요", "팀 이름을 정해 주세요", "팀 색상과 엠블럼"][step]).font(.title3.bold())
             switch step {
             case 1:
-                HStack(spacing: 8) {
-                    ForEach(SaveSlot.allCases, id: \.self) { item in
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
+                    ForEach([SaveSlot.baseball, .baseballPlayer, .football, .footballPlayer], id: \.self) { item in
                         Button { slot = item } label: {
                             VStack(spacing: 6) {
-                                Image(systemName: item == .football ? "soccerball" : item.isCareer ? "figure.baseball" : "baseball.fill")
+                                Image(systemName: item == .football ? "soccerball" : item == .footballPlayer ? "figure.soccer"
+                                    : item.isCareer ? "figure.baseball" : "baseball.fill")
                                     .font(.system(size: 28))
                                 Text(item.label).font(.headline)
                                 Text(model.hasSave(slot: item) ? "저장되어 있음"
-                                    : item == .football ? "11명 · 승점제" : item.isCareer ? "선수 한 명의 커리어" : "9이닝 · 승률제").note()
+                                    : item == .football ? "구단 경영 · 승점제" : item == .footballPlayer ? "선수 한 명의 커리어"
+                                    : item.isCareer ? "타자·투수 한 명의 커리어" : "구단 경영 · 승률제").note()
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
@@ -120,10 +122,10 @@ struct OnboardingView: View {
                     }
                 }
                 Text(slot.isCareer
-                    ? "야구 선수: 16세에 6부 시민 구단에 입단해, 토큰으로 훈련하고 더 높은 리그로 올라가 1부 프로 리그의 스타가 되는 것이 목표입니다. 구단은 모두 CPU가 운영합니다."
+                    ? "\(slot.label): 16세에 6부 시민 구단에 입단해, 토큰으로 훈련하고 더 높은 리그로 올라가 1부 프로 리그의 스타가 되는 것이 목표입니다. 구단은 모두 CPU가 운영합니다."
                     : "구단과 선수는 따로 저장됩니다. 나중에 설정에서 다른 모드로 바꿔 하나 더 만들 수 있습니다. 한 번에 하나만 토큰을 받습니다.").note()
             case 2 where makingPlayer:
-                CareerForm(setup: $career)
+                CareerForm(setup: $career, sport: slot.sport)
                 Text("\(LeagueTier.citizenAmateur.displayName) 리그의 시민 구단에 입단합니다. 시작 훈련 포인트 \(FundsLedger.startingFunds.formatted()) P.").note()
             case 2:
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 8) {

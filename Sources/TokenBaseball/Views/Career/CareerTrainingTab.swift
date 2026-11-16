@@ -46,7 +46,7 @@ struct CareerTrainingTab: View {
         let blocked = game.careerTrainingBlockedReason(key)
         return HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 1) {
-                Text(CareerDrill.name(key)).font(.callout.weight(.medium))
+                Text(CareerDrill.name(key, sport: game.sport)).font(.callout.weight(.medium))
                 Text("\(key.label) \(Int(value))").note()
             }
             .frame(width: 118, alignment: .leading)

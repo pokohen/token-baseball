@@ -1,6 +1,6 @@
 import Foundation
 
-/// 선수 모드: 구단을 운영하는 대신 야구 선수 한 명이 되어 커리어를 보낸다.
+/// 선수 모드: 구단을 운영하는 대신 선수 한 명(야구 타자·투수, 축구 선수)이 되어 커리어를 보낸다.
 ///
 /// 세계는 구단 모드와 똑같이 돌아가고, 60개 구단이 모두 CPU 구단이다.
 /// `userTeamID`는 "내 선수가 뛰는 구단"을 가리키고, 그 구단의 경기가 중계된다.
@@ -20,13 +20,15 @@ extension Game {
     /// 새 선수 모드: 6개 리그 60팀을 모두 CPU 구단으로 만들고, 내 선수를 6부 구단에 입단시킨다.
     public static func newCareer(setup: CareerSetup, now: Date, seed: UInt64) -> Game {
         var game = Game(funds: FundsLedger(startedAt: now), rng: SeededRNG(seed: seed), chargeAnchor: now)
+        let sport = setup.sport
+        if sport != .baseball { game.sportChoice = sport }
         var taken: Set<String> = []
         for tier in LeagueTier.allCases {
             for slot in 0..<Balance.teamsPerLeague {
                 let id = game.teams.count
                 let identity = tier == .pro
-                    ? NameGenerator.proTeams(.baseball)[slot]
-                    : NameGenerator.cpuTeam(tier: tier, taken: taken, sport: .baseball, &game.rng)
+                    ? NameGenerator.proTeams(sport)[slot]
+                    : NameGenerator.cpuTeam(tier: tier, taken: taken, sport: sport, &game.rng)
                 taken.insert(identity.name)
                 game.teams.append(Team(
                     id: id, name: identity.name, city: identity.city, tier: tier, isUser: false, season: 1))
@@ -48,7 +50,8 @@ extension Game {
         let range = Balance.abilityRange(tier)
         let squad = roster(of: team)
         let reference = squad.filter { $0.position == setup.position }.map(\.ability).min()
-            ?? squad.filter { $0.isPitcher == setup.position.isPitcher }.map(\.ability).min()
+            ?? squad.filter { $0.isPitcher == setup.position.isPitcher && $0.position != .goalkeeper }
+                .map(\.ability).min()
             ?? range.lowerBound
         let ability = clamp(reference - 2, range.lowerBound, range.upperBound)
 
@@ -107,6 +110,85 @@ extension Game {
         return policy
     }
 
+    // MARK: 출전 (축구)
+
+    /// 축구: 감독이 나를 선발로 쓸지. 같은 포지션 선수들과 능력을 비교하고, 감독 신뢰만큼 보정한다 (−5 ~ +5).
+    /// 골키퍼는 교체로 나올 수 없어서, 주전이 아니어도 친선 경기와 네 경기 중 한 경기에는 선발로 나온다.
+    func careerFootballStarts(kind: MatchKind) -> Bool {
+        guard let career, let me = players[career.playerID], let teamID = me.teamID else { return false }
+        let team = teams[teamID]
+        let quota = formation(of: teamID).slots.filter { $0 == me.position }.count
+        let peers = roster(of: teamID).filter { $0.position == me.position && $0.id != me.id }
+            .map(\.ability).sorted(by: >)
+        if peers.count < quota { return true }
+        if quota > 0, me.ability + (career.trust - 50) / 10 >= peers[quota - 1] { return true }
+        if me.position == .goalkeeper {
+            return kind == .friendly || team.gamesPlayed % Balance.careerKeeperRotation == 0
+        }
+        return false
+    }
+
+    /// 다음 경기에 내 축구 선수가 어떻게 나오는지 (화면 안내용).
+    public var careerFootballPlan: (starts: Bool, subMinute: Int?)? {
+        guard let career, let me = players[career.playerID], me.position.sport == .football,
+              let next = nextMatch()
+        else { return nil }
+        let starts = careerFootballStarts(kind: next.kind)
+        return (starts, starts || me.position == .goalkeeper ? nil : Balance.careerSubMinute(trust: career.trust))
+    }
+
+    /// 축구: 선발 11명을 정한다. 내가 선발이면 같은 포지션에서 가장 약한 선발 대신 들어가고,
+    /// 아니면 벤치에서 시작해 정해진 시간에 교체로 들어간다.
+    mutating func prepareCareerFootballLineup(kind: MatchKind) {
+        guard let career, let me = players[career.playerID] else { return }
+        let starts = careerFootballStarts(kind: kind)
+        var team = teams[userTeamID]
+        team.lineupOverride = []
+        team.formation = formation(of: userTeamID)
+        self.career?.subMinute = nil
+        guard let auto = FootballLineupBuilder.build(team: team, players: players) else { return }
+        var ids = auto.starters.map(\.id)
+        if starts, !ids.contains(me.id) {
+            let same = ids.indices.filter { players[ids[$0]]?.position == me.position }
+            let candidates = same.isEmpty ? ids.indices.filter { players[ids[$0]]?.position != .goalkeeper } : same
+            if let index = candidates.min(by: {
+                (players[ids[$0]]?.ability ?? 0, $0) < (players[ids[$1]]?.ability ?? 0, $1)
+            }) {
+                ids[index] = me.id
+            }
+        } else if !starts, let index = ids.firstIndex(of: me.id) {
+            let bench = auto.bench.compactMap { players[$0] }
+            if let replacement = bench.first(where: { $0.position == me.position }) {
+                ids[index] = replacement.id
+            }
+        }
+        teams[userTeamID].lineupOverride = ids == auto.starters.map(\.id) ? [] : ids
+        if !ids.contains(me.id), me.position != .goalkeeper {
+            self.career?.subMinute = Balance.careerSubMinute(trust: career.trust)
+        }
+    }
+
+    /// 축구: 경기 엔진에 넘어간 내 선수에게 세부 기록, 플레이 스타일, 교체 투입 시간을 붙인다.
+    func decorateCareerFootball(_ match: inout FootballMatch, userIsHome: Bool) {
+        guard let career else { return }
+        var side = userIsHome ? match.home : match.away
+        guard let index = side.players.firstIndex(where: { $0.playerID == career.playerID }) else { return }
+        side.players[index].detail = FootballDetail()
+        let style = career.style ?? .balanced
+        if style != .balanced, side.players[index].natural != .goalkeeper { side.players[index].style = style }
+        if !side.players[index].isOnPitch, let minute = career.subMinute {
+            side.guaranteedSub = career.playerID
+            side.guaranteedMinute = minute
+        }
+        if userIsHome { match.home = side } else { match.away = side }
+    }
+
+    /// 축구: 경기 전에 플레이 스타일을 고른다.
+    public mutating func setCareerStyle(_ style: PlayStyle) {
+        guard career != nil else { return }
+        career?.style = style == .balanced ? nil : style
+    }
+
     /// 다음 경기에 내 선발 투수가 나오는 차례인지.
     public var careerStartsNextMatch: Bool {
         guard let me = myPlayer, me.position == .starter, let team = me.teamID else { return false }
@@ -117,8 +199,12 @@ extension Game {
     /// - 타자: 매 경기 선발로 나온다. 타순은 타격 순이고, 감독 신뢰가 높으면 앞으로 당겨진다.
     /// - 선발 투수: 쉬는 날을 채우면 반드시 선발로 나온다.
     /// - 불펜 투수: 선발이 내려가면 가장 먼저 올라온다.
-    mutating func prepareCareerLineup() {
+    mutating func prepareCareerLineup(kind: MatchKind = .regular) {
         guard let career, let me = players[career.playerID], me.teamID == userTeamID else { return }
+        if me.position.sport == .football {
+            prepareCareerFootballLineup(kind: kind)
+            return
+        }
         var team = teams[userTeamID]
         team.lineupOverride = []
         team.firstReliever = nil
@@ -172,5 +258,14 @@ extension Game {
             total += career.seasonRatingTotal
         }
         return (batting, pitching, games, total)
+    }
+
+    /// 축구 선수의 통산 기록: 끝난 시즌들에 진행 중인 시즌을 더한 값.
+    public var careerFootballTotals: FootballLine {
+        var line = FootballLine()
+        guard let career else { return line }
+        for season in career.history { line += season.football ?? FootballLine() }
+        if !career.seasonClosed, let me = players[career.playerID] { line += me.football ?? FootballLine() }
+        return line
     }
 }

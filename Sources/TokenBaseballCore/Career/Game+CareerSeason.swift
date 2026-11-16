@@ -15,6 +15,7 @@ extension Game {
             // 무소속 선수는 구단 로스터에 없어서 시즌 기록이 따로 비워지지 않는다.
             players[me.id]?.batting = BattingLine()
             players[me.id]?.pitching = PitchingLine()
+            if me.position.sport == .football { players[me.id]?.football = FootballLine() }
             players[me.id]?.abilityAtSeasonStart = me.ability
             players[me.id]?.isHot = false
         }
@@ -24,6 +25,14 @@ extension Game {
             career.goal = CareerGoal(kind: .wins, target: tier.isCitizen ? 4 : 3)
         case .reliever, .closer:
             career.goal = CareerGoal(kind: .appearances, target: 18)
+        case .forward:
+            career.goal = CareerGoal(kind: .goals, target: 6 + clamp(Int(me.ability - mid(Balance.strengthRange(tier))) / 3, -3, 6))
+        case .midfielder:
+            career.goal = CareerGoal(kind: .points, target: 6 + clamp(Int(me.ability - mid(Balance.strengthRange(tier))) / 3, -3, 6))
+        case .defender:
+            career.goal = CareerGoal(kind: .matches, target: 24)
+        case .goalkeeper:
+            career.goal = CareerGoal(kind: .matches, target: 10)
         default:
             let edge = Int(me.ability - mid(Balance.strengthRange(tier)))
             career.goal = CareerGoal(kind: .hits, target: 26 + clamp(edge, -6, 10))
@@ -38,7 +47,7 @@ extension Game {
         let won = awards.filter { $0.season == season && $0.isMine }
         career.history.append(CareerSeason(
             season: season, age: me.age, teamName: teams[userTeamID].name, tier: teams[userTeamID].tier,
-            batting: me.batting, pitching: me.pitching,
+            batting: me.batting, pitching: me.pitching, football: me.football,
             ratedGames: career.seasonRatedGames, ratingTotal: career.seasonRatingTotal,
             awards: won.map(\.title)))
         career.seasonClosed = true
@@ -141,7 +150,9 @@ extension Game {
         var pitching = PitchingLine()
         var ratedGames = 0
         var ratingTotal = 0.0
+        var football = FootballLine()
         for season in career.history {
+            football += season.football ?? FootballLine()
             batting += season.batting
             pitching += season.pitching
             ratedGames += season.ratedGames
@@ -150,6 +161,7 @@ extension Game {
         let record = CareerRecord(
             name: me.name, position: me.position, firstSeason: career.firstSeason, lastSeason: season,
             retiredAge: me.age, clubs: career.clubs, batting: batting, pitching: pitching,
+            football: me.position.sport == .football ? football : nil,
             ratedGames: ratedGames, ratingTotal: ratingTotal, awards: career.awards,
             peakAbility: career.peakAbility, bestTier: career.bestTier, earnings: career.earnings)
         careerHall = (careerHall ?? []) + [record]
@@ -167,6 +179,7 @@ extension Game {
         guard career?.retired == true else { throw GameError("지금은 새 선수를 만들 수 없습니다.") }
         let name = setup.name.trimmingCharacters(in: .whitespaces)
         guard !name.isEmpty else { throw GameError("선수 이름을 입력해 주세요.") }
+        guard setup.sport == sport else { throw GameError("이 세계에서는 \(sport.label) 선수만 만들 수 있습니다.") }
         let ranked = rankedStandings(.citizenAmateur)
         let club = ranked[min(Balance.careerStartSlot, ranked.count - 1)].teamID
         var cleaned = setup

@@ -81,7 +81,7 @@ extension Game {
         guard let next = nextMatch() else { throw GameError("지금은 치를 경기가 없습니다.") }
         if isCareer {
             ensurePlayable(userTeamID)
-            prepareCareerLineup()
+            prepareCareerLineup(kind: next.kind)
         }
         guard canField(userTeam) else {
             throw GameError(sport == .football

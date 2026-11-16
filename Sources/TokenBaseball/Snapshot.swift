@@ -11,6 +11,8 @@ enum Snapshot {
         renderAll(model: model, to: directory.appendingPathComponent("football", isDirectory: true), sport: .football)
         renderCareer(model: model, to: directory.appendingPathComponent("career", isDirectory: true), position: .shortstop)
         renderCareer(model: model, to: directory.appendingPathComponent("career-pitcher", isDirectory: true), position: .starter)
+        renderCareer(model: model, to: directory.appendingPathComponent("career-football", isDirectory: true), position: .forward)
+        renderCareer(model: model, to: directory.appendingPathComponent("career-keeper", isDirectory: true), position: .goalkeeper)
     }
 
     /// 선수 모드 화면.
@@ -30,12 +32,15 @@ enum Snapshot {
         model.todayTokens = 12_000_000
 
         render(OnboardingView(bankrupt: false, step: 1), model, directory, "01-onboarding-모드")
-        render(CareerForm(setup: .constant(CareerSetup(name: "김하늘", position: position))).padding(24), model, directory, "02-선수-만들기")
+        render(
+            CareerForm(setup: .constant(CareerSetup(name: "김하늘", position: position)), sport: position.sport).padding(24),
+            model, directory, "02-선수-만들기")
         for tab in AppTab.allCases {
             render(TabContent(tab: tab, game: game).padding(12), model, directory, "1-\(tab.title(career: true))")
         }
         try? game.startMatch(now: now.addingTimeInterval(10 * 3600))
-        for _ in 0..<140 { game.stepMatch() }
+        // 축구는 교체로 들어간 뒤의 장면이 나오도록 후반까지 돌린다.
+        for _ in 0..<(position.sport == .football ? 255 : 140) { game.stepMatch() }
         model.game = game
         try? SaveStore(fileURL: directory.appendingPathComponent("demo-save.json")).save(GameSave(game: game))
         render(TabContent(tab: .match, game: game).padding(12), model, directory, "3-중계")

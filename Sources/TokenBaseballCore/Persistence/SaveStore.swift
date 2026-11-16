@@ -19,20 +19,26 @@ public enum SaveSlot: String, CaseIterable, Sendable {
     case football
     /// 야구 선수 모드.
     case baseballPlayer = "baseball-player"
+    /// 축구 선수 모드.
+    case footballPlayer = "football-player"
 
-    public var sport: Sport { self == .football ? .football : .baseball }
+    public var sport: Sport { self == .football || self == .footballPlayer ? .football : .baseball }
     /// 구단이 아니라 선수 한 명을 키우는 모드인지.
-    public var isCareer: Bool { self == .baseballPlayer }
+    public var isCareer: Bool { self == .baseballPlayer || self == .footballPlayer }
 
     public var label: String {
         switch self {
         case .baseball: "야구 구단"
         case .football: "축구 구단"
         case .baseballPlayer: "야구 선수"
+        case .footballPlayer: "축구 선수"
         }
     }
 
     public init(sport: Sport) { self = sport == .football ? .football : .baseball }
+
+    /// 그 종목의 선수 모드 칸.
+    public static func career(for sport: Sport) -> SaveSlot { sport == .football ? .footballPlayer : .baseballPlayer }
 }
 
 /// 게임 상태를 로컬 JSON 파일로 저장한다. 서버로 보내지 않는다.

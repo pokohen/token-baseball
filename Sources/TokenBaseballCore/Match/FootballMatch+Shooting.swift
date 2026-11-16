@@ -7,11 +7,13 @@ extension FootballMatch {
     mutating func shoot(_ events: inout [MatchEvent]) {
         guard let shooterIndex = pickAttacker({
             Self.slotWeight($0.slot, forward: 3, midfielder: 1.4, defender: 0.35) * (0.5 + $0.shooting / 100)
+                * ($0.style?.shotWeight ?? 1)
         }) else { return }
         var assistIndex: Int?
         if rng.chance(0.7) {
             assistIndex = pickAttacker(excluding: shooterIndex) {
                 Self.slotWeight($0.slot, forward: 1.5, midfielder: 2, defender: 0.8) * (0.5 + $0.passing / 100)
+                    * ($0.style?.assistWeight ?? 1)
             }
         }
         let shooter = attacking.players[shooterIndex]
@@ -21,7 +23,7 @@ extension FootballMatch {
 
         let wall = defending.mean([.defender]) { $0.tackling } - defending.shortHanded
         if rng.chance(clamp(0.24 * exp((wall - power) / 100), 0.08, 0.5)) {
-            let blocker = name(of: defending, in: [.defender])
+            let blocker = name(of: defending, in: [.defender], credit: \.clearances)
             if rng.chance(0.45) {
                 say(&events, .play, "\(shooter.name) 슛! \(blocker) 몸으로 막아 코너킥")
                 awardCorner()

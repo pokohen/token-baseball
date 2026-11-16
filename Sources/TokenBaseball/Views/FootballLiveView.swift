@@ -4,6 +4,9 @@ import TokenBaseballCore
 /// 축구 실시간 중계 화면. 배속과 건너뛰기는 없다.
 struct FootballLiveView: View {
     let live: LiveFootballMatch
+    /// 선수 모드: 내 선수 이름과 이 경기에서 지금까지의 평점.
+    var myName: String? = nil
+    var myPerformance: Game.CareerPerformance? = nil
 
     private var state: FootballMatch { live.state }
     private var mine: FootballSide { live.userIsHome ? state.home : state.away }
@@ -26,6 +29,18 @@ struct FootballLiveView: View {
                 }
                 .note()
             }
+            if let myName {
+                Card {
+                    if let myPerformance {
+                        KeyValueRow(
+                            key: "내 선수 \(myName)",
+                            value: "평점 \(String(format: "%.1f", myPerformance.rating)) · \(myPerformance.line)",
+                            valueColor: .accentColor)
+                    } else {
+                        KeyValueRow(key: "내 선수 \(myName)", value: "벤치에서 대기 중")
+                    }
+                }
+            }
             Card {
                 pitch
                 let share = Int(((live.userIsHome ? state.homePossession : 1 - state.homePossession) * 100).rounded())
@@ -40,9 +55,11 @@ struct FootballLiveView: View {
             }
             Card("문자 중계") {
                 ForEach(Array(state.log.suffix(8).reversed().enumerated()), id: \.offset) { index, event in
+                    // 내 선수가 나온 장면은 눈에 띄게 한다.
+                    let mine = myName.map { event.text.contains($0) } ?? false
                     Text(event.text)
-                        .font(index == 0 ? .callout.weight(.semibold) : .callout)
-                        .foregroundStyle(event.kind == .score ? Theme.win : index == 0 ? .primary : .secondary)
+                        .font(index == 0 || mine ? .callout.weight(.semibold) : .callout)
+                        .foregroundStyle(event.kind == .score ? Theme.win : mine ? Color.accentColor : index == 0 ? .primary : .secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 if state.log.isEmpty { Text("곧 경기가 시작됩니다.").note() }

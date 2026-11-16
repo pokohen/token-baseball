@@ -22,6 +22,10 @@ public struct CareerSetup: Equatable, Sendable {
     /// 선수 모드에서 고를 수 있는 포지션. 마무리는 세이브 상황에만 나와서 뺐다.
     public static let batterPositions: [Position] = Position.fieldPositions + [.designated]
     public static let pitcherPositions: [Position] = [.starter, .reliever]
+    /// 축구 선수 모드의 포지션.
+    public static let footballPositions: [Position] = Position.football
+
+    public var sport: Sport { position.sport }
 }
 
 /// 다른 구단이 본 내 입지.
@@ -56,6 +60,8 @@ public struct CareerOffer: Codable, Equatable, Identifiable, Sendable {
 public struct CareerGoal: Codable, Equatable, Sendable {
     public enum Kind: String, Codable, Sendable {
         case hits, homeRuns, wins, strikeouts, appearances
+        // 축구
+        case goals, points, cleanSheets, matches
     }
 
     public var kind: Kind
@@ -70,6 +76,10 @@ public struct CareerGoal: Codable, Equatable, Sendable {
         case .wins: "\(target)승"
         case .strikeouts: "탈삼진 \(target)개"
         case .appearances: "\(target)경기 등판"
+        case .goals: "\(target)골"
+        case .points: "공격 포인트 \(target)개 (골 + 도움)"
+        case .cleanSheets: "무실점 \(target)경기"
+        case .matches: "\(target)경기 출전"
         }
     }
 
@@ -80,6 +90,10 @@ public struct CareerGoal: Codable, Equatable, Sendable {
         case .wins: player.pitching.wins
         case .strikeouts: player.pitching.strikeouts
         case .appearances: player.pitching.games
+        case .goals: player.football?.goals ?? 0
+        case .points: player.football?.points ?? 0
+        case .cleanSheets: player.football?.cleanSheets ?? 0
+        case .matches: player.football?.games ?? 0
         }
     }
 }
@@ -92,6 +106,8 @@ public struct CareerSeason: Codable, Equatable, Sendable {
     public var tier: LeagueTier
     public var batting: BattingLine
     public var pitching: PitchingLine
+    /// 축구 선수의 시즌 기록. 야구 선수는 nil.
+    public var football: FootballLine? = nil
     /// 평점이 매겨진 경기 수와 평점 합.
     public var ratedGames: Int
     public var ratingTotal: Double
@@ -110,6 +126,7 @@ public struct CareerRecord: Codable, Equatable, Sendable {
     public var clubs: [String]
     public var batting: BattingLine
     public var pitching: PitchingLine
+    public var football: FootballLine? = nil
     public var ratedGames: Int
     public var ratingTotal: Double
     public var awards: [String]
@@ -159,6 +176,10 @@ public struct Career: Codable, Equatable, Sendable {
     public var isFreeAgent = false
     public var retired = false
     public var goal: CareerGoal?
+    /// 축구: 경기 전에 고른 플레이 스타일. nil이면 균형.
+    public var style: PlayStyle?
+    /// 축구: 이번 경기에 선발이 아니면 교체로 들어갈 시간(분). 선발이거나 야구면 nil.
+    var subMinute: Int?
 
     init(playerID: PlayerID, season: Int) {
         self.playerID = playerID
@@ -174,19 +195,32 @@ public struct Career: Codable, Equatable, Sendable {
 
 /// 능력치 하나를 올리는 훈련.
 public enum CareerDrill {
-    public static func name(_ key: Attributes.Key) -> String {
+    public static func name(_ key: Attributes.Key, sport: Sport = .baseball) -> String {
+        if sport == .football {
+            switch key {
+            case .shooting: return "슈팅 연습"
+            case .passing: return "패스 훈련"
+            case .dribbling: return "드리블 훈련"
+            case .tackling: return "수비 훈련"
+            case .speed: return "스프린트"
+            case .physical: return "웨이트 트레이닝"
+            case .keeping: return "골키핑 훈련"
+            case .stamina: return "러닝"
+            default: return key.label
+            }
+        }
         switch key {
-        case .contact: "티 배팅"
-        case .power: "웨이트 트레이닝"
-        case .eye: "선구안 훈련"
-        case .speed: "주루 훈련"
-        case .fielding: "펑고"
-        case .arm: "롱토스"
-        case .stuff: "불펜 피칭"
-        case .control: "제구 훈련"
-        case .breaking: "변화구 연마"
-        case .stamina: "러닝"
-        default: key.label
+        case .contact: return "티 배팅"
+        case .power: return "웨이트 트레이닝"
+        case .eye: return "선구안 훈련"
+        case .speed: return "주루 훈련"
+        case .fielding: return "펑고"
+        case .arm: return "롱토스"
+        case .stuff: return "불펜 피칭"
+        case .control: return "제구 훈련"
+        case .breaking: return "변화구 연마"
+        case .stamina: return "러닝"
+        default: return key.label
         }
     }
 }

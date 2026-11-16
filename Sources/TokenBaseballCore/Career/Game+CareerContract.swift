@@ -13,6 +13,8 @@ extension Game {
         switch me.position {
         case .starter: slots = Balance.starterRest(teams[team].tier) + 1
         case .reliever: slots = max(1, peers.count)
+        case .goalkeeper, .defender, .midfielder, .forward:
+            slots = formation(of: team).slots.filter { $0 == me.position }.count
         default: slots = 1
         }
         guard peers.count >= slots else { return .starter }

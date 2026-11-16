@@ -46,7 +46,9 @@ struct CareerHomeTab: View {
                 EmblemView(team: game.userTeam, size: 44)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(me.name).font(.headline)
-                    Text("\(me.age)세 · \(me.position.label) · \(me.throwsHand.rawValue)투\(me.bats.rawValue)타").note()
+                    Text(me.position.sport == .football
+                        ? "\(me.age)세 · \(me.position.label)"
+                        : "\(me.age)세 · \(me.position.label) · \(me.throwsHand.rawValue)투\(me.bats.rawValue)타").note()
                     Text(career.isFreeAgent
                         ? "무소속 · \(game.season)시즌"
                         : "\(game.userTeam.name) · \(game.userTier.displayName)").note()
@@ -94,6 +96,11 @@ struct CareerHomeTab: View {
 
     private func appearanceNote(_ me: Player) -> String? {
         guard game.nextMatch() != nil, !game.isMatchLive else { return nil }
+        if let plan = game.careerFootballPlan {
+            if plan.starts { return "다음 경기에 선발로 나섭니다." }
+            if let minute = plan.subMinute { return "다음 경기는 벤치에서 시작합니다. \(minute)분쯤 교체로 들어갑니다." }
+            return "다음 경기는 벤치입니다. 골키퍼는 교체로 나오지 않습니다."
+        }
         switch me.position {
         case .starter:
             return game.careerStartsNextMatch ? "다음 경기에 선발로 등판합니다." : "다음 경기는 등판하지 않는 날입니다. 팀 경기를 지켜봅니다."

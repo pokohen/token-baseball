@@ -48,9 +48,10 @@ extension Game {
     mutating func startFootballMatch(
         _ next: NextMatch, home: TeamID, away: TeamID, tier: LeagueTier, now: Date
     ) throws {
-        guard let state = makeFootballMatch(home: home, away: away, kind: next.kind, seed: rng.next()) else {
+        guard var state = makeFootballMatch(home: home, away: away, kind: next.kind, seed: rng.next()) else {
             throw GameError("경기를 시작할 수 없습니다.")
         }
+        if isCareer { decorateCareerFootball(&state, userIsHome: next.userIsHome) }
         // 같은 라운드의 내 리그 다른 경기는 함께 돌아가며 "타 구장 소식"으로 보인다.
         var others: [FootballMatch] = []
         if next.kind == .regular {
@@ -137,6 +138,8 @@ extension Game {
             summary += settle(.friendly)
             friendliesPlayed += 1
         }
+
+        if isCareer { summary += settleCareerFootballMatch(kind: match.kind, state: state, userIsHome: userIsHome) }
 
         lastResult = LastResult(
             kind: match.kind, myRuns: mine.goals, theirRuns: theirs.goals,
@@ -250,7 +253,8 @@ extension Game {
                 guard let player, let teamID = player.teamID else { return nil }
                 awards.append(AwardRecord(
                     season: season, tier: tier, title: title, playerName: player.name,
-                    teamName: teams[teamID].name, detail: detail(player), isMine: teamID == userTeamID))
+                    teamName: teams[teamID].name, detail: detail(player),
+                    isMine: isCareer ? isMyPlayer(player.id) : teamID == userTeamID))
                 return player
             }
             func value(_ player: Player) -> Double { Double(line(player).goals) + Double(line(player).assists) * 0.7 }
@@ -276,7 +280,8 @@ extension Game {
                 players[player.id] = player
             }
         }
-        let mine = awards.filter { $0.season == season && $0.isMine }
+        // 선수 모드의 수상은 시즌 기록을 정리할 때 다룬다.
+        let mine = isCareer ? [] : awards.filter { $0.season == season && $0.isMine }
         for award in mine {
             teams[userTeamID].fame += Balance.fameAward
             post("\(award.tier.displayName) \(award.title): \(award.playerName) (\(award.detail)). 인지도 +\(Int(Balance.fameAward)).")
@@ -290,7 +295,7 @@ extension Game {
             list.prefix(count).map {
                 Leader(
                     playerName: $0.name, teamName: $0.teamID.map { teams[$0].name } ?? "",
-                    value: text($0), isMine: $0.teamID == userTeamID)
+                    value: text($0), isMine: isCareer ? isMyPlayer($0.id) : $0.teamID == userTeamID)
             }
         }
         let keepers = everyone.filter { $0.position == .goalkeeper && line($0).games >= max(1, round / 2) }

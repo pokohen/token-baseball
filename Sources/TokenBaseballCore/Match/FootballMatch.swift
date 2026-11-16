@@ -199,9 +199,9 @@ public struct FootballMatch: Codable, Equatable, Sendable {
             let lose = clamp(0.08 / m, 0.02, 0.25)
             if roll < advance {
                 zone = 1
-                say(&events, .play, "\(attacking.shortName) \(holder([.defender, .midfielder])) \(rng.pick(Self.buildUpLines))")
+                say(&events, .play, "\(attacking.shortName) \(holder([.defender, .midfielder], credit: \.advances)) \(rng.pick(Self.buildUpLines))")
             } else if roll < advance + lose {
-                let thief = name(of: defending, in: [.forward, .midfielder])
+                let thief = name(of: defending, in: [.forward, .midfielder], credit: \.tackles)
                 flip(to: 2)
                 say(&events, .play, "\(attacking.shortName) \(thief), 높은 위치에서 공을 뺏습니다!")
             } else {
@@ -217,12 +217,12 @@ public struct FootballMatch: Codable, Equatable, Sendable {
             let lose = clamp(0.27 / m, 0.08, 0.5)
             if roll < advance {
                 zone = 2
-                say(&events, .play, "\(attacking.shortName) \(holder([.midfielder, .forward])) \(rng.pick(Self.advanceLines))")
+                say(&events, .play, "\(attacking.shortName) \(holder([.midfielder, .forward], credit: \.advances)) \(rng.pick(Self.advanceLines))")
             } else if roll < advance + lose {
                 if rng.chance(0.42) {
                     foul(dangerous: false, &events)
                 } else {
-                    let thief = name(of: defending, in: [.midfielder, .defender])
+                    let thief = name(of: defending, in: [.midfielder, .defender], credit: \.tackles)
                     flip(to: 1)
                     say(&events, .play, "\(attacking.shortName) \(thief) \(rng.pick(Self.interceptLines))")
                 }
@@ -254,10 +254,10 @@ public struct FootballMatch: Codable, Equatable, Sendable {
                 if kind < 0.22 {
                     foul(dangerous: true, &events)
                 } else if kind < 0.36 {
-                    say(&events, .play, "\(defending.shortName) \(name(of: defending, in: [.defender])), 크로스를 걷어내 코너킥")
+                    say(&events, .play, "\(defending.shortName) \(name(of: defending, in: [.defender], credit: \.clearances)), 크로스를 걷어내 코너킥")
                     awardCorner()
                 } else {
-                    let thief = name(of: defending, in: [.defender])
+                    let thief = name(of: defending, in: [.defender], credit: \.tackles)
                     let counter = rng.chance(0.2)
                     flip(to: counter ? 1 : 0)
                     say(&events, .play, "\(attacking.shortName) \(thief) \(counter ? "끊어내고 역습!" : rng.pick(Self.clearLines))")
@@ -269,15 +269,38 @@ public struct FootballMatch: Codable, Equatable, Sendable {
     }
 
     /// 공을 가진 팀에서 이 자리의 선수 이름을 하나 고른다.
-    mutating func holder(_ slots: [Position]) -> String {
-        name(of: attacking, in: slots)
+    mutating func holder(_ slots: [Position], credit: WritableKeyPath<FootballDetail, Int>? = nil) -> String {
+        name(of: attacking, in: slots, credit: credit)
     }
 
-    mutating func name(of side: FootballSide, in slots: [Position]) -> String {
-        let names = side.players.filter { $0.isOnPitch && slots.contains($0.slot) }.map(\.name)
-        let fallback = side.players.filter { $0.isOnPitch }.map(\.name)
-        let pool = names.isEmpty ? fallback : names
-        return pool.isEmpty ? side.shortName : rng.pick(pool)
+    /// `credit`을 주면 고른 선수의 세부 기록에 한 번을 더한다 (세부 기록을 남기는 선수일 때만).
+    mutating func name(
+        of side: FootballSide, in slots: [Position], credit: WritableKeyPath<FootballDetail, Int>? = nil
+    ) -> String {
+        let onPitch = side.players.indices.filter { side.players[$0].isOnPitch }
+        let fitting = onPitch.filter { slots.contains(side.players[$0].slot) }
+        let pool = fitting.isEmpty ? onPitch : fitting
+        guard !pool.isEmpty else { return side.shortName }
+        var index = rng.pick(pool)
+        // 수비 장면: 플레이 스타일을 고른 선수는 더 자주(또는 덜) 나선다. 난수는 더 쓰지 않는다.
+        if credit == \.tackles || credit == \.clearances,
+           let styled = pool.first(where: { side.players[$0].style != nil }),
+           let weight = side.players[styled].style?.defenseWeight, weight != 1 {
+            let slotOrder = pool.firstIndex(of: index) ?? 0
+            let mine = pool.firstIndex(of: styled) ?? 0
+            if weight > 1, (slotOrder + clock / Self.secondsPerStep) % 3 == 0 { index = styled }
+            if weight < 1, index == styled, pool.count > 1, (clock / Self.secondsPerStep) % 2 == 0 {
+                index = pool[(mine + 1) % pool.count]
+            }
+        }
+        if let credit {
+            if side.teamID == home.teamID {
+                home.players[index].detail?[keyPath: credit] += 1
+            } else {
+                away.players[index].detail?[keyPath: credit] += 1
+            }
+        }
+        return side.players[index].name
     }
 
     /// 가중치로 공격 팀 선수 한 명을 고른다.

@@ -65,22 +65,49 @@ extension Game {
 
     /// 진행 중인 경기에서 지금까지의 내 선수 평점.
     public var careerLivePerformance: CareerPerformance? {
-        guard let career, let live else { return nil }
+        guard let career else { return nil }
+        if let liveFootball {
+            let mine = liveFootball.userIsHome ? liveFootball.state.home : liveFootball.state.away
+            let theirs = liveFootball.userIsHome ? liveFootball.state.away : liveFootball.state.home
+            return Self.careerFootballPerformance(
+                playerID: career.playerID, in: mine, conceded: theirs.goals, result: 0)
+        }
+        guard let live else { return nil }
         let mine = live.userIsHome ? live.state.home : live.state.away
         return Self.careerPerformance(playerID: career.playerID, in: mine, result: 0)
     }
 
-    /// 내 경기 정산: 평점, 감독 신뢰, 명성, 연봉. 훈련 횟수도 다시 채운다.
+    /// 내 경기 정산 (야구).
     mutating func settleCareerMatch(kind: MatchKind, state: MatchState, userIsHome: Bool) -> [String] {
-        guard var career, !career.retired, let me = players[career.playerID] else { return [] }
+        guard let career else { return [] }
         let mine = userIsHome ? state.home : state.away
         let theirs = userIsHome ? state.away : state.home
         let result = mine.runs > theirs.runs ? 1 : mine.runs < theirs.runs ? -1 : 0
+        return settleCareer(
+            kind: kind, performance: Self.careerPerformance(playerID: career.playerID, in: mine, result: result))
+    }
+
+    /// 내 경기 정산 (축구).
+    mutating func settleCareerFootballMatch(kind: MatchKind, state: FootballMatch, userIsHome: Bool) -> [String] {
+        guard let career else { return [] }
+        let mine = userIsHome ? state.home : state.away
+        let theirs = userIsHome ? state.away : state.home
+        let won = state.result == (userIsHome ? .homeWin : .awayWin)
+        let result = won ? 1 : state.result == .draw ? 0 : -1
+        return settleCareer(
+            kind: kind,
+            performance: Self.careerFootballPerformance(
+                playerID: career.playerID, in: mine, conceded: theirs.goals, result: result))
+    }
+
+    /// 평점에 따라 감독 신뢰, 명성, 연봉을 정산한다. 훈련 횟수도 다시 채운다.
+    mutating func settleCareer(kind: MatchKind, performance: CareerPerformance?) -> [String] {
+        guard var career, !career.retired, let me = players[career.playerID] else { return [] }
         var lines: [String] = []
 
         career.sessionsLeft = Balance.careerSessionsPerMatch
         career.matchesAtClub += 1
-        let performance = Self.careerPerformance(playerID: me.id, in: mine, result: result)
+        career.subMinute = nil
         career.lastRating = performance?.rating
         career.lastLine = performance?.line
         if let performance {
@@ -94,9 +121,12 @@ extension Game {
             if kind != .friendly {
                 let cap = Balance.careerFameCap(teams[userTeamID].tier)
                 // 선발 투수는 나오는 경기가 적어서 한 경기가 더 크게 반영된다.
-                let rarity = me.position == .starter ? 3.0 : 1.0
+                // 축구는 평점이 6점대에 몰려 있어서 기준을 낮추고 크게 반영한다.
+                let football = me.position.sport == .football
+                let rarity = me.position == .starter ? 3.0 : football ? 2.0 : 1.0
                 if career.fame < cap {
-                    career.fame += max(0, performance.rating - 6.5) * 0.8 * rarity * (cap - career.fame) / cap
+                    career.fame += max(0, performance.rating - (football ? 6.3 : 6.5)) * 0.8 * rarity
+                        * (cap - career.fame) / cap
                 }
             }
             if kind == .regular {
@@ -115,5 +145,44 @@ extension Game {
         career.peakAbility = max(career.peakAbility, me.ability)
         self.career = career
         return lines
+    }
+
+    // MARK: 경기 평점 (축구)
+
+    /// 축구 경기에서 내 선수가 한 일과 평점. 나오지 않았으면 nil.
+    /// `conceded`: 우리 팀이 내준 골. `result`: 이겼으면 1, 졌으면 −1, 비겼으면 0.
+    static func careerFootballPerformance(
+        playerID: PlayerID, in side: FootballSide, conceded: Int, result: Int
+    ) -> CareerPerformance? {
+        guard let entry = side.players.first(where: { $0.playerID == playerID }), entry.hasPlayed else { return nil }
+        let line = entry.line
+        let detail = entry.detail ?? FootballDetail()
+        let minutes = min(120, max(1, detail.minutes))
+        var delta = 0.0
+        delta += Double(line.goals) * 1.0 + Double(line.assists) * 0.6
+        delta += Double(line.shotsOnTarget) * 0.15
+        delta += Double(detail.advances) * 0.05 + Double(detail.tackles) * 0.12 + Double(detail.clearances) * 0.12
+        delta -= Double(detail.fouls) * 0.1 + Double(line.yellowCards) * 0.3 + Double(line.redCards) * 1.5
+        if entry.natural == .goalkeeper {
+            delta += Double(line.saves) * 0.25 - Double(line.conceded) * 0.3
+        }
+        // 무실점: 골키퍼와 수비수가 60분 이상 뛰었을 때.
+        if conceded == 0, minutes >= 60, entry.natural == .goalkeeper || entry.natural == .defender { delta += 0.5 }
+        delta += Double(result) * 0.2
+        // 포지션마다 기록이 쌓이는 양이 달라서 기준을 맞춘다 (90분 뛴 평균 선수가 6.5 근처).
+        delta += Balance.careerFootballBaseline(entry.natural)
+        // 뛴 시간이 짧으면 6.0 쪽으로 당긴다.
+        let weight = min(1, 0.35 + Double(minutes) / 90 * 0.65)
+        var text = "\(minutes)분"
+        if entry.natural == .goalkeeper {
+            text += " 선방 \(line.saves) 실점 \(line.conceded)"
+        } else {
+            if line.goals > 0 { text += " \(line.goals)골" }
+            if line.assists > 0 { text += " \(line.assists)도움" }
+            text += " 슈팅 \(line.shots)"
+            if detail.tackles + detail.clearances > 0 { text += " 수비 \(detail.tackles + detail.clearances)" }
+        }
+        if line.redCards > 0 { text += " 퇴장" } else if line.yellowCards > 0 { text += " 경고" }
+        return CareerPerformance(rating: clamp(6 + delta * weight, 1, 10), line: text)
     }
 }

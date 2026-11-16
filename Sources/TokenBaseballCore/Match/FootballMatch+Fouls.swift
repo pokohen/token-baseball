@@ -17,6 +17,7 @@ extension FootballMatch {
         let fouler = defending.players[index]
         let victim = holder(zone == 2 ? [.forward, .midfielder] : [.midfielder])
         defending.fouls += 1
+        defending.players[index].detail?.fouls += 1
 
         var text = "\(defending.shortName) \(fouler.name), \(victim)에게 반칙"
         var sentOff = false
@@ -95,11 +96,42 @@ extension FootballMatch {
         var amount = 0.0019 * (1.25 - player.stamina / 100 * 0.7)
         if player.traits.contains(.ironLungs) { amount *= 0.7 }
         if player.slot == .goalkeeper { amount *= 0.3 }
+        amount *= player.style?.drain ?? 1
         player.energy = max(0.2, player.energy - amount)
+        player.detail?.ticks += 1
+    }
+
+    /// 선수 모드: 내 선수가 벤치에서 시작했으면 정해진 시간에 반드시 들어간다.
+    /// 같은 자리에서 가장 지친 선수와 바꾼다.
+    mutating func bringOnGuaranteed(_ events: inout [MatchEvent]) {
+        for isHome in [true, false] {
+            var side = isHome ? home : away
+            guard let id = side.guaranteedSub, let at = side.guaranteedMinute, minute >= at else { continue }
+            side.guaranteedSub = nil
+            if isHome { home = side } else { away = side }
+            guard side.subsUsed < Balance.footballMaxSubs,
+                  let incoming = side.players.firstIndex(where: { $0.playerID == id && !$0.hasPlayed && !$0.isOnPitch })
+            else { continue }
+            let natural = side.players[incoming].natural
+            let outfield = side.players.indices.filter { side.players[$0].isOnPitch && side.players[$0].slot != .goalkeeper }
+            let same = outfield.filter { side.players[$0].slot == natural }
+            guard let out = (same.isEmpty ? outfield : same)
+                .min(by: { (side.players[$0].energy, $0) < (side.players[$1].energy, $1) })
+            else { continue }
+            side.players[incoming].slot = side.players[out].slot
+            side.players[out].isOnPitch = false
+            side.players[incoming].isOnPitch = true
+            side.players[incoming].hasPlayed = true
+            side.players[incoming].line.games = 1
+            side.subsUsed += 1
+            say(&events, .change, "\(side.shortName) 교체: \(side.players[out].name) 나가고 \(side.players[incoming].name) 들어옵니다")
+            if isHome { home = side } else { away = side }
+        }
     }
 
     /// 60분 이후 지친 선수부터 같은 포지션의 벤치 선수로 바꾼다. 한 틱에 한 팀 한 명.
     mutating func substitute(_ events: inout [MatchEvent]) {
+        bringOnGuaranteed(&events)
         guard minute >= 60 else { return }
         let threshold = 0.66
         // 한꺼번에 바꾸지 않고 6분에 한 명꼴로 바꾼다.

@@ -320,6 +320,21 @@ public enum Balance {
     public static let careerBreakthroughCost = 30_000_000
     /// 구단을 옮긴 뒤 이 경기 수가 지나야 다른 구단의 제안이 다시 온다.
     public static let careerOfferCooldown = 10
+    /// 축구 평점의 포지션별 기준 보정. 시뮬레이션으로 맞춘다.
+    public static func careerFootballBaseline(_ position: Position) -> Double {
+        switch position {
+        case .goalkeeper: 0.2
+        case .defender: 0.1
+        case .midfielder: 0.2
+        default: 0.1
+        }
+    }
+    /// 축구: 주전이 아닌 골키퍼는 이 경기 수마다 한 번 선발로 나온다.
+    public static let careerKeeperRotation = 4
+    /// 축구: 선발이 아닐 때 교체로 들어가는 시간(분). 감독 신뢰가 높을수록 일찍 들어간다 (신뢰 20이면 80분, 60이면 60분).
+    public static func careerSubMinute(trust: Double) -> Int {
+        Int(clamp(90 - trust * 0.5, 50, 85))
+    }
     /// 훈련하지 않아도 저절로 크는 정도 (다른 선수의 성장에 곱하는 값).
     public static let careerNaturalGrowth = 0.3
 
