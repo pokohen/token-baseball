@@ -8,7 +8,8 @@ struct MatchTab: View {
     var body: some View {
         VStack(spacing: 10) {
             if let live = game.live {
-                LiveMatchView(live: live)
+                LiveMatchView(
+                    live: live, myName: game.myPlayer?.name, myPerformance: game.careerLivePerformance)
             } else if let live = game.liveFootball {
                 FootballLiveView(live: live)
             } else {
@@ -24,7 +25,14 @@ struct MatchTab: View {
                 }
                 NextMatchCard(game: game)
                 schedule
-                if game.sport == .football { TacticCard(game: game) } else { PolicyCard(game: game) }
+                if game.sport == .football {
+                    TacticCard(game: game)
+                } else if game.isCareer {
+                    Text("선수 모드에서는 라인업과 투수 운용을 감독이 정합니다. 경기 중에는 개입하지 않습니다.").note()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    PolicyCard(game: game)
+                }
             }
         }
     }
@@ -55,6 +63,9 @@ struct MatchTab: View {
 /// 실시간 중계 화면. 배속과 건너뛰기는 없다.
 struct LiveMatchView: View {
     let live: LiveMatch
+    /// 선수 모드: 내 선수 이름과 이 경기에서 지금까지의 평점.
+    var myName: String? = nil
+    var myPerformance: Game.CareerPerformance? = nil
 
     private var state: MatchState { live.state }
 
@@ -62,6 +73,18 @@ struct LiveMatchView: View {
         VStack(spacing: 10) {
             Card(live.kind.label, trailing: state.inningLabel) {
                 scoreboard
+            }
+            if let myName {
+                Card {
+                    if let myPerformance {
+                        KeyValueRow(
+                            key: "내 선수 \(myName)",
+                            value: "평점 \(String(format: "%.1f", myPerformance.rating)) · \(myPerformance.line)",
+                            valueColor: .accentColor)
+                    } else {
+                        KeyValueRow(key: "내 선수 \(myName)", value: "아직 나오지 않았습니다")
+                    }
+                }
             }
             Card {
                 HStack(alignment: .center, spacing: 16) {
@@ -82,9 +105,11 @@ struct LiveMatchView: View {
             }
             Card("문자 중계") {
                 ForEach(Array(state.log.suffix(8).reversed().enumerated()), id: \.offset) { index, event in
+                    // 내 선수가 나온 장면은 눈에 띄게 한다.
+                    let mine = myName.map { event.text.contains($0) } ?? false
                     Text(event.text)
-                        .font(index == 0 ? .callout.weight(.semibold) : .callout)
-                        .foregroundStyle(event.kind == .score ? Theme.win : index == 0 ? .primary : .secondary)
+                        .font(index == 0 || mine ? .callout.weight(.semibold) : .callout)
+                        .foregroundStyle(event.kind == .score ? Theme.win : mine ? Color.accentColor : index == 0 ? .primary : .secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 if state.log.isEmpty { Text("곧 경기가 시작됩니다.").note() }

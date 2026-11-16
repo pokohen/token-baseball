@@ -19,10 +19,12 @@ final class AppModel: ObservableObject {
 
     /// 야구 저장 파일의 위치. 축구 저장 파일은 같은 폴더에 따로 둔다.
     let baseStore: SaveStore
-    /// 지금 운영 중인 종목.
-    @Published private(set) var sport: Sport
-    /// 지금 종목의 저장 파일.
-    var store: SaveStore { baseStore.sibling(for: sport) }
+    /// 지금 진행 중인 저장 칸 (야구 구단 / 축구 구단 / 야구 선수).
+    @Published private(set) var slot: SaveSlot
+    /// 지금 종목.
+    var sport: Sport { slot.sport }
+    /// 지금 저장 칸의 파일.
+    var store: SaveStore { baseStore.sibling(slot: slot) }
     let sources: UsageSources
     private var matchGeneration = 0
     private var matchTask: Task<Void, Never>?
@@ -41,7 +43,7 @@ final class AppModel: ObservableObject {
     init(store: SaveStore = AppModel.defaultStore(), sources: UsageSources = UsageSources()) {
         self.baseStore = store
         self.sources = sources
-        self.sport = store.loadActiveSport()
+        self.slot = store.loadActiveSlot()
         loadGame()
     }
 
@@ -57,23 +59,26 @@ final class AppModel: ObservableObject {
 
     /// 그 종목의 구단을 이미 만들어 두었는지.
     func hasSave(for sport: Sport) -> Bool { baseStore.sibling(for: sport).exists }
+    func hasSave(slot: SaveSlot) -> Bool { baseStore.sibling(slot: slot).exists }
 
-    /// 종목을 바꾼다. 지금 구단은 저장해 두고, 그 종목의 구단을 불러온다 (없으면 창단 화면).
-    /// 쉬는 구단은 그동안 쓴 토큰과 흐른 시간을 받지 않는다.
-    func switchSport(to target: Sport) {
-        guard target != sport else { return }
+    func switchSport(to target: Sport) { switchSlot(to: SaveSlot(sport: target)) }
+
+    /// 저장 칸을 바꾼다. 지금 것은 저장해 두고, 그 칸의 구단·선수를 불러온다 (없으면 만들기 화면).
+    /// 쉬는 구단·선수는 그동안 쓴 토큰과 흐른 시간을 받지 않는다.
+    func switchSlot(to target: SaveSlot) {
+        guard target != slot else { return }
         pendingSave?.cancel()
         save()
         matchTask?.cancel()
         matchTask = nil
         matchGeneration += 1
         do {
-            try baseStore.saveActiveSport(target)
+            try baseStore.saveActiveSlot(target)
         } catch {
-            message = "종목을 바꾸지 못했습니다: \(error.localizedDescription)"
+            message = "바꾸지 못했습니다: \(error.localizedDescription)"
             return
         }
-        sport = target
+        slot = target
         message = nil
         wasMatchReady = nil
         todayTokens = 0
@@ -231,24 +236,59 @@ final class AppModel: ObservableObject {
         if game?.isBankrupt == true {
             perform { try $0.foundNewClub(setup: setup, now: Date()) }
         } else {
-            let target = chosen ?? sport
+            let target = SaveSlot(sport: chosen ?? sport)
             // 이미 있는 구단을 덮어쓰지 않는다.
-            guard !hasSave(for: target) else {
-                switchSport(to: target)
+            guard !hasSave(slot: target) else {
+                switchSlot(to: target)
                 return
             }
-            if target != sport {
-                do {
-                    try baseStore.saveActiveSport(target)
-                } catch {
-                    message = "구단을 만들지 못했습니다: \(error.localizedDescription)"
-                    return
-                }
-                matchGeneration += 1
-                sport = target
-            }
+            guard activate(target) else { return }
             let seed = UInt64.random(in: 1...UInt64.max)
-            game = Game.newGame(setup: setup, now: Date(), seed: seed, sport: target)
+            game = Game.newGame(setup: setup, now: Date(), seed: seed, sport: target.sport)
+            message = nil
+            save()
+        }
+        pollUsage()
+    }
+
+    /// 새로 만들 저장 칸으로 옮긴다. 실패하면 false.
+    private func activate(_ target: SaveSlot) -> Bool {
+        guard target != slot else { return true }
+        // 지금 진행하던 것은 저장해 두고 떠난다.
+        pendingSave?.cancel()
+        save()
+        matchTask?.cancel()
+        matchTask = nil
+        do {
+            try baseStore.saveActiveSlot(target)
+        } catch {
+            message = "만들지 못했습니다: \(error.localizedDescription)"
+            return false
+        }
+        matchGeneration += 1
+        slot = target
+        game = nil
+        todayTokens = 0
+        recentRate = 0
+        wasMatchReady = nil
+        return true
+    }
+
+    /// 선수 모드: 내 선수를 만든다. 은퇴한 뒤라면 같은 세계에서 새 선수로 시작한다.
+    func createCareer(_ setup: CareerSetup) {
+        var setup = setup
+        setup.name = setup.name.trimmingCharacters(in: .whitespaces)
+        guard !setup.name.isEmpty else { message = "선수 이름을 입력해 주세요."; return }
+        if slot.isCareer, game?.career?.retired == true {
+            perform { try $0.startNewCareer(setup: setup, now: Date()) }
+        } else {
+            // 이미 있는 선수를 덮어쓰지 않는다.
+            guard !hasSave(slot: .baseballPlayer) else {
+                switchSlot(to: .baseballPlayer)
+                return
+            }
+            guard activate(.baseballPlayer) else { return }
+            game = Game.newCareer(setup: setup, now: Date(), seed: UInt64.random(in: 1...UInt64.max))
             message = nil
             save()
         }
@@ -336,6 +376,11 @@ final class AppModel: ObservableObject {
         // 토큰 사용이 일정 시간 없으면 쉰다.
         // (장부의 반영 시각은 토큰을 안 써도 계속 갱신되므로 기준으로 쓸 수 없다.)
         if now.timeIntervalSince(lastTokenAt ?? launchedAt) > 600 { return .rest }
+        if let me = game.myPlayer {
+            // 선수 모드: 내 선수가 하는 훈련만 보여 준다.
+            let mine: [Sprites.Drill] = me.isPitcher ? [.pitching, .running, .weights] : [.batting, .fielding, .running, .weights]
+            return mine[(Int(now.timeIntervalSince1970) / 8) % mine.count]
+        }
         var drills: [Sprites.Drill] = game.sport == .football
             ? [.dribbling, .shooting, .keeping, .running]
             : [.batting, .pitching, .fielding, .running]

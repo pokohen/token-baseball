@@ -9,6 +9,38 @@ enum Snapshot {
     static func renderAll(model: AppModel, to directory: URL) {
         renderAll(model: model, to: directory, sport: .baseball)
         renderAll(model: model, to: directory.appendingPathComponent("football", isDirectory: true), sport: .football)
+        renderCareer(model: model, to: directory.appendingPathComponent("career", isDirectory: true), position: .shortstop)
+        renderCareer(model: model, to: directory.appendingPathComponent("career-pitcher", isDirectory: true), position: .starter)
+    }
+
+    /// 선수 모드 화면.
+    static func renderCareer(model: AppModel, to directory: URL, position: Position) {
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let now = Date()
+        var game = Game.newCareer(
+            setup: CareerSetup(name: "김하늘", position: position, bats: .left, hometown: "부산"), now: now, seed: 7)
+        game.collect([UsageRecord(id: "demo", timestamp: now, usage: TokenUsage(output: 6_000_000))], now: now)
+        for index in 0..<7 {
+            for key in game.careerTrainableKeys.prefix(2) { try? game.trainCareer(key) }
+            try? game.startMatch(now: now.addingTimeInterval(Double(index) * 3600))
+            game.runMatchToEnd()
+        }
+        try? game.trainCareer(game.careerTrainableKeys[0])
+        game.generateDemoCareerOffer()
+        model.game = game
+        model.todayTokens = 6_000_000
+
+        render(OnboardingView(bankrupt: false, step: 1), model, directory, "01-onboarding-모드")
+        render(CareerForm(setup: .constant(CareerSetup(name: "김하늘", position: position))).padding(24), model, directory, "02-선수-만들기")
+        for tab in AppTab.allCases {
+            render(TabContent(tab: tab, game: game).padding(12), model, directory, "1-\(tab.title(career: true))")
+        }
+        try? game.startMatch(now: now.addingTimeInterval(10 * 3600))
+        for _ in 0..<140 { game.stepMatch() }
+        model.game = game
+        try? SaveStore(fileURL: directory.appendingPathComponent("demo-save.json")).save(GameSave(game: game))
+        render(TabContent(tab: .match, game: game).padding(12), model, directory, "3-중계")
+        render(Text(model.menuBarText).padding(8), model, directory, "4-상단바", width: nil)
     }
 
     static func renderAll(model: AppModel, to directory: URL, sport: Sport) {

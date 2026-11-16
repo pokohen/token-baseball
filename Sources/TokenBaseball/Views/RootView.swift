@@ -4,14 +4,24 @@ import TokenBaseballCore
 enum AppTab: String, CaseIterable {
     case home = "홈", match = "경기", league = "리그", club = "구단", players = "선수", settings = "설정"
 
-    func icon(_ sport: Sport) -> String {
+    /// 선수 모드에서는 구단 탭 자리가 훈련, 선수 탭 자리가 커리어다.
+    func icon(_ sport: Sport, career: Bool = false) -> String {
         switch self {
         case .home: "house.fill"
         case .match: sport == .football ? "soccerball" : "baseball.fill"
         case .league: "list.number"
-        case .club: "building.2.fill"
-        case .players: "person.3.fill"
+        case .club: career ? "dumbbell.fill" : "building.2.fill"
+        case .players: career ? "person.text.rectangle.fill" : "person.3.fill"
         case .settings: "gearshape.fill"
+        }
+    }
+
+    func title(career: Bool) -> String {
+        guard career else { return rawValue }
+        switch self {
+        case .club: return "훈련"
+        case .players: return "커리어"
+        default: return rawValue
         }
     }
 }
@@ -31,6 +41,8 @@ struct RootView: View {
                     Button("종료") { NSApplication.shared.terminate(nil) }
                 }
                 .padding(24)
+            } else if let game = model.game, game.career?.retired == true {
+                CareerRetiredView(game: game)
             } else if let game = model.game, !game.isBankrupt {
                 main(game)
             } else {
@@ -50,8 +62,8 @@ struct RootView: View {
                         model.message = nil
                     } label: {
                         VStack(spacing: 2) {
-                            Image(systemName: item.icon(game.sport)).font(.system(size: 14))
-                            Text(item.rawValue).font(.caption2)
+                            Image(systemName: item.icon(game.sport, career: game.isCareer)).font(.system(size: 14))
+                            Text(item.title(career: game.isCareer)).font(.caption2)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 6)
@@ -79,7 +91,7 @@ struct RootView: View {
             }
 
             ScrollView {
-                TabContent(tab: tab, game: game, startMatchTab: { tab = .match })
+                TabContent(tab: tab, game: game, startMatchTab: { tab = .match }, openTab: { tab = $0 })
                     .padding(12)
             }
         }
@@ -91,14 +103,22 @@ struct TabContent: View {
     let tab: AppTab
     let game: Game
     var startMatchTab: () -> Void = {}
+    var openTab: (AppTab) -> Void = { _ in }
 
     var body: some View {
         switch tab {
-        case .home: HomeTab(game: game, goToMatch: startMatchTab)
+        case .home:
+            if game.isCareer {
+                CareerHomeTab(game: game, goToMatch: startMatchTab, goToCareer: { openTab(.players) })
+            } else {
+                HomeTab(game: game, goToMatch: startMatchTab)
+            }
         case .match: MatchTab(game: game)
         case .league: LeagueTab(game: game)
-        case .club: ClubTab(game: game)
-        case .players: PlayersTab(game: game)
+        case .club:
+            if game.isCareer { CareerTrainingTab(game: game) } else { ClubTab(game: game) }
+        case .players:
+            if game.isCareer { CareerTab(game: game) } else { PlayersTab(game: game) }
         case .settings: SettingsTab(game: game)
         }
     }

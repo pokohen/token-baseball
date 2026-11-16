@@ -11,7 +11,11 @@ struct OnboardingView: View {
     @State private var name = ""
     @State private var colorIndex = 0
     @State private var emblemIndex = 0
-    @State private var sport = Sport.baseball
+    @State private var slot = SaveSlot.baseball
+    @State private var career = CareerSetup(name: "", position: .shortstop)
+    private var sport: Sport { slot.sport }
+    /// 구단이 아니라 선수를 만드는 중인지.
+    private var makingPlayer: Bool { fixedSport == nil && slot.isCareer }
 
     /// 파산 뒤 다시 만들 때는 종목을 바꿀 수 없다 (세계가 그대로 이어진다).
     init(bankrupt: Bool, step: Int = 0) {
@@ -34,8 +38,11 @@ struct OnboardingView: View {
             HStack {
                 if step > 0 { Button("이전") { step -= step == 2 && fixedSport != nil ? 2 : 1 } }
                 Spacer()
-                if step == 1, fixedSport == nil, model.hasSave(for: sport) {
-                    Button("\(sport.label) 구단 이어서 하기") { model.switchSport(to: sport) }
+                if step == 1, fixedSport == nil, model.hasSave(slot: slot) {
+                    Button("\(slot.label) 이어서 하기") { model.switchSlot(to: slot) }
+                        .keyboardShortcut(.defaultAction)
+                } else if makingPlayer, step == 2 {
+                    Button("커리어 시작") { model.createCareer(career) }
                         .keyboardShortcut(.defaultAction)
                 } else if step < 4 {
                     // 종목이 정해져 있으면 종목 고르기는 건너뛴다.
@@ -51,7 +58,7 @@ struct OnboardingView: View {
             }
         }
         .padding(24)
-        .onAppear { sport = model.sport }
+        .onAppear { slot = model.slot }
     }
 
     private var welcome: some View {
@@ -72,10 +79,12 @@ struct OnboardingView: View {
                 }
             } else {
                 Text("Token Baseball").font(.title2.bold())
-                Text("평소처럼 AI 코딩을 하면 쓴 토큰이 구단 자금으로 쌓입니다. 그 돈으로 시민 구단을 프로 구단으로 키워 보세요. 야구단과 축구단 중에 고를 수 있습니다.")
+                Text("평소처럼 AI 코딩을 하면 쓴 토큰이 구단 자금으로 쌓입니다. 그 돈으로 시민 구단을 프로 구단으로 키워 보세요. 야구단과 축구단 중에 고를 수 있고, 야구 선수 한 명이 되어 토큰으로 훈련하며 커리어를 보낼 수도 있습니다.")
                 Card("토큰 사용량을 읽는 곳") {
                     Text(model.sources.claudeCode.root.path).font(.caption.monospaced()).textSelection(.enabled)
                     Text(model.sources.codex.root.path).font(.caption.monospaced()).textSelection(.enabled)
+                    Text(model.sources.gemini.root.path).font(.caption.monospaced()).textSelection(.enabled)
+                    Text(model.sources.opencode.root.path).font(.caption.monospaced()).textSelection(.enabled)
                     Text("이 컴퓨터 안에서만 읽습니다. 외부로 보내지 않습니다. 설치 이전 사용량은 세지 않습니다.").note()
                 }
             }
@@ -85,28 +94,37 @@ struct OnboardingView: View {
 
     private var form: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(["", "종목을 골라 주세요", "연고지를 골라 주세요", "팀 이름을 정해 주세요", "팀 색상과 엠블럼"][step]).font(.title3.bold())
+            Text(makingPlayer && step == 2
+                ? "내 선수를 만들어 주세요"
+                : ["", "무엇을 할지 골라 주세요", "연고지를 골라 주세요", "팀 이름을 정해 주세요", "팀 색상과 엠블럼"][step]).font(.title3.bold())
             switch step {
             case 1:
-                HStack(spacing: 10) {
-                    ForEach(Sport.allCases, id: \.self) { item in
-                        Button { sport = item } label: {
+                HStack(spacing: 8) {
+                    ForEach(SaveSlot.allCases, id: \.self) { item in
+                        Button { slot = item } label: {
                             VStack(spacing: 6) {
-                                Image(systemName: item == .football ? "soccerball" : "baseball.fill").font(.system(size: 30))
-                                Text("\(item.label) 구단").font(.headline)
-                                Text(model.hasSave(for: item) ? "저장된 구단 있음" : item == .football ? "11명 · 승점제" : "9이닝 · 승률제").note()
+                                Image(systemName: item == .football ? "soccerball" : item.isCareer ? "figure.baseball" : "baseball.fill")
+                                    .font(.system(size: 28))
+                                Text(item.label).font(.headline)
+                                Text(model.hasSave(slot: item) ? "저장되어 있음"
+                                    : item == .football ? "11명 · 승점제" : item.isCareer ? "선수 한 명의 커리어" : "9이닝 · 승률제").note()
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
-                            .background(sport == item ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.accentColor, lineWidth: sport == item ? 2 : 0))
+                            .background(slot == item ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.accentColor, lineWidth: slot == item ? 2 : 0))
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("\(item.label) 구단")
+                        .accessibilityLabel(item.label)
                     }
                 }
-                Text("구단은 종목별로 따로 저장됩니다. 나중에 설정에서 다른 종목으로 바꿔 구단을 하나 더 만들 수 있습니다. 한 번에 한 구단만 토큰을 자금으로 받습니다.").note()
+                Text(slot.isCareer
+                    ? "야구 선수: 16세에 6부 시민 구단에 입단해, 토큰으로 훈련하고 더 높은 리그로 올라가 1부 프로 리그의 스타가 되는 것이 목표입니다. 구단은 모두 CPU가 운영합니다."
+                    : "구단과 선수는 따로 저장됩니다. 나중에 설정에서 다른 모드로 바꿔 하나 더 만들 수 있습니다. 한 번에 하나만 토큰을 받습니다.").note()
+            case 2 where makingPlayer:
+                CareerForm(setup: $career)
+                Text("\(LeagueTier.citizenAmateur.displayName) 리그의 시민 구단에 입단합니다. 시작 훈련 포인트 \(FundsLedger.startingFunds.formatted()) P.").note()
             case 2:
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 8) {
                     ForEach(NameGenerator.userCities, id: \.self) { item in

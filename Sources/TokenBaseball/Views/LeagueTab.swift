@@ -64,7 +64,7 @@ struct LeagueTab: View {
                         }
                     }
                     .font(.callout.monospacedDigit())
-                    .foregroundStyle(team.isUser ? Color.accentColor : .primary)
+                    .foregroundStyle(team.isUser || (game.isCareer && team.id == game.userTeamID) ? Color.accentColor : .primary)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -76,7 +76,7 @@ struct LeagueTab: View {
     }
 
     @ViewBuilder private var promotion: some View {
-        if let requirement = game.promotionRequirement {
+        if !game.isCareer, let requirement = game.promotionRequirement {
             Card("승강 플레이오프 신청") {
                 KeyValueRow(
                     key: "필요 인지도", value: "\(Int(game.userTeam.fame)) / \(Int(requirement.fame))",
@@ -152,7 +152,7 @@ struct TeamDetail: View {
                     Text("\(player.name) (\(player.age))").font(.caption)
                     Spacer()
                     Text("\(player.grade) \(Int(player.ability))").font(.caption.monospacedDigit())
-                    if !team.isUser, game.tradeWindowOpen {
+                    if !game.isCareer, !team.isUser, game.tradeWindowOpen {
                         let fee = game.value(for: player) * 13 / 10
                         Button("제안 \(Format.money(fee))") {
                             model.perform { try $0.proposeTransfer(player.id, fee: fee) }
