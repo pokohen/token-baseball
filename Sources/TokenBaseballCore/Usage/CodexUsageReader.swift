@@ -108,14 +108,22 @@ public struct CodexUsageReader: Sendable {
 public struct UsageSources: Sendable {
     public var claudeCode: ClaudeCodeUsageReader
     public var codex: CodexUsageReader
+    public var gemini: GeminiUsageReader
+    public var opencode: OpenCodeUsageReader
 
-    public init(claudeCode: ClaudeCodeUsageReader = .init(), codex: CodexUsageReader = .init()) {
+    public init(
+        claudeCode: ClaudeCodeUsageReader = .init(), codex: CodexUsageReader = .init(),
+        gemini: GeminiUsageReader = .init(), opencode: OpenCodeUsageReader = .init()
+    ) {
         self.claudeCode = claudeCode
         self.codex = codex
+        self.gemini = gemini
+        self.opencode = opencode
     }
 
     public func records(since: Date, until: Date = .distantFuture) -> [UsageRecord] {
         claudeCode.records(since: since, until: until) + codex.records(since: since, until: until)
+            + gemini.records(since: since, until: until) + opencode.records(since: since, until: until)
     }
 
     public func total(since: Date, until: Date = .distantFuture) -> TokenUsage {
