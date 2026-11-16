@@ -33,8 +33,8 @@ AI 코딩 도구에서 쓴 토큰이 **구단 자금**이 되는 macOS 메뉴바
 **1. 받기**
 
 ```sh
-git clone https://github.com/pokohen/token-baseball.git
-cd token-baseball
+git clone https://github.com/pokohen/token-sport.git
+cd token-sport
 ```
 
 git을 쓰지 않으면 GitHub 저장소 페이지의 **Code → Download ZIP**으로 받아 압축을 풀어도 된다.
