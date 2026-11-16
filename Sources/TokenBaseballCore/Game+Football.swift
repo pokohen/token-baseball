@@ -19,14 +19,18 @@ extension Game {
         return FootballLineupBuilder.fitted(team: team, players: players, season: season)
     }
 
-    func makeFootballMatch(home: TeamID, away: TeamID, kind: MatchKind, seed: UInt64) -> FootballMatch? {
+    func makeFootballMatch(
+        home: TeamID, away: TeamID, kind: MatchKind, seed: UInt64, rules: FootballRules? = nil
+    ) -> FootballMatch? {
         var homeTeam = teams[home], awayTeam = teams[away]
         homeTeam.formation = formation(of: home)
         awayTeam.formation = formation(of: away)
-        guard let homeSide = FootballLineupBuilder.side(team: homeTeam, players: players),
-              let awaySide = FootballLineupBuilder.side(team: awayTeam, players: players)
+        let friendly = kind == .friendly
+        guard let homeSide = FootballLineupBuilder.side(team: homeTeam, players: players, ignoreSuspensions: friendly),
+              let awaySide = FootballLineupBuilder.side(team: awayTeam, players: players, ignoreSuspensions: friendly)
         else { return nil }
-        return FootballMatch(away: awaySide, home: homeSide, rules: footballRules(for: kind, home: home), seed: seed)
+        return FootballMatch(
+            away: awaySide, home: homeSide, rules: rules ?? footballRules(for: kind, home: home), seed: seed)
     }
 
     /// 화면 없이 한 경기를 끝까지 치르고 홈 팀이 이겼는지 돌려준다 (승부가 나야 하는 경기용).
@@ -48,9 +52,16 @@ extension Game {
     mutating func startFootballMatch(
         _ next: NextMatch, home: TeamID, away: TeamID, tier: LeagueTier, now: Date
     ) throws {
-        guard let state = makeFootballMatch(home: home, away: away, kind: next.kind, seed: rng.next()) else {
+        // 플레이오프는 대진 형식에 따라 규칙이 다르다 (합산 2차전, 중립 결승).
+        let playoffRules = next.kind == .playoff
+            ? series.first { !$0.isDecided && $0.involves(userTeamID) }.map { footballPlayoffRules($0, home: home) }
+            : nil
+        guard var state = makeFootballMatch(
+            home: home, away: away, kind: next.kind, seed: rng.next(), rules: playoffRules)
+        else {
             throw GameError("경기를 시작할 수 없습니다.")
         }
+        if isCareer { decorateCareerFootball(&state, userIsHome: next.userIsHome) }
         // 같은 라운드의 내 리그 다른 경기는 함께 돌아가며 "타 구장 소식"으로 보인다.
         var others: [FootballMatch] = []
         if next.kind == .regular {
@@ -124,12 +135,11 @@ extension Game {
             summary += settle(.regular)
             round += 1
         case .playoff:
-            applyFootball(state, tier: userTier, countsForStandings: false)
-            if let index = series.firstIndex(where: {
-                !$0.isDecided && ($0.upperTeam == userTeamID || $0.lowerTeam == userTeamID)
-            }) {
-                let winner = state.result == .homeWin ? state.home.teamID : state.away.teamID
-                if winner == series[index].upperTeam { series[index].upperWins += 1 } else { series[index].lowerWins += 1 }
+            applyFootball(state, tier: userTier, countsForStandings: false, competitive: true)
+            if let index = series.firstIndex(where: { !$0.isDecided && $0.involves(userTeamID) }) {
+                recordPlayoffGame(
+                    index, home: state.home.teamID, homeScore: state.home.goals, awayScore: state.away.goals,
+                    shootoutHomeWon: state.wentToShootout ? state.result == .homeWin : nil)
             }
             summary += settle(.playoff)
         case .friendly:
@@ -137,6 +147,8 @@ extension Game {
             summary += settle(.friendly)
             friendliesPlayed += 1
         }
+
+        if isCareer { summary += settleCareerFootballMatch(kind: match.kind, state: state, userIsHome: userIsHome) }
 
         lastResult = LastResult(
             kind: match.kind, myRuns: mine.goals, theirRuns: theirs.goals,
@@ -146,15 +158,33 @@ extension Game {
     }
 
     /// 경기 결과를 선수 기록·순위표에 반영한다.
-    mutating func applyFootball(_ state: FootballMatch, tier: LeagueTier, countsForStandings: Bool) {
+    /// `competitive`: 출장 정지를 채우는 경기인지 (리그 경기와 플레이오프). 친선 경기는 아니다.
+    mutating func applyFootball(
+        _ state: FootballMatch, tier: LeagueTier, countsForStandings: Bool, competitive: Bool? = nil
+    ) {
         for (side, opponent) in [(state.home, state.away), (state.away, state.home)] {
             let teamID = side.teamID
+            if competitive ?? countsForStandings {
+                // 이 경기를 쉬며 출장 정지를 채운 선수들.
+                for id in teams[teamID].roster {
+                    if let left = players[id]?.suspendedMatches, left > 0 {
+                        players[id]?.suspendedMatches = left > 1 ? left - 1 : nil
+                    }
+                }
+            }
             for (index, entry) in side.players.enumerated() where entry.hasPlayed {
                 guard var player = players[entry.playerID] else { continue }
                 if countsForStandings {
                     var line = player.football ?? FootballLine()
+                    let yellowsBefore = line.yellowCards
                     line += entry.line
                     player.football = line
+                    // 출장 정지: 퇴장은 다음 리그 한 경기, 시즌 경고 다섯 장마다 한 경기.
+                    if entry.line.redCards > 0 {
+                        player.suspendedMatches = Balance.footballRedCardBan
+                    } else if line.yellowCards / Balance.footballYellowsPerBan > yellowsBefore / Balance.footballYellowsPerBan {
+                        player.suspendedMatches = 1
+                    }
                 }
                 player.isHot = entry.line.goals >= 1 || entry.line.assists >= 2
                     || (entry.line.cleanSheets >= 1 && entry.line.saves >= 3)
@@ -250,7 +280,8 @@ extension Game {
                 guard let player, let teamID = player.teamID else { return nil }
                 awards.append(AwardRecord(
                     season: season, tier: tier, title: title, playerName: player.name,
-                    teamName: teams[teamID].name, detail: detail(player), isMine: teamID == userTeamID))
+                    teamName: teams[teamID].name, detail: detail(player),
+                    isMine: isCareer ? isMyPlayer(player.id) : teamID == userTeamID))
                 return player
             }
             func value(_ player: Player) -> Double { Double(line(player).goals) + Double(line(player).assists) * 0.7 }
@@ -276,7 +307,8 @@ extension Game {
                 players[player.id] = player
             }
         }
-        let mine = awards.filter { $0.season == season && $0.isMine }
+        // 선수 모드의 수상은 시즌 기록을 정리할 때 다룬다.
+        let mine = isCareer ? [] : awards.filter { $0.season == season && $0.isMine }
         for award in mine {
             teams[userTeamID].fame += Balance.fameAward
             post("\(award.tier.displayName) \(award.title): \(award.playerName) (\(award.detail)). 인지도 +\(Int(Balance.fameAward)).")
@@ -290,7 +322,7 @@ extension Game {
             list.prefix(count).map {
                 Leader(
                     playerName: $0.name, teamName: $0.teamID.map { teams[$0].name } ?? "",
-                    value: text($0), isMine: $0.teamID == userTeamID)
+                    value: text($0), isMine: isCareer ? isMyPlayer($0.id) : $0.teamID == userTeamID)
             }
         }
         let keepers = everyone.filter { $0.position == .goalkeeper && line($0).games >= max(1, round / 2) }

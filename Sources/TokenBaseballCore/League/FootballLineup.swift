@@ -19,8 +19,16 @@ public enum FootballLineupBuilder {
 
     /// 능력 순으로 자동 구성한다. 내가 정한 선발 11명이 있고 쓸 수 있으면 그것을 따른다.
     /// 골키퍼 1명을 포함해 11명이 있어야 한다.
-    public static func build(team: Team, players: [PlayerID: Player]) -> FootballLineup? {
-        let roster = team.roster.compactMap { players[$0] }.filter { $0.position.sport == .football }
+    /// `ignoreSuspensions`: 친선 경기에는 출장 정지가 적용되지 않는다.
+    public static func build(
+        team: Team, players: [PlayerID: Player], ignoreSuspensions: Bool = false
+    ) -> FootballLineup? {
+        let everyone = team.roster.compactMap { players[$0] }.filter { $0.position.sport == .football }
+        // 출장 정지 중인 선수는 뺀다. 빼고 나서 경기를 치를 수 없으면 정지를 무시한다.
+        let available = everyone.filter { ignoreSuspensions || ($0.suspendedMatches ?? 0) <= 0 }
+        let fieldable = available.count >= Balance.footballStarters
+            && available.contains { $0.position == .goalkeeper }
+        let roster = fieldable ? available : everyone
         guard roster.count >= Balance.footballStarters,
               roster.contains(where: { $0.position == .goalkeeper })
         else { return nil }
@@ -28,7 +36,8 @@ public enum FootballLineupBuilder {
         let ranked = roster.sorted { ($0.ability, -$0.id) > ($1.ability, -$1.id) }
 
         var chosen: [Player]
-        let override = team.lineupOverride.compactMap { players[$0] }.filter { team.roster.contains($0.id) }
+        let override = team.lineupOverride.compactMap { players[$0] }
+            .filter { player in roster.contains { $0.id == player.id } }
         if override.count == Balance.footballStarters, Set(override.map(\.id)).count == override.count,
            override.contains(where: { $0.position == .goalkeeper }) {
             chosen = override
@@ -77,8 +86,10 @@ public enum FootballLineupBuilder {
     }
 
     /// 경기 엔진에 넘길 팀 구성.
-    public static func side(team: Team, players: [PlayerID: Player]) -> FootballSide? {
-        guard let lineup = build(team: team, players: players) else { return nil }
+    public static func side(
+        team: Team, players: [PlayerID: Player], ignoreSuspensions: Bool = false
+    ) -> FootballSide? {
+        guard let lineup = build(team: team, players: players, ignoreSuspensions: ignoreSuspensions) else { return nil }
         func state(_ id: PlayerID, slot: Position, starts: Bool) -> FootballPlayerState? {
             guard let player = players[id] else { return nil }
             let a = player.attributes

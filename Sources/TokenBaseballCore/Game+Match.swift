@@ -13,6 +13,8 @@ extension Game {
     /// 다음에 치를 내 경기. 없으면 nil.
     public func nextMatch() -> NextMatch? {
         guard !isBankrupt else { return nil }
+        // 선수 모드: 은퇴했거나 무소속이면 치를 경기가 없다.
+        if let career, career.retired || career.isFreeAgent { return nil }
         switch phase {
         case .regular:
             guard round < Balance.roundsPerSeason,
@@ -23,14 +25,12 @@ extension Game {
                 userIsHome: fixture.home == userTeamID,
                 label: "\(round + 1)라운드")
         case .playoff:
-            guard let mine = series.first(where: {
-                !$0.isDecided && ($0.upperTeam == userTeamID || $0.lowerTeam == userTeamID)
-            }) else { return nil }
+            guard let mine = series.first(where: { !$0.isDecided && $0.involves(userTeamID) }) else { return nil }
             let home = mine.nextHome
             return NextMatch(
                 kind: .playoff, opponent: home == userTeamID ? mine.nextAway : home,
                 userIsHome: home == userTeamID,
-                label: "승강 플레이오프 \(mine.gamesPlayed + 1)차전")
+                label: mine.nextLabel)
         case .offseason:
             guard friendliesPlayed < Balance.friendliesPerOffseason else { return nil }
             return NextMatch(
@@ -72,7 +72,15 @@ extension Game {
         guard !isBankrupt else { throw GameError("구단이 해체되었습니다. 새 구단을 만들어 주세요.") }
         guard !isMatchLive else { throw GameError("진행 중인 경기가 끝나야 다음 경기를 시작할 수 있습니다.") }
         guard charges > 0 else { throw GameError("아직 경기 기회가 없습니다.") }
+        if let career {
+            guard !career.retired else { throw GameError("은퇴했습니다. 새 선수를 만들어 주세요.") }
+            guard !career.isFreeAgent else { throw GameError("무소속입니다. 입단할 구단을 먼저 골라 주세요.") }
+        }
         guard let next = nextMatch() else { throw GameError("지금은 치를 경기가 없습니다.") }
+        if isCareer {
+            ensurePlayable(userTeamID)
+            prepareCareerLineup(kind: next.kind)
+        }
         guard canField(userTeam) else {
             throw GameError(sport == .football
                 ? "골키퍼 1명을 포함해 11명이 있어야 경기를 할 수 있습니다."
@@ -167,11 +175,9 @@ extension Game {
             round += 1
         case .playoff:
             apply(state, tier: userTier, countsForStandings: false)
-            if let index = series.firstIndex(where: {
-                !$0.isDecided && ($0.upperTeam == userTeamID || $0.lowerTeam == userTeamID)
-            }) {
-                let winner = state.home.runs > state.away.runs ? state.home.teamID : state.away.teamID
-                if winner == series[index].upperTeam { series[index].upperWins += 1 } else { series[index].lowerWins += 1 }
+            if let index = series.firstIndex(where: { !$0.isDecided && $0.involves(userTeamID) }) {
+                recordPlayoffGame(
+                    index, home: state.home.teamID, homeScore: state.home.runs, awayScore: state.away.runs)
             }
             summary += settleUserMatch(
                 kind: .playoff, myScore: mine.runs, theirScore: theirs.runs, opponent: theirs.teamID, userIsHome: userIsHome)
@@ -181,6 +187,8 @@ extension Game {
                 kind: .friendly, myScore: mine.runs, theirScore: theirs.runs, opponent: theirs.teamID, userIsHome: userIsHome)
             friendliesPlayed += 1
         }
+
+        if isCareer { summary += settleCareerMatch(kind: match.kind, state: state, userIsHome: userIsHome) }
 
         lastResult = LastResult(
             kind: match.kind, myRuns: mine.runs, theirRuns: theirs.runs,
@@ -204,7 +212,14 @@ extension Game {
                 guard var player = players[pitcher.playerID] else { continue }
                 if countsForStandings { player.pitching += pitcher.line }
                 player.isHot = pitcher.line.outs >= 15 && pitcher.line.runs <= 2
-                if index == 0 { player.lastStartGame = teams[teamID].gamesPlayed }
+                if index == 0 {
+                    player.lastStartGame = teams[teamID].gamesPlayed
+                } else {
+                    let game = teams[teamID].gamesPlayed
+                    player.reliefStreak = player.lastReliefGame == game - 1 ? (player.reliefStreak ?? 1) + 1 : 1
+                    player.lastReliefGame = game
+                    player.lastReliefPitches = pitcher.line.pitches
+                }
                 players[player.id] = player
                 playedFactor[player.id] = index == 0 ? Balance.playFactorStarter : Balance.playFactorSub
             }
@@ -247,6 +262,8 @@ extension Game {
         kind: MatchKind, myScore: Int, theirScore: Int, opponent: TeamID, userIsHome: Bool,
         shootoutWon: Bool? = nil
     ) -> [String] {
+        // 선수 모드에는 구단 재정이 없다. 내 선수의 정산은 따로 한다.
+        guard !isCareer else { return [] }
         var lines: [String] = []
         let tier = userTier
         let won = shootoutWon ?? (myScore > theirScore)

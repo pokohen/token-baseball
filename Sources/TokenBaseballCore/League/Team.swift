@@ -88,6 +88,8 @@ public struct Team: Codable, Identifiable, Equatable, Sendable {
     public var tactic: Tactic? = nil
     /// 축구 포메이션. nil이면 4-4-2.
     public var formation: Formation? = nil
+    /// 선발이 내려가면 가장 먼저 올릴 불펜 투수 (선수 모드의 내 선수). 보통은 nil.
+    public var firstReliever: PlayerID? = nil
     /// 이 구단이 만들어진 시즌.
     public var foundedSeason: Int
 
@@ -173,9 +175,17 @@ public enum LineupBuilder {
         }
         guard let starter else { return nil }
 
-        let relievers = pitchers
+        var relievers = pitchers
             .filter { $0.id != starter.id && $0.position == .reliever }
             .sorted { ($0.ability, -$0.id) > ($1.ability, -$1.id) }
+        if let first = team.firstReliever, let index = relievers.firstIndex(where: { $0.id == first }) {
+            relievers.insert(relievers.remove(at: index), at: 0)
+        }
+        // 직전 경기에 많이 던졌거나 연투한 불펜은 맨 뒤로 보낸다 (꼭 필요할 때만 나온다).
+        let tired = relievers.filter { $0.needsReliefRest(game: team.gamesPlayed) }
+        if !tired.isEmpty, tired.count < relievers.count {
+            relievers = relievers.filter { !$0.needsReliefRest(game: team.gamesPlayed) } + tired
+        }
         let closers = pitchers.filter { $0.id != starter.id && $0.position == .closer }
         var bullpen = relievers.map(\.id) + closers.prefix(1).map(\.id)
         if bullpen.isEmpty {

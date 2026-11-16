@@ -64,19 +64,35 @@ struct LeagueTab: View {
                         }
                     }
                     .font(.callout.monospacedDigit())
-                    .foregroundStyle(team.isUser ? Color.accentColor : .primary)
+                    .foregroundStyle(team.isUser || (game.isCareer && team.id == game.userTeamID) ? Color.accentColor : .primary)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 if openTeam == team.id { TeamDetail(game: game, team: team, row: row) }
             }
-            Text("팀을 누르면 선수단을 볼 수 있습니다. 10위는 자동 강등, 9위는 승강 플레이오프.").note()
+            Text(game.sport == .football
+                ? "팀을 누르면 선수단을 볼 수 있습니다. 1위는 자동 승격, 2~5위는 승격 플레이오프(한 팀 승격), 9위와 10위는 자동 강등."
+                : "팀을 누르면 선수단을 볼 수 있습니다. 1위는 자동 승격, 2위와 3위는 와일드카드를 거쳐 윗 리그 9위와 승강 플레이오프, 10위는 자동 강등.").note()
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     @ViewBuilder private var promotion: some View {
-        if let requirement = game.promotionRequirement {
+        if !game.isCareer, let level = game.promotionStadiumRequirement {
+            Card("승격 조건: 구장 등급") {
+                KeyValueRow(
+                    key: "필요한 경기장", value: "Lv\(game.userTeam.stadiumLevel) / Lv\(level)",
+                    valueColor: game.userTeam.stadiumLevel >= level ? Theme.win : Theme.loss)
+                if game.userTeam.stadiumLevel >= level {
+                    Label("구장 등급을 채웠습니다. 순위만으로 승격이 정해집니다.", systemImage: "checkmark.seal.fill")
+                        .font(.callout).foregroundStyle(Theme.win)
+                } else {
+                    Text("시즌이 끝날 때까지 경기장을 Lv\(level)로 올리지 못하면, 1위를 해도 승격 자격이 다음 순위 팀으로 넘어갑니다. 구단 탭에서 업그레이드합니다.").note()
+                }
+                Text("신청은 필요 없습니다. 1위는 자동 승격, 2~5위는 승격 플레이오프(준결승 두 경기 합산, 결승 중립 구장 단판)를 치릅니다.").note()
+            }
+        } else if !game.isCareer, let requirement = game.promotionRequirement {
             Card("승강 플레이오프 신청") {
                 KeyValueRow(
                     key: "필요 인지도", value: "\(Int(game.userTeam.fame)) / \(Int(requirement.fame))",
@@ -84,12 +100,12 @@ struct LeagueTab: View {
                 KeyValueRow(key: "신청비", value: Format.money(requirement.fee))
                 KeyValueRow(key: "신청 마감", value: "\(Balance.applicationDeadlineRound)라운드 (지금 \(game.round)라운드 종료)")
                 if game.appliedForPromotion {
-                    Label("신청 완료. 시즌이 끝났을 때 1위면 자동 승격, 2위면 승강 플레이오프에 나갑니다.", systemImage: "checkmark.seal.fill")
+                    Label("신청 완료. 시즌이 끝났을 때 1위면 자동 승격, 2위나 3위면 와일드카드를 거쳐 승강 플레이오프에 나갑니다.", systemImage: "checkmark.seal.fill")
                         .font(.callout).foregroundStyle(Theme.win)
                 } else {
                     Button("신청하기") { model.perform { try $0.applyForPromotion() } }
                         .disabled(game.phase != .regular)
-                    Text("신청하지 않으면 1~2위를 해도 승격할 수 없고, 그 자리는 다음 순위 팀이 이어받습니다.").note()
+                    Text("신청하지 않으면 1~3위를 해도 승격할 수 없고, 그 자리는 다음 순위 팀이 이어받습니다.").note()
                 }
             }
         }
@@ -152,7 +168,7 @@ struct TeamDetail: View {
                     Text("\(player.name) (\(player.age))").font(.caption)
                     Spacer()
                     Text("\(player.grade) \(Int(player.ability))").font(.caption.monospacedDigit())
-                    if !team.isUser, game.tradeWindowOpen {
+                    if !game.isCareer, !team.isUser, game.tradeWindowOpen {
                         let fee = game.value(for: player) * 13 / 10
                         Button("제안 \(Format.money(fee))") {
                             model.perform { try $0.proposeTransfer(player.id, fee: fee) }

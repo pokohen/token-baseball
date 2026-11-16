@@ -41,7 +41,17 @@
 
 ✅ 토큰 사용량이 구단 자금이 된다.
 
-💡 PokeTokenBar처럼 로컬 로그에서 사용량을 읽는다 (Claude Code `~/.claude/projects/**/*.jsonl`, Codex 등). 외부 서버로 보내지 않는다.
+✅ PokeTokenBar처럼 로컬 로그에서 사용량을 읽는다. 외부 서버로 보내지 않는다.
+
+| 도구 | 읽는 곳 | 확인 |
+|---|---|---|
+| Claude Code | `~/.claude/projects/**/*.jsonl` | 실제 로그로 확인 |
+| Codex | `~/.codex/sessions/**/*.jsonl` | 실제 로그로 확인 (2025년 11월 형식) |
+| Gemini CLI | `~/.gemini/tmp/<프로젝트>/chats/` | 도구의 소스 코드 기준. 실제 로그로는 아직 확인하지 못함 |
+| opencode | `~/.local/share/opencode/opencode*.db` | 도구의 소스 코드 기준. 실제 로그로는 아직 확인하지 못함 |
+
+- 같은 응답을 두 번 세지 않도록 도구마다 응답 ID로 중복을 없앤다.
+- Cursor는 로컬에 토큰 수를 남기지 않아 읽을 수 없다. 웹에서 쓰는 claude.ai, ChatGPT도 로컬 기록이 없다.
 
 ✅ 토큰 수를 가중치 없이 그대로 자금으로 쓴다. 혼자 하는 아케이드 게임이라 다른 사용자와 형평을 맞출 필요가 없다.
 
@@ -111,6 +121,8 @@
 | **선수** | 로스터, 라인업, 영입 → [선수 영입](05-player-recruitment.md) |
 | **설정** | 토큰 경로, 환산 난이도, 알림, 애니메이션 |
 
+[야구 선수 모드](09-baseball-player-mode.md)에서는 구단 탭 자리가 **훈련**, 선수 탭 자리가 **커리어**가 된다.
+
 💡 알림: 경기 가능, 시즌 종료, 승강 플레이오프 결과, 업그레이드 완료.
 
 ## 기술 스택
@@ -137,6 +149,7 @@ Sources/
     World/             세계 시뮬레이션 (CPU 팀, 성장, 맞춰주기)
     Club/              시설, 홍보, 재정, 인지도
     Players/           선수 생성, 능력·잠재력, 영입
+    Career/            선수 모드 (내 선수, 훈련, 평점, 계약, 시즌 흐름)
   TokenBaseball/       macOS 앱 (상단바, 팝오버, 설정)
 Tests/
   TokenBaseballCoreTests/

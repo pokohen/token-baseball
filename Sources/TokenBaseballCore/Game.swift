@@ -1,154 +1,5 @@
 import Foundation
 
-/// CPU 팀 맞춰주기 강도.
-public enum RubberBand: String, Codable, CaseIterable, Sendable {
-    case off = "끄기", weak = "약하게", normal = "보통", strong = "강하게"
-
-    /// 성장 속도 보정 폭.
-    var growthSwing: Double {
-        switch self {
-        case .off: 0
-        case .weak: 0.10
-        case .normal: 0.15
-        case .strong: 0.25
-        }
-    }
-
-    /// 시즌당 리그 평균 상승 한도.
-    var seasonCap: Double {
-        switch self {
-        case .off: 0
-        case .weak: 2
-        case .normal: 3
-        case .strong: 5
-        }
-    }
-
-    /// 영입 보정을 하는지.
-    var adjustsRecruiting: Bool { self == .normal || self == .strong }
-}
-
-/// 상단바에 보일 숫자.
-public enum MenuBarDisplay: String, Codable, CaseIterable, Sendable {
-    case funds = "구단 자금", today = "오늘 사용량", nextMatch = "다음 경기"
-}
-
-public struct Settings: Codable, Equatable, Sendable {
-    public var rubberBand = RubberBand.normal
-    /// 가격 난이도 (0.1 ~ 2.0). 비용에만 곱한다. 토큰 수는 건드리지 않는다.
-    public var priceDifficulty = 1.0
-    public var menuBarDisplay = MenuBarDisplay.funds
-    public var animationEnabled = true
-    public var notificationsEnabled = true
-
-    public init() {}
-}
-
-public struct NewsItem: Codable, Equatable, Identifiable, Sendable {
-    public var id: Int
-    public var season: Int
-    public var text: String
-}
-
-public enum SeasonPhase: String, Codable, Sendable {
-    case regular, playoff, offseason
-}
-
-/// 승강 플레이오프 한 시리즈 (3전 2선승, 상위 리그 팀 홈에서 1·3차전).
-public struct PlayoffSeries: Codable, Equatable, Sendable {
-    public var upperTier: LeagueTier
-    public var upperTeam: TeamID
-    public var lowerTeam: TeamID
-    public var upperWins = 0
-    public var lowerWins = 0
-
-    public var gamesPlayed: Int { upperWins + lowerWins }
-    public var isDecided: Bool { upperWins >= 2 || lowerWins >= 2 }
-    /// 다음 경기의 홈 팀: 1·3차전은 상위 리그 팀.
-    public var nextHome: TeamID { gamesPlayed == 1 ? lowerTeam : upperTeam }
-    public var nextAway: TeamID { gamesPlayed == 1 ? upperTeam : lowerTeam }
-}
-
-/// 리그 이동 예정.
-public struct TierMove: Codable, Equatable, Sendable {
-    public var team: TeamID
-    public var to: LeagueTier
-}
-
-public enum MatchKind: String, Codable, Sendable {
-    case regular, playoff, friendly
-
-    public var label: String {
-        switch self {
-        case .regular: "정규시즌"
-        case .playoff: "승강 플레이오프"
-        case .friendly: "친선 경기"
-        }
-    }
-}
-
-/// 진행 중인 내 경기와, 같은 라운드의 내 리그 다른 경기들.
-public struct LiveMatch: Codable, Equatable, Sendable {
-    public var kind: MatchKind
-    public var state: MatchState
-    public var others: [MatchState]
-    public var userIsHome: Bool
-    public var tier: LeagueTier
-}
-
-/// 진행 중인 내 축구 경기와, 같은 라운드의 내 리그 다른 경기들.
-public struct LiveFootballMatch: Codable, Equatable, Sendable {
-    public var kind: MatchKind
-    public var state: FootballMatch
-    public var others: [FootballMatch]
-    public var userIsHome: Bool
-    public var tier: LeagueTier
-}
-
-/// 끝난 내 경기 결과. 상단바의 "경기 종료" 표시에 쓴다.
-public struct LastResult: Codable, Equatable, Sendable {
-    public var kind: MatchKind
-    public var myRuns: Int
-    public var theirRuns: Int
-    public var opponent: String
-    public var wasHome: Bool
-    /// 팝오버를 열어 확인했는지.
-    public var acknowledged = false
-    public var summary: [String]
-    /// 승부차기로 끝난 경기: 내가 이겼는지. 그 밖에는 nil.
-    public var shootoutWon: Bool? = nil
-
-    public var label: String {
-        if let shootoutWon { return "\(shootoutWon ? "승" : "패") \(myRuns):\(theirRuns) 승부차기" }
-        return myRuns > theirRuns ? "승 \(myRuns):\(theirRuns)" : myRuns < theirRuns ? "패 \(myRuns):\(theirRuns)" : "무 \(myRuns):\(theirRuns)"
-    }
-}
-
-public struct AwardRecord: Codable, Equatable, Sendable {
-    public var season: Int
-    public var tier: LeagueTier
-    public var title: String
-    public var playerName: String
-    public var teamName: String
-    public var detail: String
-    public var isMine: Bool
-}
-
-/// 해체된 구단의 기록 (명예의 전당).
-public struct HallEntry: Codable, Equatable, Sendable {
-    public var name: String
-    public var foundedSeason: Int
-    public var endedSeason: Int
-    public var bestTier: LeagueTier
-    public var star: String?
-}
-
-public struct GameError: Error, Equatable, CustomStringConvertible, Sendable {
-    public let message: String
-    public init(_ message: String) { self.message = message }
-    public var description: String { message }
-}
-
 /// 게임 전체 상태. 이것 하나를 저장하면 그대로 이어서 할 수 있다.
 public struct Game: Codable, Equatable, Sendable {
     public var settings = Settings()
@@ -218,6 +69,11 @@ public struct Game: Codable, Equatable, Sendable {
     var draftDone = false
     var expiryNoticeSent = false
 
+    // 선수 모드. 구단 모드와 예전 저장 파일에는 없다.
+    public internal(set) var career: Career?
+    /// 은퇴한 내 선수들의 기록실.
+    public internal(set) var careerHall: [CareerRecord]?
+
     // MARK: 읽기
 
     public var sport: Sport { sportChoice ?? .baseball }
@@ -276,8 +132,14 @@ public struct Game: Codable, Equatable, Sendable {
         phase == .offseason ? player.contract.seasonsLeft <= 0 : player.contract.seasonsLeft <= 1
     }
 
+    /// 이적 기간. 야구는 오프시즌과 시즌 중 트레이드 마감 전, 축구는 여름과 겨울 두 번이다.
     public var tradeWindowOpen: Bool {
-        phase == .offseason || (phase == .regular && round < Balance.tradeDeadlineRound)
+        if phase == .offseason { return true }
+        guard phase == .regular else { return false }
+        if sport == .football {
+            return round < Balance.footballSummerWindowRounds || Balance.footballWinterWindow.contains(round)
+        }
+        return round < Balance.tradeDeadlineRound
     }
 
     // MARK: 소식
@@ -356,143 +218,5 @@ public struct Game: Codable, Equatable, Sendable {
         }
         freeAgents.removeAll { $0 == playerID }
         players[playerID] = nil
-    }
-}
-
-// MARK: - 새 게임
-
-extension Game {
-    public struct ClubSetup: Equatable, Sendable {
-        public var city: String
-        public var name: String
-        public var colorIndex: Int
-        public var emblemIndex: Int
-
-        public init(city: String, name: String, colorIndex: Int = 0, emblemIndex: Int = 0) {
-            self.city = city
-            self.name = name
-            self.colorIndex = colorIndex
-            self.emblemIndex = emblemIndex
-        }
-    }
-
-    /// 새 게임: 6개 리그 60팀을 만들고, 내 시민 구단을 6부에 넣는다.
-    public static func newGame(setup: ClubSetup, now: Date, seed: UInt64, sport: Sport = .baseball) -> Game {
-        var game = Game(funds: FundsLedger(startedAt: now), rng: SeededRNG(seed: seed), chargeAnchor: now)
-        if sport != .baseball { game.sportChoice = sport }
-        var taken: Set<String> = [setup.name]
-
-        for tier in LeagueTier.allCases {
-            for slot in 0..<Balance.teamsPerLeague {
-                let id = game.teams.count
-                let isUser = tier == .citizenAmateur && slot == Balance.teamsPerLeague - 1
-                if isUser {
-                    var team = Team(
-                        id: id, name: setup.name, city: setup.city, tier: tier, isUser: true, season: 1)
-                    team.colorIndex = setup.colorIndex
-                    team.emblemIndex = setup.emblemIndex
-                    game.teams.append(team)
-                    game.userTeamID = id
-                    game.fillUserStartRoster()
-                } else {
-                    let identity = tier == .pro
-                        ? NameGenerator.proTeams(sport)[slot]
-                        : NameGenerator.cpuTeam(tier: tier, taken: taken, sport: sport, &game.rng)
-                    taken.insert(identity.name)
-                    game.teams.append(Team(
-                        id: id, name: identity.name, city: identity.city, tier: tier, isUser: false, season: 1))
-                    game.setUpCPUTeam(id, slot: slot)
-                }
-            }
-        }
-        game.startSeasonSchedules()
-        game.post("\(setup.name) 창단! \(LeagueTier.citizenAmateur.displayName) 리그에서 첫 시즌을 시작합니다.")
-        return game
-    }
-
-    init(funds: FundsLedger, rng: SeededRNG, chargeAnchor: Date) {
-        self.funds = funds
-        self.rng = rng
-        self.chargeAnchor = chargeAnchor
-    }
-
-    /// 시작 로스터 (야구 14명, 축구 16명): 동네 사회인 선수. 숨은 보석은 많아야 1명.
-    mutating func fillUserStartRoster() {
-        let tier = LeagueTier.citizenAmateur
-        let positions = rosterPositions(tier)
-        let gemIndex: Int? = rng.chance(0.5) ? rng.int(0...(positions.count - 1)) : nil
-        for (index, position) in positions.enumerated() {
-            var spec = PlayerFactory.Spec(position: position, tier: tier, season: season)
-            spec.ability = 25...35
-            if index == gemIndex {
-                // 숨은 보석: 잠재력은 높지만 스카우트 눈에는 별 2개 정도로 낮게 보인다.
-                spec.age = 19...22
-                spec.potential = 55...65
-                spec.scoutBias = -2
-            }
-            let player = makePlayer(spec)
-            add(player.id, to: userTeamID)
-        }
-    }
-
-    /// CPU 구단 초기 설정: 리그 강도 범위 안에서 강팀·중위권·약팀을 고르게 만든다.
-    mutating func setUpCPUTeam(_ id: TeamID, slot: Int) {
-        let tier = teams[id].tier
-        let offsets: [Double] = [8, 6, 4, 2, 0, -1, -3, -5, -7, -8]
-        teams[id].targetOffset = offsets[slot % offsets.count]
-        teams[id].style = rng.pick(TeamStyle.allCases)
-        teams[id].colorIndex = rng.int(0...7)
-        teams[id].emblemIndex = rng.int(0...5)
-        let level = [8, 6, 5, 4, 2, 1][tier.index]
-        teams[id].trainingLevel = max(1, level + rng.int(-1...1))
-        teams[id].stadiumLevel = max(1, level + rng.int(-1...1))
-        teams[id].fame = Balance.requiredFame(from: tier == .pro ? .semiPro : tier) * rng.double(0.6...1.4)
-        teams[id].funds = Balance.cpuIncomePerMatch(tier) * 5
-        fillCPURoster(id, target: mid(Balance.strengthRange(tier)) + teams[id].targetOffset)
-        // 무작위로 만들다 보면 강도가 리그 범위를 살짝 벗어날 수 있어 한 번 맞춘다.
-        normalizeCPURoster(id, leagueTarget: nil)
-    }
-
-    func mid(_ range: ClosedRange<Double>) -> Double { (range.lowerBound + range.upperBound) / 2 }
-
-    /// 목표 강도에 맞는 선수로 로스터의 빈자리를 채운다.
-    mutating func fillCPURoster(_ id: TeamID, target: Double) {
-        let tier = teams[id].tier
-        var needed = rosterPositions(tier)
-        for player in roster(of: id) {
-            if let index = needed.firstIndex(of: player.position) { needed.remove(at: index) }
-        }
-        let range = Balance.abilityRange(tier)
-        for position in needed where teams[id].roster.count < rosterLimit(tier) {
-            var spec = PlayerFactory.Spec(position: position, tier: tier, season: season)
-            let center = clamp(target + rng.gaussian() * 4, range.lowerBound, range.upperBound)
-            spec.ability = center...center
-            switch teams[id].style {
-            case .youth: spec.age = 18...27
-            case .veteran: spec.age = 26...(Balance.ageRange(tier).upperBound)
-            default: break
-            }
-            let player = makePlayer(spec)
-            add(player.id, to: id)
-        }
-    }
-
-    /// 새 시즌 일정과 순위표.
-    mutating func startSeasonSchedules() {
-        schedules = []
-        standings = []
-        leagueStartAverage = []
-        for tier in LeagueTier.allCases {
-            let ids = teams(in: tier).map(\.id)
-            schedules.append(ScheduleBuilder.build(teams: ids, &rng))
-            standings.append(ids.map { StandingRow(teamID: $0) })
-            leagueStartAverage.append(cpuAverageStrength(tier))
-        }
-    }
-
-    func cpuAverageStrength(_ tier: LeagueTier) -> Double {
-        let cpu = teams(in: tier).filter { !$0.isUser }
-        guard !cpu.isEmpty else { return 0 }
-        return cpu.reduce(0) { $0 + strength(of: $1.id) } / Double(cpu.count)
     }
 }
