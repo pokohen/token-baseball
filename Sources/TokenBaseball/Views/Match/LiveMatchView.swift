@@ -16,16 +16,7 @@ struct LiveMatchView: View {
                 scoreboard
             }
             if let myName {
-                Card {
-                    if let myPerformance {
-                        KeyValueRow(
-                            key: "내 선수 \(myName)",
-                            value: "평점 \(String(format: "%.1f", myPerformance.rating)) · \(myPerformance.line)",
-                            valueColor: .accentColor)
-                    } else {
-                        KeyValueRow(key: "내 선수 \(myName)", value: "아직 나오지 않았습니다")
-                    }
-                }
+                MyPlayerLiveCard(name: myName, performance: myPerformance, waiting: "아직 나오지 않았습니다")
             }
             Card {
                 HStack(alignment: .center, spacing: 16) {
@@ -44,26 +35,8 @@ struct LiveMatchView: View {
                 KeyValueRow(key: "투수 \(pitcher.name)", value: "\(pitcher.line.pitches)구")
                 KeyValueRow(key: "타자 \(batter.name)", value: "\(batter.line.atBats)타수 \(batter.line.hits)안타")
             }
-            Card("문자 중계") {
-                ForEach(Array(state.log.suffix(8).reversed().enumerated()), id: \.offset) { index, event in
-                    // 내 선수가 나온 장면은 눈에 띄게 한다.
-                    let mine = myName.map { event.text.contains($0) } ?? false
-                    Text(event.text)
-                        .font(index == 0 || mine ? .callout.weight(.semibold) : .callout)
-                        .foregroundStyle(event.kind == .score ? Theme.win : mine ? Color.accentColor : index == 0 ? .primary : .secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                if state.log.isEmpty { Text("곧 경기가 시작됩니다.").note() }
-            }
-            if !live.others.isEmpty {
-                Card("타 구장 소식") {
-                    ForEach(Array(live.others.enumerated()), id: \.offset) { _, other in
-                        KeyValueRow(
-                            key: "\(other.away.shortName) \(other.away.runs) : \(other.home.runs) \(other.home.shortName)",
-                            value: other.isFinished ? "종료" : other.inningLabel)
-                    }
-                }
-            }
+            CommentaryCard(log: state.log, myName: myName)
+            OtherMatchesCard(rows: live.others.map { ("\($0.away.shortName) \($0.away.runs) : \($0.home.runs) \($0.home.shortName)", $0.isFinished ? "종료" : $0.inningLabel) })
         }
     }
 
