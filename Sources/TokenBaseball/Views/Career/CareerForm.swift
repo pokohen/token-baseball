@@ -16,9 +16,8 @@ struct CareerForm: View {
             TextField("선수 이름", text: $setup.name).textFieldStyle(.roundedBorder)
             ChoiceGrid(items: CareerSetup.footballPositions, selection: $setup.position, columns: 4) { $0.label }
             Text(positionNote).note()
-            Picker("출신", selection: $setup.hometown) {
-                ForEach(NameGenerator.userCities, id: \.self) { Text($0).tag($0) }
-            }
+            Text("출신 (연고지)").font(.callout.weight(.medium))
+            ChoiceGrid(items: NameGenerator.userCities, selection: $setup.hometown, columns: 4) { $0 }
         }
         .font(.callout)
         .onAppear { if setup.position.sport != .football { setup.position = .forward } }
@@ -57,9 +56,8 @@ struct CareerForm: View {
             .pickerStyle(.segmented)
             .labelsHidden()
 
-            Picker("출신", selection: $setup.hometown) {
-                ForEach(NameGenerator.userCities, id: \.self) { Text($0).tag($0) }
-            }
+            Text("출신 (연고지)").font(.callout.weight(.medium))
+            ChoiceGrid(items: NameGenerator.userCities, selection: $setup.hometown, columns: 4) { $0 }
         }
         .font(.callout)
         .onAppear {

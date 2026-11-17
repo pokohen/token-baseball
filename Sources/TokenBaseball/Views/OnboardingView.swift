@@ -30,7 +30,8 @@ struct OnboardingView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            if step == 0 { welcome } else { form }
+            // 선수 만들기는 고를 것이 많아 창 높이를 넘을 수 있으니 스크롤할 수 있게 한다.
+            if step == 0 { welcome } else { ScrollView { form.frame(maxWidth: .infinity, alignment: .leading) } }
             if let message = model.message {
                 Text(message).font(.callout).foregroundStyle(Theme.loss)
             }
@@ -128,13 +129,7 @@ struct OnboardingView: View {
                 CareerForm(setup: $career, sport: slot.sport)
                 Text("\(LeagueTier.citizenAmateur.displayName) 리그의 시민 구단에 입단합니다. 시작 훈련 포인트 \(FundsLedger.startingFunds.formatted()) P.").note()
             case 2:
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 8) {
-                    ForEach(NameGenerator.userCities, id: \.self) { item in
-                        Button(item) { city = item }
-                            .buttonStyle(.bordered)
-                            .tint(city == item ? Color.accentColor : .secondary)
-                    }
-                }
+                ChoiceGrid(items: NameGenerator.userCities, selection: $city, columns: 4) { $0 }
             case 3:
                 TextField(defaultName, text: $name).textFieldStyle(.roundedBorder)
                 Text("비워 두면 \"\(defaultName)\"이 됩니다. 나중에 설정에서 바꿀 수 있습니다.").note()
