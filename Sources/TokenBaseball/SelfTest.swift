@@ -105,6 +105,28 @@ enum SelfTest {
         model.game?.runMatchToEnd()
         check("이어서 끝까지", model.game?.isMatchLive == false)
 
+        // 추가 경기: 기회가 없을 때 토큰으로 사서 바로 시작한다
+        // 같은 시각에 남은 기회를 다 써서 기회가 없는 상태를 만든다.
+        let fixed = Date().addingTimeInterval((hours + 4) * 3600)
+        var spent = 0
+        while (model.game?.charges ?? 0) > 0, spent < 5 {
+            model.perform { try $0.startMatch(now: fixed) }
+            model.game?.runMatchToEnd()
+            spent += 1
+        }
+        check("추가 경기: 기회가 없는 상태", model.game?.charges == 0)
+        _ = model.game?.collect(
+            [UsageRecord(id: "selftest-extra", timestamp: Date(), usage: TokenUsage(output: 30_000_000))], now: Date())
+        model.buyExtraMatchAndStart()
+        check("추가 경기: 사서 바로 시작", model.game?.isMatchLive == true, model.message ?? "")
+        model.game?.runMatchToEnd()
+        check("추가 경기: 값이 두 배", model.game?.extraMatchCost == Balance.extraMatchCost * 2)
+        // 배속은 고른 값이 남는다
+        let speedBefore = model.matchSpeed
+        model.matchSpeed = 4
+        check("배속: 저장", UserDefaults.standard.integer(forKey: "matchSpeed") == 4)
+        model.matchSpeed = speedBefore
+
         // 9. 새 버전 확인: GitHub 응답 읽기 (네트워크는 쓰지 않는다)
         let notifiedBefore = UpdateChecker.notifiedHead
         defer { UpdateChecker.notifiedHead = notifiedBefore }

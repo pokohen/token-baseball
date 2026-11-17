@@ -7,6 +7,7 @@ struct MatchTab: View {
 
     var body: some View {
         VStack(spacing: 10) {
+            if game.isMatchLive { MatchSpeedCard() }
             if let live = game.live {
                 LiveMatchView(
                     live: live, myName: game.myPlayer?.name, myPerformance: game.careerLivePerformance)

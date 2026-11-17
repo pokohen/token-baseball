@@ -43,8 +43,17 @@ final class AppModel: ObservableObject {
     @Published var updateStatus: String?
     @Published var checkingUpdate = false
 
-    /// 공 하나에 걸리는 시간. 배속과 건너뛰기는 없다.
+    /// 공 하나에 걸리는 시간 (1배속 기준).
     static let pitchInterval: Duration = .seconds(3)
+    /// 고를 수 있는 중계 배속.
+    static let matchSpeeds = [1, 2, 4, 8]
+    /// 중계 배속. 경기 도중에도 바꿀 수 있고, 다음 경기에도 이어진다.
+    @Published var matchSpeed: Int = {
+        let saved = UserDefaults.standard.integer(forKey: "matchSpeed")
+        return AppModel.matchSpeeds.contains(saved) ? saved : 1
+    }() {
+        didSet { UserDefaults.standard.set(matchSpeed, forKey: "matchSpeed") }
+    }
 
     init(store: SaveStore = AppModel.defaultStore(), sources: UsageSources = UsageSources()) {
         self.baseStore = store

@@ -28,13 +28,29 @@ struct NextMatchCard: View {
                     .buttonStyle(.borderedProminent)
                     .disabled(game.charges == 0)
                 }
-                if game.charges == 0, let wait = game.timeToNextCharge(now: model.now) {
-                    Text("다음 경기 기회까지 \(Format.countdown(wait))").note()
+                if game.charges == 0 {
+                    if let wait = game.timeToNextCharge(now: model.now) {
+                        Text("다음 경기 기회까지 \(Format.countdown(wait))").note()
+                    }
+                    HStack {
+                        Text("기다리지 않고 \(game.isCareer ? "훈련 포인트" : "자금")로 바로 치를 수 있습니다. 연달아 쓰면 두 배씩 비싸지고, 경기 기회가 새로 생기면 처음 값으로 돌아갑니다.").note()
+                        Spacer()
+                        Button("바로 경기 · \(costText)") {
+                            model.buyExtraMatchAndStart()
+                            if model.game?.isMatchLive == true { goToMatch() }
+                        }
+                        .disabled(game.extraMatchBlockedReason != nil)
+                        .help(game.extraMatchBlockedReason ?? "경기 기회를 하나 사서 바로 시작합니다")
+                    }
                 }
             } else {
                 Text("지금은 치를 경기가 없습니다.").note()
             }
         }
+    }
+
+    private var costText: String {
+        game.isCareer ? "\(Format.tokens(game.extraMatchCost)) P" : Format.money(game.extraMatchCost)
     }
 
     private var chargeText: String {
