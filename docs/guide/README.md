@@ -12,19 +12,19 @@
 
 ## 설치, 업데이트, 초기화
 
-터미널에서 실행한다. 저장소를 직접 받을 필요는 없다 (Xcode 16 이상은 있어야 한다). 저장소를 직접 받아 개발하는 경우의 명령(`Scripts/update.sh`)은 [README](../../README.md#설치)에 있다.
+터미널에서 실행한다. 저장소를 직접 받을 필요는 없다. 배포 파일이 올라와 있으면 그것을 내려받으므로 Xcode도 필요 없다 (없으면 이 맥에서 직접 만들고, 그때는 Xcode 16 이상이 필요하다). 저장소를 직접 받아 개발하는 경우의 명령(`Scripts/update.sh`)은 [README](../../README.md#설치)에 있다.
 
 | 하려는 것 | 명령 | 구단·선수 저장 파일 |
 |---|---|---|
 | 처음 설치 | `curl -fsSL https://raw.githubusercontent.com/pokohen/token-sport/main/Scripts/install.sh \| bash` | 없음 (처음 화면부터) |
-| **업데이트** | 같은 명령을 다시 실행한다 (또는 `~/.token-sport/Scripts/install.sh`) | **그대로**. 코드만 새로 받아 앱을 다시 만들어 바꿔 넣는다 |
-| **초기화** | `~/.token-sport/Scripts/reset.sh` | 백업 폴더로 옮긴다. 코드를 새로 받고 앱을 처음부터 다시 만든다 |
+| **업데이트** | 같은 명령을 다시 실행한다 | **그대로**. 앱만 새 버전으로 바뀐다 |
+| **초기화** | 앱을 끄고 `~/Library/Application Support/TokenBaseball` 폴더의 이름을 바꾸거나 지운다 | 처음 화면부터 다시 시작한다 |
 
 - **새 버전 알림**: 앱이 켤 때와 여섯 시간마다 새 변경이 있는지 확인한다. 있으면 알림이 한 번 오고, 팝오버 위쪽에 "새 버전이 있습니다" 줄이, 설정 탭에 "업데이트" 카드가 나온다. 카드에서 무엇이 바뀌었는지 보고 `Scripts/update.sh`를 복사할 수 있다. 앱이 스스로 업데이트하지는 않는다. 설정 탭에서 자동 확인을 끌 수 있다.
 - 업데이트한 뒤에는 실행 중인 앱을 설정 탭의 "앱 종료"로 끄고 새로 만든 앱을 연다. 하던 구단과 선수가 그대로 이어진다.
-- 초기화는 무엇을 할지 보여 주고 확인을 묻는다. 저장 파일은 지우지 않고 `~/Library/Application Support/TokenBaseball-backup-날짜-시각`으로 옮기므로, 되돌리려면 그 폴더 이름을 `TokenBaseball`로 바꾼다.
+- 초기화할 때 폴더를 지우지 않고 이름만 바꿔 두면(예: `TokenBaseball-backup`), 나중에 이름을 되돌려 예전 선수를 다시 불러올 수 있다. 저장소를 직접 받아 쓰는 경우에는 `Scripts/reset.sh`가 이 일을 해 준다.
 - 한 모드만 처음부터 다시 하고 싶으면 초기화할 필요 없이 그 모드의 저장 파일만 지운다 (`~/Library/Application Support/TokenBaseball` 안의 `save.json` 야구 구단, `save-football.json` 축구 구단, `save-baseball-player.json` 야구 선수, `save-football-player.json` 축구 선수).
-- 직접 고친 파일이 있으면 두 명령 모두 아무것도 하지 않고 멈춘다.
+- 아직 배포되지 않은 최신 변경까지 쓰려면 설치 명령 끝에 `-s -- --build`를 붙여 소스로 직접 만든다 (Xcode 필요).
 
 ## 모든 모드에 공통인 것
 

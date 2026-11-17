@@ -14,8 +14,11 @@ enum UpdateChecker {
         var count: Int
         /// 가장 최근 변경의 제목들 (새 것부터, 병합 기록은 뺀다).
         var titles: [String]
-        /// 기본 브랜치의 맨 끝 커밋. 같은 업데이트를 두 번 알리지 않으려고 쓴다.
+        /// 기본 브랜치의 맨 끝 커밋(또는 배포 버전). 같은 업데이트를 두 번 알리지 않으려고 쓴다.
         var head: String
+        /// 배포 버전이면 그 이름 (예: "0.3.0")과 내려받는 페이지.
+        var version: String? = nil
+        var page: URL? = nil
     }
 
     enum Outcome: Equatable, Sendable {
@@ -48,7 +51,25 @@ enum UpdateChecker {
         set { UserDefaults.standard.set(newValue, forKey: "updateNotifiedHead") }
     }
 
+    /// 배포 파일(.dmg)로 설치한 앱인지. 그러면 새 버전은 "최신 배포 버전"과 비교한다.
+    static var isReleaseBuild: Bool {
+        if ProcessInfo.processInfo.environment["TOKEN_BASEBALL_RELEASE_VERSION"] != nil { return true }
+        return Bundle.main.object(forInfoDictionaryKey: "TBRelease") as? Bool ?? false
+    }
+
+    /// 이 앱의 버전 (예: "0.2.0").
+    static var appVersion: String {
+        ProcessInfo.processInfo.environment["TOKEN_BASEBALL_RELEASE_VERSION"]
+            ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
+    }
+
+    /// 설치·업데이트 명령 한 줄.
+    static var installCommand: String {
+        "curl -fsSL https://raw.githubusercontent.com/\(repository)/main/Scripts/install.sh | bash"
+    }
+
     static func check() async -> Outcome {
+        if isReleaseBuild { return await checkRelease() }
         guard let commit = buildCommit else {
             return .unknown("앱 번들로 실행할 때만 확인할 수 있습니다 (Scripts/make-app.sh로 만든 앱).")
         }
@@ -67,6 +88,59 @@ enum UpdateChecker {
         } catch {
             return .unknown("확인하지 못했습니다: \(error.localizedDescription)")
         }
+    }
+
+    /// 배포 버전 확인: GitHub Releases의 최신 버전이 이 앱보다 높은지.
+    static func checkRelease() async -> Outcome {
+        guard let url = URL(string: "https://api.github.com/repos/\(repository)/releases/latest") else {
+            return .unknown("저장소 주소가 올바르지 않습니다.")
+        }
+        var request = URLRequest(url: url, timeoutInterval: 15)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("TokenSport-update-check", forHTTPHeaderField: "User-Agent")
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if status == 404 { return .upToDate }
+            guard status == 200 else { return .unknown("GitHub가 응답하지 않았습니다 (\(status)).") }
+            return parseRelease(data, current: appVersion)
+        } catch {
+            return .unknown("확인하지 못했습니다: \(error.localizedDescription)")
+        }
+    }
+
+    /// GitHub의 최신 배포 응답을 읽어 지금 버전과 비교한다.
+    static func parseRelease(_ data: Data, current: String) -> Outcome {
+        struct Response: Decodable {
+            let tag_name: String
+            let name: String?
+            let body: String?
+            let html_url: String?
+        }
+        guard let response = try? JSONDecoder().decode(Response.self, from: data) else {
+            return .unknown("응답을 읽지 못했습니다.")
+        }
+        let latest = response.tag_name.hasPrefix("v") ? String(response.tag_name.dropFirst()) : response.tag_name
+        guard isVersion(latest, newerThan: current) else { return .upToDate }
+        // 배포 설명의 목록 줄을 변경 내용으로 보여 준다.
+        let notes = (response.body ?? "").split(separator: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { $0.hasPrefix("* ") || $0.hasPrefix("- ") }
+            .map { String($0.dropFirst(2)) }
+        return .available(Update(
+            count: max(1, notes.count), titles: Array(notes.prefix(5)), head: response.tag_name,
+            version: latest, page: response.html_url.flatMap(URL.init(string:))))
+    }
+
+    /// "0.10.0" > "0.9.3" 같은 숫자 비교.
+    static func isVersion(_ a: String, newerThan b: String) -> Bool {
+        let x = a.split(separator: ".").map { Int($0) ?? 0 }
+        let y = b.split(separator: ".").map { Int($0) ?? 0 }
+        for index in 0..<max(x.count, y.count) {
+            let l = index < x.count ? x[index] : 0, r = index < y.count ? y[index] : 0
+            if l != r { return l > r }
+        }
+        return false
     }
 
     /// GitHub의 compare 응답을 읽는다.
