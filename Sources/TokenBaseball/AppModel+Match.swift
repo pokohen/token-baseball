@@ -11,6 +11,13 @@ extension AppModel {
         if game?.isMatchLive == true { runMatchLoop() }
     }
 
+    /// 토큰으로 경기 기회를 하나 사서 곧바로 경기를 시작한다.
+    func buyExtraMatchAndStart() {
+        perform { try $0.buyExtraMatch(now: Date()) }
+        guard message == nil else { return }
+        startMatch()
+    }
+
     func acknowledgeResult() {
         guard game?.lastResult?.acknowledged == false else { return }
         game?.acknowledgeResult()
@@ -39,7 +46,8 @@ extension AppModel {
                 if events.contains(where: { $0.kind == .change }) { pause += .seconds(3) }
                 if events.contains(where: { $0.kind == .score }) { pause += .seconds(2) }
                 if self.game?.isMatchLive != true { break }
-                try? await Task.sleep(for: pause)
+                // 배속: 기다리는 시간만 줄인다. 경기 내용은 배속과 상관없이 같다.
+                try? await Task.sleep(for: pause / max(1, self.matchSpeed))
             }
             if let self, self.matchGeneration == generation { self.matchTask = nil }
         }

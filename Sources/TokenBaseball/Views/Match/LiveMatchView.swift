@@ -1,7 +1,7 @@
 import SwiftUI
 import TokenBaseballCore
 
-/// 실시간 중계 화면. 배속과 건너뛰기는 없다.
+/// 실시간 중계 화면. 배속은 경기 탭의 배속 카드에서 고른다.
 struct LiveMatchView: View {
     let live: LiveMatch
     /// 선수 모드: 내 선수 이름과 이 경기에서 지금까지의 평점.

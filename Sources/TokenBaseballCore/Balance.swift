@@ -432,6 +432,9 @@ public enum Balance {
 
     public static let matchChargeInterval: TimeInterval = 60 * 60
     public static let maxMatchCharges = 3
+    /// 토큰으로 경기 기회를 하나 사는 값. 연달아 사면 두 배씩 오른다 (최대 `extraMatchMaxDoublings`번).
+    public static let extraMatchCost = 3_000_000
+    public static let extraMatchMaxDoublings = 6
 
     // MARK: 영입
 

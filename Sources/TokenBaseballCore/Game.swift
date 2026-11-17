@@ -69,6 +69,9 @@ public struct Game: Codable, Equatable, Sendable {
     var draftDone = false
     var expiryNoticeSent = false
 
+    /// 마지막으로 경기 기회가 저절로 생긴 뒤에 토큰으로 산 경기 수 (살수록 비싸진다). 예전 저장 파일에는 없다.
+    public internal(set) var extraMatchesBought: Int?
+
     // 선수 모드. 구단 모드와 예전 저장 파일에는 없다.
     public internal(set) var career: Career?
     /// 은퇴한 내 선수들의 기록실.
@@ -161,6 +164,8 @@ public struct Game: Codable, Equatable, Sendable {
         while charges < Balance.maxMatchCharges,
               now.timeIntervalSince(chargeAnchor) >= Balance.matchChargeInterval {
             charges += 1
+            // 기회가 저절로 생기면 추가 경기 값이 처음으로 돌아간다.
+            extraMatchesBought = nil
             chargeAnchor = chargeAnchor.addingTimeInterval(Balance.matchChargeInterval)
         }
         if charges >= Balance.maxMatchCharges { chargeAnchor = now }
@@ -171,6 +176,37 @@ public struct Game: Codable, Equatable, Sendable {
     public func timeToNextCharge(now: Date) -> TimeInterval? {
         guard charges < Balance.maxMatchCharges else { return nil }
         return max(0, Balance.matchChargeInterval - now.timeIntervalSince(chargeAnchor))
+    }
+
+    // MARK: 추가 경기
+
+    /// 지금 토큰(구단 자금 또는 훈련 포인트)으로 경기 기회를 하나 사는 값.
+    /// 연달아 살수록 두 배씩 비싸지고, 경기 기회가 저절로 하나 생기면 처음 값으로 돌아간다.
+    public var extraMatchCost: Int {
+        price(Balance.extraMatchCost << min(extraMatchesBought ?? 0, Balance.extraMatchMaxDoublings))
+    }
+
+    /// 지금 추가 경기를 살 수 없는 이유. 살 수 있으면 nil.
+    public var extraMatchBlockedReason: String? {
+        if isBankrupt { return "구단이 해체되었습니다." }
+        if isMatchLive { return "진행 중인 경기가 끝나야 합니다." }
+        if charges > 0 { return "경기 기회가 남아 있습니다." }
+        if nextMatch() == nil { return "지금은 치를 경기가 없습니다." }
+        if funds.balance < extraMatchCost {
+            return isCareer
+                ? "훈련 포인트가 모자랍니다. \(Format.tokens(extraMatchCost)) P가 필요합니다."
+                : "자금이 모자랍니다. \(Format.money(extraMatchCost))이 필요합니다."
+        }
+        return nil
+    }
+
+    /// 한 시간을 기다리지 않고 토큰으로 경기 기회를 하나 산다. 경기 기회가 없을 때만 살 수 있다.
+    public mutating func buyExtraMatch(now: Date) throws {
+        refreshCharges(now: now)
+        if let reason = extraMatchBlockedReason { throw GameError(reason) }
+        funds.spend(extraMatchCost, .extraMatch)
+        extraMatchesBought = (extraMatchesBought ?? 0) + 1
+        charges += 1
     }
 
     // MARK: 선수 만들기

@@ -42,6 +42,7 @@ public struct FundsLedger: Codable, Equatable, Sendable {
         case recruit = "선수 영입"
         case fee = "승강 신청비"
         case training = "훈련"
+        case extraMatch = "추가 경기"
     }
 
     private struct Counted: Codable, Equatable, Sendable {
