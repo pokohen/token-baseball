@@ -12,7 +12,7 @@ mkdir -p /tmp/tb-test
 TOKEN_BASEBALL_SAVE=/tmp/tb-test/save.json swift run TokenBaseball
 ```
 
-처음부터 다시 하려면 `/tmp/tb-test` 폴더를 지운다.
+처음부터 다시 하려면 `/tmp/tb-test` 폴더를 지운다. (`Scripts/reset.sh`는 진짜 저장 폴더를 옮기는 명령이라, 이렇게 저장 위치를 바꿔 시험할 때는 쓰지 않는다.)
 
 ## 자동 테스트
 
@@ -21,6 +21,12 @@ swift test                                    # 전체 (5~6분)
 swift test --filter Career                    # 선수 모드만 (2분쯤)
 swift test --filter UsageReader               # 토큰 읽기만
 TB_STRESS=1 swift test --filter StressTests   # 여러 시드 장기 시뮬레이션
+```
+
+앱 흐름 자가 점검도 있다. 화면 없이 앱 상태를 직접 몰아서 네 가지 모드의 만들기, 훈련, 경기, 모드 전환, 다시 켜기(경기 도중 포함)가 실제 저장 파일과 함께 돌아가는지 본다. 지정한 폴더는 비워지므로 빈 폴더를 준다.
+
+```sh
+swift build && TOKEN_BASEBALL_SELFTEST=/tmp/tb-selftest .build/debug/TokenBaseball
 ```
 
 자동 테스트가 지키는 것:
@@ -127,6 +133,17 @@ TB_STRESS=1 swift test --filter StressTests   # 여러 시드 장기 시뮬레�
 - [ ] 축구 구단: 퇴장당한 선수가 로스터에 "출장 정지"로 표시되고 다음 경기 선발에서 빠진다
 - [ ] 축구 구단: 오프시즌에 "유소년 승급" 후보 세 명이 온다
 - [ ] 축구 구단: 4~16라운드에는 이적 시장이 닫혀 있다
+
+### 10. 업데이트와 초기화 명령
+
+진짜 저장 폴더를 다루는 명령이다. 시험 삼아 돌릴 때는 `TOKEN_BASEBALL_DATA_DIR=임시 폴더`를 앞에 붙이면 그 폴더를 저장 폴더로 보고 동작한다.
+
+- [ ] `Scripts/update.sh`: 최신 코드를 받고 앱을 다시 만든 뒤, 앱을 열면 하던 구단·선수가 그대로다
+- [ ] `Scripts/update.sh`: 이미 최신이면 "이미 최신입니다"가 나오고 앱만 다시 만든다
+- [ ] `Scripts/reset.sh`: 무엇을 할지 보여 주고 묻는다. `n`이면 아무것도 바뀌지 않는다
+- [ ] `Scripts/reset.sh`: `y`면 저장 폴더가 `TokenBaseball-backup-날짜-시각`으로 옮겨지고, 앱을 열면 처음 화면이 나온다
+- [ ] 백업 폴더 이름을 `TokenBaseball`로 되돌리면 예전 구단·선수가 다시 나온다
+- [ ] 파일을 하나 고친 상태에서는 두 명령 모두 멈추고 고친 파일 목록을 보여 준다
 
 ## 시간이 오래 걸리는 것
 

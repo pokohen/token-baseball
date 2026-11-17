@@ -71,14 +71,27 @@ open "build/Token Baseball.app"
 
 직접 빌드한 앱이라 보통은 바로 열린다. ZIP으로 받았거나 다른 맥에서 만든 앱을 옮겨 와서 "확인되지 않은 개발자" 경고가 나오면, Finder에서 앱을 **우클릭 → 열기**로 한 번 열어 준다.
 
-**업데이트**
+**업데이트** (저장 파일은 그대로, 코드만 새로)
 
 ```sh
-git pull
-Scripts/make-app.sh
+Scripts/update.sh
 ```
 
-실행 중인 앱을 끄고 새로 만든 앱으로 바꾼다. 저장 파일은 그대로 이어진다.
+최신 코드를 받아 앱을 다시 만든다. 구단과 선수는 그대로 이어진다. 실행 중인 앱을 끄고 새로 만든 앱을 연다.
+
+**초기화** (처음부터 다시)
+
+```sh
+Scripts/reset.sh
+```
+
+무엇을 하는지 보여 주고 확인을 묻는다.
+
+1. 저장 파일(구단·선수)을 백업 폴더로 옮긴다. 지우지는 않는다: `~/Library/Application Support/TokenBaseball-backup-날짜-시각`. 되돌리려면 그 폴더 이름을 `TokenBaseball`로 바꾼다.
+2. 코드를 원격 저장소의 최신 상태로 새로 받는다.
+3. 빌드 결과를 지우고 앱을 처음부터 다시 만든다.
+
+직접 고친 파일이나 올리지 않은 커밋이 있으면 두 스크립트 모두 아무것도 하지 않고 멈춘다. 확인 없이 초기화하려면 `Scripts/reset.sh --yes`.
 
 **삭제**
 
@@ -135,3 +148,4 @@ Tests/
 |---|---|
 | `TOKEN_BASEBALL_SAVE` | 저장 파일 위치를 바꾼다 (축구 저장 파일과 종목 표시 파일도 같은 폴더에 생긴다) |
 | `TOKEN_BASEBALL_SNAPSHOT` | 각 화면을 이 폴더에 PNG로 그리고 끝낸다 (임시 게임 사용, 축구 화면은 `football/`, 선수 모드는 `career/`, `career-pitcher/`, `career-football/`, `career-keeper/` 아래) |
+| `TOKEN_BASEBALL_SELFTEST` | 화면 없이 앱 흐름을 점검하고 끝낸다: 만들기 → 훈련 → 경기 → 모드 전환 → 다시 켜기 (이 폴더에 임시 저장 파일을 만든다. 폴더 안의 내용은 지워진다) |

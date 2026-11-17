@@ -9,6 +9,9 @@ struct TokenBaseballApp: App {
     init() {
         // Dock 아이콘 없이 상단바에만 뜨는 앱.
         NSApplication.shared.setActivationPolicy(.accessory)
+        if let directory = ProcessInfo.processInfo.environment["TOKEN_BASEBALL_SELFTEST"], !directory.isEmpty {
+            exit(SelfTest.run(in: URL(fileURLWithPath: directory)) ? 0 : 1)
+        }
         let model = AppModel()
         _model = StateObject(wrappedValue: model)
         if let directory = ProcessInfo.processInfo.environment["TOKEN_BASEBALL_SNAPSHOT"], !directory.isEmpty {
