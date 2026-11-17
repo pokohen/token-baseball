@@ -24,7 +24,7 @@ struct LineupView: View {
                     if let player = game.players[entry.id] {
                         HStack(spacing: 6) {
                             Text("\(index + 1)").font(.callout.monospacedDigit()).frame(width: 14)
-                            Text(entry.position.rawValue).font(.caption.monospaced()).frame(width: 26, alignment: .leading)
+                            PositionTag(position: entry.position)
                                 .foregroundStyle(entry.position == player.position || entry.position == .designated ? Color.primary : Theme.warn)
                             Text(player.name).font(.callout)
                             Spacer()
@@ -97,7 +97,7 @@ struct FootballLineupView: View {
                 ForEach(Array(lineup.starters.enumerated()), id: \.element.id) { index, entry in
                     if let player = game.players[entry.id] {
                         HStack(spacing: 6) {
-                            Text(entry.slot.rawValue).font(.caption.monospaced()).frame(width: 26, alignment: .leading)
+                            PositionTag(position: entry.slot)
                                 .foregroundStyle(entry.slot == player.position ? Color.primary : Theme.warn)
                             Text(player.name).font(.callout)
                             if player.isHot { Image(systemName: "flame.fill").foregroundStyle(Theme.loss).font(.caption2) }

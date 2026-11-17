@@ -30,16 +30,7 @@ struct FootballLiveView: View {
                 .note()
             }
             if let myName {
-                Card {
-                    if let myPerformance {
-                        KeyValueRow(
-                            key: "내 선수 \(myName)",
-                            value: "평점 \(String(format: "%.1f", myPerformance.rating)) · \(myPerformance.line)",
-                            valueColor: .accentColor)
-                    } else {
-                        KeyValueRow(key: "내 선수 \(myName)", value: "벤치에서 대기 중")
-                    }
-                }
+                MyPlayerLiveCard(name: myName, performance: myPerformance, waiting: "벤치에서 대기 중")
             }
             Card {
                 pitch
@@ -53,26 +44,8 @@ struct FootballLiveView: View {
                 }
                 .font(.caption.monospacedDigit())
             }
-            Card("문자 중계") {
-                ForEach(Array(state.log.suffix(8).reversed().enumerated()), id: \.offset) { index, event in
-                    // 내 선수가 나온 장면은 눈에 띄게 한다.
-                    let mine = myName.map { event.text.contains($0) } ?? false
-                    Text(event.text)
-                        .font(index == 0 || mine ? .callout.weight(.semibold) : .callout)
-                        .foregroundStyle(event.kind == .score ? Theme.win : mine ? Color.accentColor : index == 0 ? .primary : .secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                if state.log.isEmpty { Text("곧 경기가 시작됩니다.").note() }
-            }
-            if !live.others.isEmpty {
-                Card("타 구장 소식") {
-                    ForEach(Array(live.others.enumerated()), id: \.offset) { _, other in
-                        KeyValueRow(
-                            key: "\(other.away.shortName) \(other.away.goals) : \(other.home.goals) \(other.home.shortName)",
-                            value: other.isFinished ? "종료" : other.clockLabel)
-                    }
-                }
-            }
+            CommentaryCard(log: state.log, myName: myName)
+            OtherMatchesCard(rows: live.others.map { ("\($0.away.shortName) \($0.away.goals) : \($0.home.goals) \($0.home.shortName)", $0.isFinished ? "종료" : $0.clockLabel) })
         }
     }
 

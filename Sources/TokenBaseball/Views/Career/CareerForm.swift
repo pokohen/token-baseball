@@ -14,13 +14,7 @@ struct CareerForm: View {
     private var football: some View {
         VStack(alignment: .leading, spacing: 12) {
             TextField("선수 이름", text: $setup.name).textFieldStyle(.roundedBorder)
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 6) {
-                ForEach(CareerSetup.footballPositions, id: \.self) { position in
-                    Button(position.label) { setup.position = position }
-                        .buttonStyle(.bordered)
-                        .tint(setup.position == position ? Color.accentColor : .secondary)
-                }
-            }
+            ChoiceGrid(items: CareerSetup.footballPositions, selection: $setup.position, columns: 4) { $0.label }
             Text(positionNote).note()
             Picker("출신", selection: $setup.hometown) {
                 ForEach(NameGenerator.userCities, id: \.self) { Text($0).tag($0) }
@@ -47,13 +41,7 @@ struct CareerForm: View {
             .labelsHidden()
 
             let positions = pitcher ? CareerSetup.pitcherPositions : CareerSetup.batterPositions
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: pitcher ? 2 : 3), spacing: 6) {
-                ForEach(positions, id: \.self) { position in
-                    Button(position.label) { setup.position = position }
-                        .buttonStyle(.bordered)
-                        .tint(setup.position == position ? Color.accentColor : .secondary)
-                }
-            }
+            ChoiceGrid(items: positions, selection: $setup.position, columns: pitcher ? 2 : 3) { $0.label }
             Text(positionNote).note()
 
             HStack {

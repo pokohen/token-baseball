@@ -13,16 +13,7 @@ struct MatchTab: View {
             } else if let live = game.liveFootball {
                 FootballLiveView(live: live, myName: game.myPlayer?.name, myPerformance: game.careerLivePerformance)
             } else {
-                if let result = game.lastResult {
-                    Card("지난 경기", trailing: result.kind.label) {
-                        HStack {
-                            Text(result.label).font(.title3.bold())
-                                .foregroundStyle(resultColor(result))
-                            Text("\(result.wasHome ? "홈" : "원정") vs \(result.opponent)").font(.callout)
-                        }
-                        ForEach(result.summary, id: \.self) { Text($0).note() }
-                    }
-                }
+                if let result = game.lastResult { LastResultCard(result: result) }
                 NextMatchCard(game: game)
                 schedule
                 if game.sport == .football, game.isCareer {
@@ -37,11 +28,6 @@ struct MatchTab: View {
                 }
             }
         }
-    }
-
-    private func resultColor(_ result: LastResult) -> Color {
-        if let won = result.shootoutWon { return won ? Theme.win : Theme.loss }
-        return result.myRuns > result.theirRuns ? Theme.win : result.myRuns < result.theirRuns ? Theme.loss : .primary
     }
 
     @ViewBuilder private var schedule: some View {

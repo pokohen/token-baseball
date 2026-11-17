@@ -164,7 +164,7 @@ struct TeamDetail: View {
             }
             ForEach(game.roster(of: team.id).sorted { $0.ability > $1.ability }.prefix(8)) { player in
                 HStack {
-                    Text(player.position.rawValue).font(.caption.monospaced()).frame(width: 26, alignment: .leading)
+                    PositionTag(position: player.position)
                     Text("\(player.name) (\(player.age))").font(.caption)
                     Spacer()
                     Text("\(player.grade) \(Int(player.ability))").font(.caption.monospacedDigit())

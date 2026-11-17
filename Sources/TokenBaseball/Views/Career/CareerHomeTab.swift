@@ -30,13 +30,7 @@ struct CareerHomeTab: View {
                 NextMatchCard(game: game, goToMatch: goToMatch)
                 if let note = appearanceNote(me) { Text(note).note().frame(maxWidth: .infinity, alignment: .leading) }
             }
-            Card("소식") {
-                if game.news.isEmpty { Text("아직 소식이 없습니다.").note() }
-                ForEach(game.news.suffix(12).reversed()) { item in
-                    Text(item.text).font(.callout).frame(maxWidth: .infinity, alignment: .leading)
-                    if item.id != game.news.suffix(12).first?.id { Divider() }
-                }
-            }
+            NewsCard(game: game)
         }
     }
 
@@ -52,7 +46,7 @@ struct CareerHomeTab: View {
                     Text(career.isFreeAgent
                         ? "무소속 · \(game.season)시즌"
                         : "\(game.userTeam.name) · \(game.userTier.displayName)").note()
-                    Text("\(game.season)시즌 · \(CareerText.phase(game))").note()
+                    Text("\(game.season)시즌 · \(game.phaseText)").note()
                 }
                 Spacer()
                 VStack(alignment: .trailing) {
@@ -79,19 +73,7 @@ struct CareerHomeTab: View {
     }
 
     private func notice(_ text: String, _ color: Color) -> some View {
-        Button(action: goToCareer) {
-            HStack(alignment: .top) {
-                Image(systemName: "envelope.fill")
-                Text(text).font(.callout)
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-            }
-            .padding(10)
-            .foregroundStyle(.white)
-            .background(color, in: RoundedRectangle(cornerRadius: 10))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
+        Banner(text: text, color: color, icon: "envelope.fill", action: goToCareer)
     }
 
     private func appearanceNote(_ me: Player) -> String? {

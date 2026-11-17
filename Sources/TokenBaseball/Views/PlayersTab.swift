@@ -64,7 +64,7 @@ struct PlayerRow: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Text(player.position.rawValue).font(.caption.monospaced()).frame(width: 26, alignment: .leading)
+            PositionTag(position: player.position)
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 4) {
                     Text(player.name).font(.callout.weight(.medium))

@@ -144,7 +144,7 @@ struct CareerTab: View {
                 }
                 ForEach(peers) { player in
                     HStack {
-                        Text(player.position.rawValue).font(.caption.monospaced()).frame(width: 26, alignment: .leading)
+                        PositionTag(position: player.position)
                         Text(player.name).fontWeight(player.id == me.id ? .bold : .regular)
                         Text("\(player.age)세").note()
                         Spacer()

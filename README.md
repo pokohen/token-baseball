@@ -135,6 +135,8 @@ Sources/
     Game*.swift        게임 전체 상태와 명령 (경기, 세계 시뮬레이션, 시즌, 구단, 이적 시장)
     Balance.swift      조정할 수 있는 수치 모음
   TokenBaseball/       macOS 앱 (상단바, 팝오버, 설정)
+    Views/             탭별 화면
+    Views/Components/  여러 화면이 같이 쓰는 조각 (카드, 줄, 알림 배너, 소식, 문자 중계, 선택 버튼 묶음 등)
     Views/Career/      선수 모드 화면 (선수 만들기, 홈, 훈련, 커리어)
 Tests/
   TokenBaseballCoreTests/
