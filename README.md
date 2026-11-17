@@ -135,3 +135,4 @@ Tests/
 |---|---|
 | `TOKEN_BASEBALL_SAVE` | 저장 파일 위치를 바꾼다 (축구 저장 파일과 종목 표시 파일도 같은 폴더에 생긴다) |
 | `TOKEN_BASEBALL_SNAPSHOT` | 각 화면을 이 폴더에 PNG로 그리고 끝낸다 (임시 게임 사용, 축구 화면은 `football/`, 선수 모드는 `career/`, `career-pitcher/`, `career-football/`, `career-keeper/` 아래) |
+| `TOKEN_BASEBALL_SELFTEST` | 화면 없이 앱 흐름을 점검하고 끝낸다: 만들기 → 훈련 → 경기 → 모드 전환 → 다시 켜기 (이 폴더에 임시 저장 파일을 만든다. 폴더 안의 내용은 지워진다) |

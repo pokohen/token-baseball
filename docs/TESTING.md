@@ -23,6 +23,12 @@ swift test --filter UsageReader               # 토큰 읽기만
 TB_STRESS=1 swift test --filter StressTests   # 여러 시드 장기 시뮬레이션
 ```
 
+앱 흐름 자가 점검도 있다. 화면 없이 앱 상태를 직접 몰아서 네 가지 모드의 만들기, 훈련, 경기, 모드 전환, 다시 켜기(경기 도중 포함)가 실제 저장 파일과 함께 돌아가는지 본다. 지정한 폴더는 비워지므로 빈 폴더를 준다.
+
+```sh
+swift build && TOKEN_BASEBALL_SELFTEST=/tmp/tb-selftest .build/debug/TokenBaseball
+```
+
 자동 테스트가 지키는 것:
 
 - 야구 구단 모드가 같은 시드에서 늘 똑같이 흘러간다 (지문 비교). 예전 엔진으로 만든 저장 파일도 지금 코드로 읽어 이어 간다
