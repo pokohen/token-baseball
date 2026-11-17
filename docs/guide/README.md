@@ -8,6 +8,21 @@
 | ⚾ 야구 | [야구 구단 경영](baseball-club.md) | [야구 개인 성장](baseball-player.md) |
 | ⚽ 축구 | [축구 구단 경영](football-club.md) | [축구 개인 성장](football-player.md) |
 
+## 설치, 업데이트, 초기화
+
+저장소 폴더에서 실행한다. 자세한 설치 방법은 [README](../../README.md#설치)에 있다.
+
+| 하려는 것 | 명령 | 구단·선수 저장 파일 |
+|---|---|---|
+| 처음 설치 | `Scripts/make-app.sh` 뒤 `open "build/Token Baseball.app"` | 없음 (처음 화면부터) |
+| **업데이트** | `Scripts/update.sh` | **그대로**. 코드만 새로 받아 앱을 다시 만든다 |
+| **초기화** | `Scripts/reset.sh` | 백업 폴더로 옮긴다. 코드를 새로 받고 앱을 처음부터 다시 만든다 |
+
+- 업데이트한 뒤에는 실행 중인 앱을 설정 탭의 "앱 종료"로 끄고 새로 만든 앱을 연다. 하던 구단과 선수가 그대로 이어진다.
+- 초기화는 무엇을 할지 보여 주고 확인을 묻는다. 저장 파일은 지우지 않고 `~/Library/Application Support/TokenBaseball-backup-날짜-시각`으로 옮기므로, 되돌리려면 그 폴더 이름을 `TokenBaseball`로 바꾼다.
+- 한 모드만 처음부터 다시 하고 싶으면 초기화할 필요 없이 그 모드의 저장 파일만 지운다 (`~/Library/Application Support/TokenBaseball` 안의 `save.json` 야구 구단, `save-football.json` 축구 구단, `save-baseball-player.json` 야구 선수, `save-football-player.json` 축구 선수).
+- 직접 고친 파일이 있으면 두 명령 모두 아무것도 하지 않고 멈춘다.
+
 ## 모든 모드에 공통인 것
 
 - **토큰이 재화다.** Claude Code, Codex, Gemini CLI, opencode에서 쓴 토큰을 로컬 로그에서 읽는다. 구단 경영에서는 구단 자금(1토큰 = 1원), 개인 성장에서는 훈련 포인트(1토큰 = 1 P)가 된다. 구단이나 선수를 만든 뒤에 쓴 토큰만 세고, 20초마다 반영된다.
