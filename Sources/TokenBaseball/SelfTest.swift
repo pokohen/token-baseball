@@ -105,6 +105,19 @@ enum SelfTest {
         model.game?.runMatchToEnd()
         check("이어서 끝까지", model.game?.isMatchLive == false)
 
+        // 9. 새 버전 확인: GitHub 응답 읽기 (네트워크는 쓰지 않는다)
+        let notifiedBefore = UpdateChecker.notifiedHead
+        defer { UpdateChecker.notifiedHead = notifiedBefore }
+        let ahead = Data(#"{"ahead_by":3,"commits":[{"sha":"a1","commit":{"message":"첫 변경\n\n본문"}},{"sha":"b2","commit":{"message":"Merge pull request #1"}},{"sha":"c3","commit":{"message":"마지막 변경"}}]}"#.utf8)
+        check("업데이트: 새 버전", UpdateChecker.parse(ahead)
+            == .available(.init(count: 3, titles: ["마지막 변경", "첫 변경"], head: "c3")))
+        check("업데이트: 최신", UpdateChecker.parse(Data(#"{"ahead_by":0,"commits":[]}"#.utf8)) == .upToDate)
+        if case .unknown = UpdateChecker.parse(Data("{}".utf8)) { check("업데이트: 깨진 응답", true) } else { check("업데이트: 깨진 응답", false) }
+        model.apply(UpdateChecker.parse(ahead))
+        check("업데이트: 앱에 표시", model.update?.count == 3 && model.updateStatus != nil)
+        model.apply(.upToDate)
+        check("업데이트: 최신이면 지움", model.update == nil)
+
         print(failures == 0 ? "SELFTEST 통과" : "SELFTEST 실패 \(failures)건")
         return failures == 0
     }

@@ -74,6 +74,10 @@ enum Snapshot {
             render(TabContent(tab: tab, game: game).padding(12), model, directory, "1-\(tab.rawValue)")
         }
         render(LineupView(game: game).padding(12), model, directory, "2-라인업")
+        // 새 버전이 있을 때의 설정 카드와 알림 줄
+        model.update = .init(count: 3, titles: ["선수 만들기 화면에서 고른 것이 보이게 수정", "훈련 비용 조정"], head: "demo")
+        render(UpdateCard().padding(12), model, directory, "5-업데이트")
+        model.update = nil
         render(MarketView(game: game).padding(12), model, directory, "2-영입")
 
         try? game.startMatch(now: now.addingTimeInterval(10 * 3600))

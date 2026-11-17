@@ -18,6 +18,7 @@
 | **업데이트** | `Scripts/update.sh` | **그대로**. 코드만 새로 받아 앱을 다시 만든다 |
 | **초기화** | `Scripts/reset.sh` | 백업 폴더로 옮긴다. 코드를 새로 받고 앱을 처음부터 다시 만든다 |
 
+- **새 버전 알림**: 앱이 켤 때와 여섯 시간마다 새 변경이 있는지 확인한다. 있으면 알림이 한 번 오고, 팝오버 위쪽에 "새 버전이 있습니다" 줄이, 설정 탭에 "업데이트" 카드가 나온다. 카드에서 무엇이 바뀌었는지 보고 `Scripts/update.sh`를 복사할 수 있다. 앱이 스스로 업데이트하지는 않는다. 설정 탭에서 자동 확인을 끌 수 있다.
 - 업데이트한 뒤에는 실행 중인 앱을 설정 탭의 "앱 종료"로 끄고 새로 만든 앱을 연다. 하던 구단과 선수가 그대로 이어진다.
 - 초기화는 무엇을 할지 보여 주고 확인을 묻는다. 저장 파일은 지우지 않고 `~/Library/Application Support/TokenBaseball-backup-날짜-시각`으로 옮기므로, 되돌리려면 그 폴더 이름을 `TokenBaseball`로 바꾼다.
 - 한 모드만 처음부터 다시 하고 싶으면 초기화할 필요 없이 그 모드의 저장 파일만 지운다 (`~/Library/Application Support/TokenBaseball` 안의 `save.json` 야구 구단, `save-football.json` 축구 구단, `save-baseball-player.json` 야구 선수, `save-football-player.json` 축구 선수).

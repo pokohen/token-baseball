@@ -29,5 +29,15 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </dict>
 </plist>
 PLIST
+# 새 버전 확인에 쓰는 정보: 빌드한 커밋과 저장소 (소유자/이름).
+# 직접 고친 파일이 있으면 커밋을 적지 않는다 (그런 빌드는 새 버전 확인을 하지 않는다).
+COMMIT=""
+if [ -z "$(git status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+    COMMIT="$(git rev-parse HEAD 2>/dev/null || true)"
+fi
+REPO="$(git remote get-url origin 2>/dev/null | sed -E 's#^(https://github.com/|git@github.com:)##; s#\.git$##' || true)"
+/usr/libexec/PlistBuddy -c "Add :TBCommit string $COMMIT" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Add :TBRepository string $REPO" "$APP/Contents/Info.plist"
+
 codesign --force --sign - "$APP" >/dev/null 2>&1 || true
 echo "$APP"
