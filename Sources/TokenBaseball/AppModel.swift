@@ -43,6 +43,17 @@ final class AppModel: ObservableObject {
     @Published var updateStatus: String?
     @Published var checkingUpdate = false
 
+    /// 구단 경영 모드를 고를 수 있게 보일지. 지금은 선수 키우기를 먼저 다듬고 있어서 기본은 숨김이다.
+    @Published var showsClubModes: Bool = UserDefaults.standard.bool(forKey: "showClubModes") {
+        didSet { UserDefaults.standard.set(showsClubModes, forKey: "showClubModes") }
+    }
+
+    /// 고를 수 있는 모드. 선수 모드는 언제나 보이고, 구단 모드는 설정에서 켰을 때만 보인다.
+    /// (지금 하고 있는 구단은 숨겨도 그대로 할 수 있다.)
+    var selectableSlots: [SaveSlot] {
+        showsClubModes ? [.baseballPlayer, .footballPlayer, .baseball, .football] : [.baseballPlayer, .footballPlayer]
+    }
+
     /// 공 하나에 걸리는 시간 (1배속 기준).
     static let pitchInterval: Duration = .seconds(3)
     /// 고를 수 있는 중계 배속.

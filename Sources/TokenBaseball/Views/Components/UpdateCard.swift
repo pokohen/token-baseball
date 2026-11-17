@@ -7,7 +7,11 @@ struct UpdateCard: View {
     @EnvironmentObject var model: AppModel
     @State private var copied = false
 
-    private static let command = "Scripts/update.sh"
+    /// 업데이트 명령. 설치 스크립트로 설치했으면 그 명령을, 저장소를 직접 받았으면 업데이트 스크립트를 보여 준다.
+    private static var command: String {
+        let installed = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".token-sport/Scripts/install.sh")
+        return FileManager.default.fileExists(atPath: installed.path) ? "~/.token-sport/Scripts/install.sh" : "Scripts/update.sh"
+    }
 
     var body: some View {
         Card("업데이트", trailing: UpdateChecker.buildCommit.map { "지금 \(String($0.prefix(7)))" }) {
@@ -17,7 +21,7 @@ struct UpdateCard: View {
                 ForEach(update.titles, id: \.self) { title in
                     Text("· \(title)").note().frame(maxWidth: .infinity, alignment: .leading)
                 }
-                Text("저장소 폴더에서 아래 명령을 실행하면 코드만 새로 받아 앱을 다시 만듭니다. 구단과 선수는 그대로입니다.").note()
+                Text("터미널에서 아래 명령을 실행하면 코드만 새로 받아 앱을 다시 만듭니다. 구단과 선수는 그대로입니다.").note()
                 HStack {
                     Text(Self.command).font(.callout.monospaced()).textSelection(.enabled)
                     Spacer()
