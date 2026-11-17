@@ -39,6 +39,10 @@ echo "앱을 만드는 중… (인텔 맥과 애플 실리콘 맥 모두)"
 TB_ARCHS="arm64 x86_64" TB_VERSION="$VERSION" TB_SIGN="$IDENTITY" Scripts/make-app.sh >/dev/null
 APP="build/Token Baseball.app"
 codesign --verify --strict --deep "$APP"
+# 배포 빌드 표시와 버전이 제대로 들어갔는지 확인한다 (빠지면 새 버전 알림이 어긋난다).
+[ "$(/usr/libexec/PlistBuddy -c "Print :TBRelease" "$APP/Contents/Info.plist")" = "true" ] \
+    && [ "$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist")" = "$VERSION" ] \
+    || { echo "앱에 배포 버전 정보가 제대로 들어가지 않았습니다."; exit 1; }
 
 DMG="build/TokenSport-$VERSION.dmg"
 STAGE="$(mktemp -d)"

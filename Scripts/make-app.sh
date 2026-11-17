@@ -49,8 +49,8 @@ REPO="$(git remote get-url origin 2>/dev/null | sed -E 's#^(https://github.com/|
 
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist"
 # 배포 파일로 나가는 빌드인지. 새 버전 확인을 "최신 커밋"이 아니라 "최신 배포 버전" 기준으로 하게 된다.
-/usr/libexec/PlistBuddy -c "Add :TBRelease bool ${TB_VERSION:+true}${TB_VERSION:-false}" "$APP/Contents/Info.plist" 2>/dev/null \
-    || /usr/libexec/PlistBuddy -c "Add :TBRelease bool false" "$APP/Contents/Info.plist"
+if [ -n "${TB_VERSION:-}" ]; then IS_RELEASE=true; else IS_RELEASE=false; fi
+/usr/libexec/PlistBuddy -c "Add :TBRelease bool $IS_RELEASE" "$APP/Contents/Info.plist"
 
 if [ -n "${TB_SIGN:-}" ]; then
     # 배포용: Developer ID로 서명한다. 공증을 받으려면 hardened runtime과 타임스탬프가 필요하다.
