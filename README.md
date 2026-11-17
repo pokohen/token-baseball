@@ -38,16 +38,18 @@ AI 코딩 도구에서 쓴 토큰이 **구단 자금**이 되는 macOS 메뉴바
 curl -fsSL https://raw.githubusercontent.com/pokohen/token-sport/main/Scripts/install.sh | bash
 ```
 
-- 소스를 `~/.token-sport`에 받아 앱을 만들고, 응용 프로그램 폴더에 **Token Baseball**을 넣은 뒤 실행한다. 처음에는 1~2분 걸린다.
-- **업데이트도 같은 명령**이다. 다시 실행하면 최신 코드로 앱을 다시 만들어 바꿔 넣는다. 구단·선수 저장 파일은 건드리지 않는다.
-- 지우려면 `~/.token-sport/Scripts/install.sh --uninstall` (저장 파일은 남긴다).
+- **배포 파일이 올라와 있으면** 서명·공증된 앱을 내려받아 응용 프로그램 폴더에 넣고 실행한다. 몇 초면 끝나고 **Xcode가 없어도 된다.**
+- 배포 파일이 아직 없으면 소스를 `~/.token-sport`에 받아 이 맥에서 앱을 만든다. 이때는 Xcode 16 이상이 필요하고 1~2분 걸린다.
+- **업데이트도 같은 명령**이다. 구단·선수 저장 파일은 건드리지 않는다.
+- 아직 배포되지 않은 최신 변경까지 쓰고 싶으면 끝에 `-s -- --build`를 붙인다 (`… | bash -s -- --build`). 소스로 직접 만든다.
+- 지우려면 응용 프로그램 폴더에서 Token Baseball을 휴지통에 넣는다. 저장 파일은 `~/Library/Application Support/TokenBaseball`에 남는다.
+
+[GitHub Releases](https://github.com/pokohen/token-sport/releases)에서 `.dmg`를 직접 받아, 열고, 앱을 응용 프로그램 폴더로 끌어다 놓아도 된다.
 
 **필요한 것**
 
-- macOS 14 (Sonoma) 이상
-- Xcode 16 이상 (Swift 6). App Store에서 설치한 뒤 한 번 실행해 둔다. 내 맥에서 직접 빌드하는 방식이라 필요하다
-
-내려받아 바로 여는 배포 파일(.dmg, .zip)은 아직 없다. 그렇게 하려면 Apple 개발자 계정으로 앱을 서명·공증해야 해서(하지 않으면 macOS가 실행을 막는다) 지금은 내 맥에서 빌드하는 방식을 쓴다.
+- macOS 14 (Sonoma) 이상. 인텔 맥과 애플 실리콘 맥 모두 된다
+- 소스로 직접 만들 때만: Xcode 16 이상 (Swift 6)
 
 ### 직접 받아서 빌드하기 (개발할 때)
 
@@ -172,4 +174,5 @@ Tests/
 | `TOKEN_BASEBALL_SNAPSHOT` | 각 화면을 이 폴더에 PNG로 그리고 끝낸다 (임시 게임 사용, 축구 화면은 `football/`, 선수 모드는 `career/`, `career-pitcher/`, `career-football/`, `career-keeper/` 아래) |
 | `TOKEN_BASEBALL_SELFTEST` | 화면 없이 앱 흐름을 점검하고 끝낸다: 만들기 → 훈련 → 경기 → 모드 전환 → 다시 켜기 (이 폴더에 임시 저장 파일을 만든다. 폴더 안의 내용은 지워진다) |
 | `TOKEN_BASEBALL_CHECK_UPDATE` | 새 버전 확인만 하고 결과를 출력한 뒤 끝낸다 |
+| `TOKEN_BASEBALL_RELEASE_VERSION` | 배포 파일로 설치한 이 버전의 앱인 것처럼 새 버전을 확인한다 (예: `0.1.0`) |
 | `TOKEN_BASEBALL_BUILD_COMMIT` | 빌드한 버전(커밋)을 이 값으로 본다 (새 버전 확인을 시험할 때) |

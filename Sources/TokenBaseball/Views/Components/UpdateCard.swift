@@ -7,23 +7,31 @@ struct UpdateCard: View {
     @EnvironmentObject var model: AppModel
     @State private var copied = false
 
-    /// 업데이트 명령. 설치 스크립트로 설치했으면 그 명령을, 저장소를 직접 받았으면 업데이트 스크립트를 보여 준다.
+    /// 업데이트 명령. 배포 파일이나 설치 명령으로 설치했으면 설치 명령 한 줄을, 저장소를 직접 받아 만든 앱이면 업데이트 스크립트를 보여 준다.
     private static var command: String {
         let installed = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".token-sport/Scripts/install.sh")
-        return FileManager.default.fileExists(atPath: installed.path) ? "~/.token-sport/Scripts/install.sh" : "Scripts/update.sh"
+        if UpdateChecker.isReleaseBuild || FileManager.default.fileExists(atPath: installed.path) {
+            return UpdateChecker.installCommand
+        }
+        return "Scripts/update.sh"
     }
 
     var body: some View {
-        Card("업데이트", trailing: UpdateChecker.buildCommit.map { "지금 \(String($0.prefix(7)))" }) {
+        Card("업데이트", trailing: UpdateChecker.isReleaseBuild
+            ? "지금 \(UpdateChecker.appVersion)" : UpdateChecker.buildCommit.map { "지금 \(String($0.prefix(7)))" }) {
             if let update = model.update {
-                Label("새 버전이 있습니다 (변경 \(update.count)건)", systemImage: "arrow.down.circle.fill")
+                Label(update.version.map { "새 버전 \($0)이(가) 나왔습니다" } ?? "새 버전이 있습니다 (변경 \(update.count)건)",
+                      systemImage: "arrow.down.circle.fill")
                     .font(.callout.weight(.medium)).foregroundStyle(Color.accentColor)
                 ForEach(update.titles, id: \.self) { title in
                     Text("· \(title)").note().frame(maxWidth: .infinity, alignment: .leading)
                 }
-                Text("터미널에서 아래 명령을 실행하면 코드만 새로 받아 앱을 다시 만듭니다. 구단과 선수는 그대로입니다.").note()
+                Text("터미널에서 아래 명령을 실행하면 새 버전으로 바뀝니다. 구단과 선수는 그대로입니다.").note()
+                if let page = update.page {
+                    Button("내려받는 페이지 열기") { NSWorkspace.shared.open(page) }
+                }
                 HStack {
-                    Text(Self.command).font(.callout.monospaced()).textSelection(.enabled)
+                    Text(Self.command).font(.caption.monospaced()).textSelection(.enabled).lineLimit(2)
                     Spacer()
                     Button(copied ? "복사됨" : "명령 복사") {
                         NSPasteboard.general.clearContents()

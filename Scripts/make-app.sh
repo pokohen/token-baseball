@@ -4,8 +4,16 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-swift build -c release
-BIN="$(swift build -c release --show-bin-path)/TokenBaseball"
+# 배포용으로 만들 때 쓰는 값 (Scripts/release.sh가 넘긴다). 평소에는 비어 있다.
+#   TB_ARCHS     "arm64 x86_64"처럼 주면 두 종류의 맥에서 모두 도는 앱을 만든다
+#   TB_VERSION   앱 버전 (예: 0.2.0)
+#   TB_SIGN      서명할 인증서 이름 (Developer ID Application: …). 없으면 내 맥에서만 쓰는 임시 서명
+ARCH_FLAGS=()
+for arch in ${TB_ARCHS:-}; do ARCH_FLAGS+=(--arch "$arch"); done
+VERSION="${TB_VERSION:-0.1.0}"
+
+swift build -c release ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"}
+BIN="$(swift build -c release ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"} --show-bin-path)/TokenBaseball"
 APP="build/Token Baseball.app"
 
 rm -rf "$APP"
@@ -39,5 +47,15 @@ REPO="$(git remote get-url origin 2>/dev/null | sed -E 's#^(https://github.com/|
 /usr/libexec/PlistBuddy -c "Add :TBCommit string $COMMIT" "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :TBRepository string $REPO" "$APP/Contents/Info.plist"
 
-codesign --force --sign - "$APP" >/dev/null 2>&1 || true
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist"
+# 배포 파일로 나가는 빌드인지. 새 버전 확인을 "최신 커밋"이 아니라 "최신 배포 버전" 기준으로 하게 된다.
+/usr/libexec/PlistBuddy -c "Add :TBRelease bool ${TB_VERSION:+true}${TB_VERSION:-false}" "$APP/Contents/Info.plist" 2>/dev/null \
+    || /usr/libexec/PlistBuddy -c "Add :TBRelease bool false" "$APP/Contents/Info.plist"
+
+if [ -n "${TB_SIGN:-}" ]; then
+    # 배포용: Developer ID로 서명한다. 공증을 받으려면 hardened runtime과 타임스탬프가 필요하다.
+    codesign --force --options runtime --timestamp --sign "$TB_SIGN" "$APP"
+else
+    codesign --force --sign - "$APP" >/dev/null 2>&1 || true
+fi
 echo "$APP"

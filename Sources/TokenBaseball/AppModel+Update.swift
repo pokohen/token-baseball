@@ -7,7 +7,7 @@ extension AppModel {
     func checkForUpdate(manual: Bool = false) {
         guard manual || UpdateChecker.isEnabled, !checkingUpdate else { return }
         // 번들 없이 실행한 개발 빌드는 조용히 넘어간다.
-        guard manual || UpdateChecker.buildCommit != nil else { return }
+        guard manual || UpdateChecker.buildCommit != nil || UpdateChecker.isReleaseBuild else { return }
         checkingUpdate = true
         Task { [weak self] in
             let outcome = await UpdateChecker.check()
@@ -23,7 +23,7 @@ extension AppModel {
             updateStatus = "최신 버전입니다."
         case .available(let found):
             update = found
-            updateStatus = "새 버전이 있습니다 (변경 \(found.count)건)."
+            updateStatus = found.version.map { "새 버전 \($0)이(가) 나왔습니다." } ?? "새 버전이 있습니다 (변경 \(found.count)건)."
             // 같은 업데이트는 한 번만 알린다.
             if UpdateChecker.notifiedHead != found.head {
                 UpdateChecker.notifiedHead = found.head
