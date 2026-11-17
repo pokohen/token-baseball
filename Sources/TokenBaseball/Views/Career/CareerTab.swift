@@ -29,39 +29,9 @@ struct CareerTab: View {
     private func offers(_ career: Career) -> some View {
         Card(career.isFreeAgent ? "입단 제안" : "들어온 제안") {
             ForEach(career.offers) { offer in
-                let team = game.teams[offer.teamID]
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        EmblemView(team: team, size: 24)
-                        VStack(alignment: .leading) {
-                            Text(team.name).font(.callout.weight(.medium))
-                            Text("\(kindLabel(offer.kind)) · \(team.tier.displayName) · \(game.rank(of: team.id))위").note()
-                        }
-                        Spacer()
-                    }
-                    KeyValueRow(key: "연봉 · 기간", value: "\(Format.money(offer.salary)) · \(offer.years)시즌")
-                    KeyValueRow(key: "예상 입지", value: offer.role.rawValue)
-                    HStack {
-                        Button("수락") { model.perform { try $0.acceptCareerOffer(offer.id) } }
-                            .buttonStyle(.borderedProminent)
-                        Button("연봉 올려 달라고 하기") { model.perform { try $0.negotiateCareerOffer(offer.id) } }
-                            .disabled(offer.negotiated)
-                        if offer.kind != .tryout {
-                            Button("거절") { model.perform { try $0.declineCareerOffer(offer.id) } }
-                        }
-                    }
-                    if offer.kind == .transfer { Text("다음 경기가 끝나면 사라집니다.").note() }
-                }
+                CareerOfferRow(game: game, offer: offer)
                 if offer.id != career.offers.last?.id { Divider() }
             }
-        }
-    }
-
-    private func kindLabel(_ kind: CareerOffer.Kind) -> String {
-        switch kind {
-        case .transfer: "이적 제안"
-        case .renewal: "재계약 제안"
-        case .tryout: "입단 제안"
         }
     }
 
@@ -143,15 +113,7 @@ struct CareerTab: View {
                     Text("포메이션 \(game.formation(of: team).label): \(me.position.label) 선발은 \(quota)명입니다. 감독 신뢰가 높으면 능력이 조금 낮아도 선발로 나옵니다.").note()
                 }
                 ForEach(peers) { player in
-                    HStack {
-                        PositionTag(position: player.position)
-                        Text(player.name).fontWeight(player.id == me.id ? .bold : .regular)
-                        Text("\(player.age)세").note()
-                        Spacer()
-                        Text("\(Int(player.ability))").monospacedDigit()
-                    }
-                    .font(.callout)
-                    .foregroundStyle(player.id == me.id ? Color.accentColor : .primary)
+                    PlayerLine(player: player, highlighted: player.id == me.id)
                 }
             }
         }
