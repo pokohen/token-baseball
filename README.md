@@ -79,6 +79,8 @@ Scripts/update.sh
 
 최신 코드를 받아 앱을 다시 만든다. 구단과 선수는 그대로 이어진다. 실행 중인 앱을 끄고 새로 만든 앱을 연다.
 
+앱이 새 버전을 알려 주기도 한다. 켤 때와 여섯 시간마다 새 변경이 있는지 확인해서, 있으면 알림을 한 번 보내고 팝오버 위쪽과 설정 탭의 "업데이트" 카드에 표시한다. 카드의 "명령 복사"로 위 명령을 복사할 수 있다. `Scripts/make-app.sh`로 만든 앱에서만 동작하고, 설정 탭에서 끌 수 있다.
+
 **초기화** (처음부터 다시)
 
 ```sh
@@ -100,6 +102,7 @@ Scripts/reset.sh
 ## 알아 둘 것
 
 - 토큰 사용량은 `~/.claude/projects`(Claude Code), `~/.codex/sessions`(Codex), `~/.gemini/tmp`(Gemini CLI), `~/.local/share/opencode`(opencode)의 로컬 로그에서 읽는다. 외부로 보내지 않는다. Gemini CLI와 opencode는 각 도구의 소스 코드를 보고 만들었고, 실제 로그로는 아직 확인하지 못했다.
+- 이 앱이 하는 네트워크 요청은 **새 버전 확인 하나뿐**이다. GitHub에 "이 빌드 뒤로 변경이 몇 개 쌓였는지"만 묻고, 보내는 것은 저장소 이름과 빌드한 버전(커밋)뿐이다. 토큰 사용량과 게임 내용은 보내지 않는다. 설정 탭의 "새 버전 자동 확인"을 끄면 요청하지 않는다.
 - 구단을 만든 뒤에 쓴 토큰만 자금이 된다. 20초마다 반영된다.
 - 게임은 `~/Library/Application Support/TokenBaseball/save.json`에 저장된다. 이 파일을 복사해 두면 백업이 된다.
 - 경기 기회는 1시간에 하나씩, 최대 3개까지 쌓인다. 경기 한 번은 실시간으로 15분쯤 걸리고 건너뛸 수 없다.
@@ -155,3 +158,5 @@ Tests/
 | `TOKEN_BASEBALL_SAVE` | 저장 파일 위치를 바꾼다 (축구 저장 파일과 종목 표시 파일도 같은 폴더에 생긴다) |
 | `TOKEN_BASEBALL_SNAPSHOT` | 각 화면을 이 폴더에 PNG로 그리고 끝낸다 (임시 게임 사용, 축구 화면은 `football/`, 선수 모드는 `career/`, `career-pitcher/`, `career-football/`, `career-keeper/` 아래) |
 | `TOKEN_BASEBALL_SELFTEST` | 화면 없이 앱 흐름을 점검하고 끝낸다: 만들기 → 훈련 → 경기 → 모드 전환 → 다시 켜기 (이 폴더에 임시 저장 파일을 만든다. 폴더 안의 내용은 지워진다) |
+| `TOKEN_BASEBALL_CHECK_UPDATE` | 새 버전 확인만 하고 결과를 출력한 뒤 끝낸다 |
+| `TOKEN_BASEBALL_BUILD_COMMIT` | 빌드한 버전(커밋)을 이 값으로 본다 (새 버전 확인을 시험할 때) |

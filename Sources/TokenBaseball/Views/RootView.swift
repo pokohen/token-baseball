@@ -78,6 +78,25 @@ struct RootView: View {
             .padding(.vertical, 6)
             Divider()
 
+            if let update = model.update, tab != .settings {
+                Button {
+                    tab = .settings
+                } label: {
+                    HStack {
+                        Image(systemName: "arrow.down.circle.fill")
+                        Text("새 버전이 있습니다 (변경 \(update.count)건)").font(.callout)
+                        Spacer()
+                        Text("설정에서 보기").font(.caption)
+                        Image(systemName: "chevron.right").font(.caption)
+                    }
+                    .padding(8)
+                    .foregroundStyle(.white)
+                    .background(Color.accentColor)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+
             if let message = model.message {
                 HStack {
                     Image(systemName: "exclamationmark.circle.fill")

@@ -12,6 +12,20 @@ struct TokenBaseballApp: App {
         if let directory = ProcessInfo.processInfo.environment["TOKEN_BASEBALL_SELFTEST"], !directory.isEmpty {
             exit(SelfTest.run(in: URL(fileURLWithPath: directory)) ? 0 : 1)
         }
+        if ProcessInfo.processInfo.environment["TOKEN_BASEBALL_CHECK_UPDATE"] != nil {
+            // 새 버전 확인만 하고 끝낸다 (확인용).
+            Task.detached {
+                switch await UpdateChecker.check() {
+                case .upToDate: print("최신 버전입니다.")
+                case .available(let update):
+                    print("새 버전이 있습니다 (변경 \(update.count)건).")
+                    update.titles.forEach { print("· \($0)") }
+                case .unknown(let reason): print(reason)
+                }
+                exit(0)
+            }
+            RunLoop.main.run()
+        }
         let model = AppModel()
         _model = StateObject(wrappedValue: model)
         if let directory = ProcessInfo.processInfo.environment["TOKEN_BASEBALL_SNAPSHOT"], !directory.isEmpty {

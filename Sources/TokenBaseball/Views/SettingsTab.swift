@@ -58,6 +58,8 @@ struct SettingsTab: View {
                 }
             }
 
+            UpdateCard()
+
             Card("토큰 경로") {
                 Text(model.sources.claudeCode.root.path).font(.caption.monospaced()).textSelection(.enabled)
                 Text(model.sources.codex.root.path).font(.caption.monospaced()).textSelection(.enabled)

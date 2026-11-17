@@ -37,6 +37,12 @@ final class AppModel: ObservableObject {
     var popoverVisible = false
     let launchedAt = Date()
 
+    /// 새 버전이 있으면 그 내용. 없거나 아직 확인하지 않았으면 nil.
+    @Published var update: UpdateChecker.Update?
+    /// 마지막 업데이트 확인의 결과를 한 줄로 (설정 탭에 보인다).
+    @Published var updateStatus: String?
+    @Published var checkingUpdate = false
+
     /// 공 하나에 걸리는 시간. 배속과 건너뛰기는 없다.
     static let pitchInterval: Duration = .seconds(3)
 
@@ -73,6 +79,11 @@ final class AppModel: ObservableObject {
         timers.append(Timer.scheduledTimer(withTimeInterval: 20, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.pollUsage() }
         })
+        // 새 버전 확인: 켤 때 한 번, 그 뒤로 여섯 시간마다.
+        timers.append(Timer.scheduledTimer(withTimeInterval: 6 * 3600, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.checkForUpdate() }
+        })
+        checkForUpdate()
         scheduleAnimation()
         pollUsage()
         if game?.isMatchLive == true { runMatchLoop() }
