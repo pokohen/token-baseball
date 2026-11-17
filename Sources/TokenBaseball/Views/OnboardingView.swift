@@ -11,7 +11,7 @@ struct OnboardingView: View {
     @State private var name = ""
     @State private var colorIndex = 0
     @State private var emblemIndex = 0
-    @State private var slot = SaveSlot.baseball
+    @State private var slot = SaveSlot.baseballPlayer
     @State private var career = CareerSetup(name: "", position: .shortstop)
     private var sport: Sport { slot.sport }
     /// 구단이 아니라 선수를 만드는 중인지.
@@ -59,14 +59,17 @@ struct OnboardingView: View {
             }
         }
         .padding(24)
-        .onAppear { slot = model.slot }
+        .onAppear {
+            // 숨겨 둔 모드가 골라져 있으면 (처음 실행 등) 야구 선수부터 보여 준다.
+            slot = model.selectableSlots.contains(model.slot) || fixedSport != nil ? model.slot : .baseballPlayer
+        }
     }
 
     private var welcome: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                if fixedSport != .football { Image(systemName: "baseball.fill") }
-                if fixedSport != .baseball { Image(systemName: "soccerball") }
+                if fixedSport != .football { Image(systemName: fixedSport == nil ? "figure.baseball" : "baseball.fill") }
+                if fixedSport != .baseball { Image(systemName: fixedSport == nil ? "figure.soccer" : "soccerball") }
             }
             .font(.system(size: 40)).foregroundStyle(Color.accentColor)
             if bankrupt {
@@ -79,8 +82,8 @@ struct OnboardingView: View {
                     }
                 }
             } else {
-                Text("Token Baseball").font(.title2.bold())
-                Text("평소처럼 AI 코딩을 하면 쓴 토큰이 구단 자금으로 쌓입니다. 그 돈으로 시민 구단을 프로 구단으로 키워 보세요. 야구단과 축구단 중에 고를 수 있고, 야구 선수나 축구 선수 한 명이 되어 토큰으로 훈련하며 커리어를 보낼 수도 있습니다.")
+                Text("Token Sport").font(.title2.bold())
+                Text("평소처럼 AI 코딩을 하면 쓴 토큰이 훈련 포인트로 쌓입니다. 야구 선수나 축구 선수 한 명이 되어, 그 포인트로 훈련하고 경기에 나서며 6부 시민 구단에서 1부 프로 리그의 스타까지 올라가 보세요.")
                 Card("토큰 사용량을 읽는 곳") {
                     Text(model.sources.claudeCode.root.path).font(.caption.monospaced()).textSelection(.enabled)
                     Text(model.sources.codex.root.path).font(.caption.monospaced()).textSelection(.enabled)
@@ -101,7 +104,7 @@ struct OnboardingView: View {
             switch step {
             case 1:
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2), spacing: 8) {
-                    ForEach([SaveSlot.baseball, .baseballPlayer, .football, .footballPlayer], id: \.self) { item in
+                    ForEach(model.selectableSlots, id: \.self) { item in
                         Button { slot = item } label: {
                             VStack(spacing: 6) {
                                 Image(systemName: item == .football ? "soccerball" : item == .footballPlayer ? "figure.soccer"
