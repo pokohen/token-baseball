@@ -8,7 +8,7 @@ struct NextMatchCard: View {
     var goToMatch: () -> Void = {}
 
     var body: some View {
-        Card("다음 경기", trailing: chargeText) {
+        Card("다음 경기", accessory: AnyView(ChargeMarks(sport: game.sport, charges: game.charges))) {
             if game.isMatchLive {
                 Text("경기가 진행 중입니다.").font(.callout)
                 Button("중계 보기", action: goToMatch)
@@ -58,8 +58,23 @@ struct NextMatchCard: View {
     private var costText: String {
         game.isCareer ? "\(Format.tokens(game.extraMatchCost)) P" : Format.money(game.extraMatchCost)
     }
+}
 
-    private var chargeText: String {
-        game.chargeMarks
+/// 남은 경기 기회: 있는 만큼 공으로, 빈 자리는 동그라미로.
+struct ChargeMarks: View {
+    let sport: Sport
+    let charges: Int
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(0..<Balance.maxMatchCharges, id: \.self) { index in
+                if index < charges {
+                    BallIcon(sport: sport, size: 13)
+                } else {
+                    Circle().stroke(Color.secondary.opacity(0.6), lineWidth: 1).frame(width: 11, height: 11)
+                }
+            }
+        }
+        .accessibilityLabel("경기 기회 \(charges)개")
     }
 }

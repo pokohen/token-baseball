@@ -107,9 +107,7 @@ struct OnboardingView: View {
                     ForEach(model.selectableSlots, id: \.self) { item in
                         Button { slot = item } label: {
                             VStack(spacing: 6) {
-                                Image(systemName: item == .football ? "soccerball" : item == .footballPlayer ? "figure.soccer"
-                                    : item.isCareer ? "figure.baseball" : "baseball.fill")
-                                    .font(.system(size: 28))
+                                BallIcon(sport: item.sport, size: 36)
                                 Text(item.label).font(.headline)
                                 Text(model.hasSave(slot: item) ? "저장되어 있음"
                                     : item == .football ? "구단 경영 · 승점제" : item == .footballPlayer ? "선수 한 명의 커리어"
