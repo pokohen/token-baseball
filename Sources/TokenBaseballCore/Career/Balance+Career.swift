@@ -56,7 +56,8 @@ extension Balance {
     public static func careerForcedRetirementAge(_ position: Position) -> Int {
         careerForcedRetirementAge + (position == .goalkeeper ? 3 : 0)
     }
-    public static let careerVoluntaryRetirementAge = 30
+    /// 스스로 은퇴하려면 끝까지 치른 시즌이 이만큼 있어야 한다.
+    public static let careerRetireMinSeasons = 1
     public static let careerForcedRetirementAge = 38
     /// 잠재력까지 남은 여유가 이 값 이하면 훈련 비용이 두 배가 된다.
     public static let careerNearPotentialRoom = 10.0

@@ -34,9 +34,7 @@ import Testing
     @Test func 야구_세계에서는_축구_선수를_만들_수_없다() throws {
         var game = TestCareer.make(.first, seed: 62)
         var auto = CareerAuto()
-        let id = try #require(game.career?.playerID)
         while game.phase != .offseason { try auto.playOne(&game) }
-        game.players[id]?.age = Balance.careerVoluntaryRetirementAge
         try game.retireCareer()
         #expect(throws: GameError.self) {
             try game.startNewCareer(setup: CareerSetup(name: "축구", position: .forward), now: auto.clock)
@@ -195,7 +193,6 @@ import Testing
     @Test func 축구_선수도_구단을_옮기고_은퇴한다() throws {
         var game = TestCareer.make(.defender, seed: 75)
         var auto = CareerAuto()
-        let id = try #require(game.career?.playerID)
         let target = try #require(game.teams(in: .citizenSemiPro).first).id
         let size = game.teams[target].roster.count
         game.career?.offers = [CareerOffer(
@@ -204,7 +201,6 @@ import Testing
         #expect(game.userTeamID == target)
         #expect(game.teams[target].roster.count == size)
         while game.phase != .offseason { try auto.playOne(&game) }
-        game.players[id]?.age = Balance.careerVoluntaryRetirementAge
         try game.retireCareer()
         let record = try #require(game.careerHall?.last)
         #expect(record.position == .defender)

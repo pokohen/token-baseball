@@ -36,16 +36,17 @@ import Testing
         #expect(totals.ratedGames == career.history.reduce(0) { $0 + $1.ratedGames } + career.seasonRatedGames)
     }
 
-    @Test func 은퇴하면_기록실에_남고_같은_세계에서_새_선수로_시작한다() throws {
+    @Test func 은퇴하면_명예의_전당에_남고_같은_세계에서_새_선수로_시작한다() throws {
         var game = TestCareer.make(.third, seed: 31)
         var auto = CareerAuto()
         let id = try #require(game.career?.playerID)
+        // 첫 시즌 도중에는 은퇴할 수 없다.
         #expect(!game.canRetireCareer)
-        while game.phase != .offseason { try auto.playOne(&game) }
         #expect(throws: GameError.self) { try game.retireCareer() }
-
-        game.players[id]?.age = Balance.careerVoluntaryRetirementAge
-        #expect(game.canRetireCareer)
+        while game.phase != .offseason { try auto.playOne(&game) }
+        // 한 시즌을 마친 오프시즌에는 나이와 상관없이 은퇴할 수 있다.
+        #expect(game.myPlayer?.age ?? 99 < 20)
+        #expect(game.canRetireCareer && game.careerRetireBlockedReason == nil)
         let club = game.userTeamID
         try game.retireCareer()
         #expect(game.career?.retired == true)
@@ -57,6 +58,7 @@ import Testing
         #expect(record.name == "김테스트")
         #expect(record.batting.games == Balance.roundsPerSeason)
         #expect(record.clubs.count >= 1)
+        #expect(record.seasons == 1 && record.honor == "동네 스타")
 
         let teams = game.teams.map(\.name)
         try game.startNewCareer(

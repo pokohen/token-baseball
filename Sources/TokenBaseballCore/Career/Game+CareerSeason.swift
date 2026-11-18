@@ -132,20 +132,27 @@ extension Game {
 
     // MARK: 은퇴
 
-    public var canRetireCareer: Bool {
-        guard let career, !career.retired, let me = players[career.playerID] else { return false }
-        return phase == .offseason && !isMatchLive && me.age >= Balance.careerVoluntaryRetirementAge
+    /// 지금 은퇴할 수 없는 이유. 할 수 있으면 nil.
+    /// 한 시즌을 끝까지 치른 뒤부터, 오프시즌에 할 수 있다 (나이는 상관없다).
+    public var careerRetireBlockedReason: String? {
+        guard let career, !career.retired, players[career.playerID] != nil else { return "선수가 없습니다." }
+        if isMatchLive { return "경기가 끝난 뒤에 은퇴할 수 있습니다." }
+        if career.history.count < Balance.careerRetireMinSeasons {
+            return "한 시즌을 끝까지 치른 뒤부터 은퇴할 수 있습니다."
+        }
+        if phase != .offseason { return "은퇴는 시즌이 끝난 오프시즌에 할 수 있습니다." }
+        return nil
     }
 
-    /// 스스로 은퇴한다. 30세부터, 오프시즌에만 할 수 있다.
+    public var canRetireCareer: Bool { careerRetireBlockedReason == nil }
+
+    /// 스스로 은퇴한다.
     public mutating func retireCareer() throws {
-        guard canRetireCareer else {
-            throw GameError("\(Balance.careerVoluntaryRetirementAge)세부터, 오프시즌에만 은퇴할 수 있습니다.")
-        }
+        if let reason = careerRetireBlockedReason { throw GameError(reason) }
         finishCareer()
     }
 
-    /// 은퇴: 커리어 기록을 기록실에 남기고 선수를 세계에서 내린다.
+    /// 은퇴: 커리어 기록을 명예의 전당에 남기고 선수를 세계에서 내린다.
     mutating func finishCareer() {
         guard var career, !career.retired, let me = players[career.playerID] else { return }
         var batting = BattingLine()
@@ -173,7 +180,7 @@ extension Game {
         career.isFreeAgent = false
         career.offers = []
         self.career = career
-        post("\(me.name) 은퇴. \(career.history.count)시즌의 커리어가 기록실에 남습니다.")
+        post("\(me.name) 은퇴. \(career.history.count)시즌의 커리어가 명예의 전당에 남습니다.")
     }
 
     /// 은퇴 뒤 같은 세계에서 새 선수로 다시 시작한다.
