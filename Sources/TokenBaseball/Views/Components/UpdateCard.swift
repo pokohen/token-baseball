@@ -6,6 +6,21 @@ import TokenBaseballCore
 struct UpdateCard: View {
     @EnvironmentObject var model: AppModel
     @State private var copied = false
+    @State private var showNotes = false
+
+    private var game: Game? { model.game }
+
+    private var commandRow: some View {
+        HStack {
+            Text(Self.command).font(.caption.monospaced()).textSelection(.enabled).lineLimit(2)
+            Spacer()
+            Button(copied ? "복사됨" : "명령 복사") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(Self.command, forType: .string)
+                copied = true
+            }
+        }
+    }
 
     /// 업데이트 명령. 배포 파일이나 설치 명령으로 설치했으면 설치 명령 한 줄을, 저장소를 직접 받아 만든 앱이면 업데이트 스크립트를 보여 준다.
     private static var command: String {
@@ -23,21 +38,36 @@ struct UpdateCard: View {
                 Label(update.version.map { "새 버전 \($0)이(가) 나왔습니다" } ?? "새 버전이 있습니다 (변경 \(update.count)건)",
                       systemImage: "arrow.down.circle.fill")
                     .font(.callout.weight(.medium)).foregroundStyle(Color.accentColor)
-                ForEach(update.titles, id: \.self) { title in
-                    Text("· \(title)").note().frame(maxWidth: .infinity, alignment: .leading)
-                }
-                Text("터미널에서 아래 명령을 실행하면 새 버전으로 바뀝니다. 구단과 선수는 그대로입니다.").note()
-                if let page = update.page {
-                    Button("내려받는 페이지 열기") { NSWorkspace.shared.open(page) }
-                }
-                HStack {
-                    Text(Self.command).font(.caption.monospaced()).textSelection(.enabled).lineLimit(2)
-                    Spacer()
-                    Button(copied ? "복사됨" : "명령 복사") {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(Self.command, forType: .string)
-                        copied = true
+                if !update.notes.isEmpty || !update.titles.isEmpty {
+                    DisclosureGroup("업데이트 내용 (\(max(update.notes.count, update.titles.count))건)", isExpanded: $showNotes) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            ForEach(Array((update.notes.isEmpty ? update.titles : update.notes).enumerated()), id: \.offset) { _, line in
+                                Text("· \(line)").note().frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            if let page = update.page {
+                                Button("웹에서 자세히 보기") { NSWorkspace.shared.open(page) }.buttonStyle(.link).font(.caption)
+                            }
+                        }
+                        .padding(.top, 4)
                     }
+                }
+                if update.download != nil, Updater.blockedReason() == nil {
+                    HStack {
+                        Button(model.updateProgress ?? "지금 업데이트") { model.installUpdate() }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(model.updateProgress != nil || game?.isMatchLive == true)
+                        if model.updateProgress != nil { ProgressView().controlSize(.small) }
+                    }
+                    Text(game?.isMatchLive == true
+                        ? "경기가 끝난 뒤에 업데이트할 수 있습니다."
+                        : "새 버전을 내려받아 서명을 확인한 뒤, 앱이 잠깐 꺼졌다가 다시 열립니다. 선수는 그대로입니다.").note()
+                    if let error = model.updateError {
+                        Text(error).font(.caption).foregroundStyle(Theme.warn)
+                        commandRow
+                    }
+                } else {
+                    Text("터미널에서 아래 명령을 실행하면 새 버전으로 바뀝니다. 선수는 그대로입니다.").note()
+                    commandRow
                 }
             } else if let status = model.updateStatus {
                 Text(status).font(.callout)

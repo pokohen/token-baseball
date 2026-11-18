@@ -135,15 +135,19 @@ enum SelfTest {
             == .available(.init(count: 3, titles: ["마지막 변경", "첫 변경"], head: "c3")))
         check("업데이트: 최신", UpdateChecker.parse(Data(#"{"ahead_by":0,"commits":[]}"#.utf8)) == .upToDate)
         if case .unknown = UpdateChecker.parse(Data("{}".utf8)) { check("업데이트: 깨진 응답", true) } else { check("업데이트: 깨진 응답", false) }
-        let release = Data(#"{"tag_name":"v0.10.0","name":"Token Sport 0.10.0","body":"변경 내용\n* 배속 추가\n* 버그 수정","html_url":"https://example.com/r"}"#.utf8)
+        let release = Data(#"{"tag_name":"v0.10.0","name":"Token Sport 0.10.0","body":"변경 내용\n* 배속 추가\n* 버그 수정","html_url":"https://example.com/r","assets":[{"name":"a.txt","browser_download_url":"https://example.com/a.txt"},{"name":"a.dmg","browser_download_url":"https://example.com/a.dmg"}]}"#.utf8)
         if case .available(let found) = UpdateChecker.parseRelease(release, current: "0.9.3") {
             check("업데이트: 배포 버전", found.version == "0.10.0" && found.titles == ["배속 추가", "버그 수정"])
+            check("업데이트: 내려받는 주소", found.download?.absoluteString == "https://example.com/a.dmg" && found.notes.count == 2)
         } else {
             check("업데이트: 배포 버전", false)
         }
         check("업데이트: 같은 배포 버전이면 최신", UpdateChecker.parseRelease(release, current: "0.10.0") == .upToDate)
         check("업데이트: 버전 비교", UpdateChecker.isVersion("0.10.0", newerThan: "0.9.9")
             && !UpdateChecker.isVersion("0.2.0", newerThan: "0.2.0") && !UpdateChecker.isVersion("0.1.9", newerThan: "0.2"))
+        check("업데이트: 자동 설명 줄 정리", UpdateChecker.cleanNote("배속 추가 by @someone in https://github.com/o/r/pull/3") == "배속 추가"
+            && UpdateChecker.cleanNote("그냥 줄") == "그냥 줄")
+        check("업데이트: 번들 없이는 앱 안 업데이트 불가", Updater.blockedReason() != nil)
         model.apply(UpdateChecker.parse(ahead))
         check("업데이트: 앱에 표시", model.update?.count == 3 && model.updateStatus != nil)
         model.apply(.upToDate)

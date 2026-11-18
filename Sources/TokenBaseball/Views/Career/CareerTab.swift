@@ -11,6 +11,7 @@ struct CareerTab: View {
             if let career = game.career, let me = game.myPlayer {
                 if !career.offers.isEmpty { offers(career) }
                 contract(career, me)
+                activities(career)
                 season(career, me)
                 history(career, me)
                 rivals(me)
@@ -59,6 +60,32 @@ struct CareerTab: View {
                     : game.tradeWindowOpen
                     ? "이적을 요청하면 제안이 더 자주 오지만 감독 신뢰가 10 떨어집니다. 이적 기간마다 한 번."
                     : "지금은 이적 기간이 아닙니다 (정규시즌 \(Balance.tradeDeadlineRound)라운드까지, 그리고 오프시즌).").note()
+            }
+        }
+    }
+
+    private func activities(_ career: Career) -> some View {
+        let cap = Balance.careerFameCap(game.userTier)
+        return Card("명성 활동", trailing: "명성 \(Int(career.fame)) / 이 리그 한도 \(Int(cap))") {
+            Text("훈련 포인트를 들여 명성을 올립니다. 경기 사이에 한 번 할 수 있고, 명성이 높을수록 더 큰 구단에서 제안이 옵니다.").note()
+            ForEach(CareerActivity.allCases, id: \.self) { activity in
+                let blocked = game.careerActivityBlockedReason(activity)
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(activity.label).font(.callout.weight(.medium))
+                        Text(activity.detail).note()
+                    }
+                    Spacer()
+                    Button("명성 +\(String(format: "%.1f", game.careerActivityGain(activity))) · \(Format.tokens(game.careerActivityCost(activity))) P") {
+                        model.perform { try $0.doCareerActivity(activity) }
+                    }
+                    .disabled(blocked != nil)
+                    .help(blocked ?? activity.detail)
+                }
+            }
+            if let reason = CareerActivity.allCases.compactMap({ game.careerActivityBlockedReason($0) }).first,
+               career.activityDone == true || career.isFreeAgent || career.fame >= cap {
+                Text(reason).note()
             }
         }
     }

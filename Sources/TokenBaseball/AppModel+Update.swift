@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import TokenBaseballCore
 
@@ -42,5 +43,30 @@ extension AppModel {
         UpdateChecker.isEnabled = enabled
         objectWillChange.send()
         if enabled { checkForUpdate() } else { update = nil; updateStatus = nil }
+    }
+
+    /// 앱 안에서 새 버전으로 바꾼다: 내려받고, 서명과 공증을 검사하고, 앱을 끄고 바꾼 뒤 다시 연다.
+    func installUpdate() {
+        guard updateProgress == nil, let update, let version = update.version, let download = update.download,
+              let app = Updater.installedApp else { return }
+        if let reason = Updater.blockedReason() { updateError = reason; return }
+        updateError = nil
+        updateProgress = "내려받는 중…"
+        Task { [weak self] in
+            do {
+                let fresh = try await Updater.prepare(from: download, expectedVersion: version, current: app) { text in
+                    Task { @MainActor in self?.updateProgress = text }
+                }
+                guard let self else { return }
+                self.updateProgress = "다시 여는 중…"
+                self.pendingSave?.cancel()
+                self.save()
+                try Updater.swapAfterExit(fresh: fresh, into: app, reopen: true)
+                NSApplication.shared.terminate(nil)
+            } catch {
+                self?.updateProgress = nil
+                self?.updateError = (error as? Updater.Failure)?.message ?? "업데이트하지 못했습니다: \(error.localizedDescription)"
+            }
+        }
     }
 }
