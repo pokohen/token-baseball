@@ -2,7 +2,7 @@ import Foundation
 
 /// 새 버전이 나왔는지 알아본다.
 ///
-/// 이 앱은 소스를 받아 직접 빌드하므로 "버전"은 빌드한 시점의 커밋이다.
+/// 배포 파일로 설치한 앱은 최신 배포 버전과, 소스로 직접 만든 앱은 빌드한 시점의 커밋과 비교한다.
 /// `Scripts/make-app.sh`가 앱 번들에 그 커밋과 저장소 이름을 적어 두고,
 /// 앱은 GitHub에 "이 커밋 뒤로 기본 브랜치에 몇 개가 더 쌓였는지"만 묻는다.
 ///
@@ -19,6 +19,10 @@ enum UpdateChecker {
         /// 배포 버전이면 그 이름 (예: "0.3.0")과 내려받는 페이지.
         var version: String? = nil
         var page: URL? = nil
+        /// 배포 파일(.dmg)을 내려받는 주소. 앱 안에서 업데이트할 때 쓴다.
+        var download: URL? = nil
+        /// 변경 내용 전체 (titles는 앞의 몇 줄만).
+        var notes: [String] = []
     }
 
     enum Outcome: Equatable, Sendable {
@@ -116,6 +120,8 @@ enum UpdateChecker {
             let name: String?
             let body: String?
             let html_url: String?
+            struct Asset: Decodable { let name: String; let browser_download_url: String }
+            let assets: [Asset]?
         }
         guard let response = try? JSONDecoder().decode(Response.self, from: data) else {
             return .unknown("응답을 읽지 못했습니다.")
@@ -126,10 +132,21 @@ enum UpdateChecker {
         let notes = (response.body ?? "").split(separator: "\n")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { $0.hasPrefix("* ") || $0.hasPrefix("- ") }
-            .map { String($0.dropFirst(2)) }
+            .map { cleanNote(String($0.dropFirst(2))) }
+        let download = response.assets?.first { $0.name.hasSuffix(".dmg") }
+            .flatMap { URL(string: $0.browser_download_url) }
         return .available(Update(
             count: max(1, notes.count), titles: Array(notes.prefix(5)), head: response.tag_name,
-            version: latest, page: response.html_url.flatMap(URL.init(string:))))
+            version: latest, page: response.html_url.flatMap(URL.init(string:)),
+            download: download, notes: notes))
+    }
+
+    /// GitHub가 자동으로 적은 줄("제목 by @누구 in https://…/pull/3")에서 제목만 남긴다.
+    static func cleanNote(_ line: String) -> String {
+        guard let range = line.range(of: " by @", options: .backwards), line[range.upperBound...].contains(" in https://") else {
+            return line
+        }
+        return String(line[..<range.lowerBound])
     }
 
     /// "0.10.0" > "0.9.3" 같은 숫자 비교.

@@ -42,6 +42,10 @@ final class AppModel: ObservableObject {
     /// 마지막 업데이트 확인의 결과를 한 줄로 (설정 탭에 보인다).
     @Published var updateStatus: String?
     @Published var checkingUpdate = false
+    /// 앱 안에서 업데이트하는 중이면 지금 하는 일 ("내려받는 중…").
+    @Published var updateProgress: String?
+    /// 앱 안 업데이트가 실패한 이유.
+    @Published var updateError: String?
 
     /// 구단 경영 모드를 고를 수 있게 보일지. 지금은 선수 키우기를 먼저 다듬고 있어서 기본은 숨김이다.
     @Published var showsClubModes: Bool = UserDefaults.standard.bool(forKey: "showClubModes") {

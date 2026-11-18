@@ -47,6 +47,20 @@ struct SettingsTab: View {
             }
             .font(.callout)
 
+            if game.isCareer, let me = game.myPlayer, game.career?.retired != true {
+                Card("선수 이름") {
+                    HStack {
+                        TextField(me.name, text: $newName).textFieldStyle(.roundedBorder)
+                        Button("바꾸기") {
+                            model.perform { try $0.renameCareerPlayer(to: newName) }
+                            if model.message == nil { newName = "" }
+                        }
+                        .disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                    Text("12자까지. 지난 기록과 구단 이력은 그대로입니다.").note()
+                }
+            }
+
             if !game.isCareer {
                 Card("팀 이름") {
                     HStack {
@@ -67,7 +81,7 @@ struct SettingsTab: View {
                 Text(model.sources.codex.root.path).font(.caption.monospaced()).textSelection(.enabled)
                 Text(model.sources.gemini.root.path).font(.caption.monospaced()).textSelection(.enabled)
                 Text(model.sources.opencode.root.path).font(.caption.monospaced()).textSelection(.enabled)
-                Text("이 컴퓨터 안에서만 읽고 외부로 보내지 않습니다. \(game.isCareer ? "선수" : "구단")을 만든 뒤에 쓴 토큰만 셉니다.").note()
+                Text("이 컴퓨터 안에서만 읽고 외부로 보내지 않습니다. \(game.isCareer ? "선수를" : "구단을") 만든 뒤에 쓴 토큰만 셉니다.").note()
                 Text("저장 파일: \(model.store.fileURL.path)").font(.caption2.monospaced()).textSelection(.enabled)
             }
 
