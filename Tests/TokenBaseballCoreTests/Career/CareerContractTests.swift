@@ -75,6 +75,10 @@ import Testing
         try game.acceptCareerOffer(career.offers[0].id)
         #expect(game.career?.isFreeAgent == false)
         #expect(game.myPlayer?.teamID == career.offers[0].teamID)
+        // 입단하자마자 라이벌이 새 리그의 다른 구단 선수로 정해진다.
+        let rival = try #require(game.careerRival)
+        #expect(rival.teamID != game.userTeamID)
+        #expect(rival.teamID.map { game.teams[$0].tier } == game.userTier)
         try auto.playOne(&game)
         #expect(game.myPlayer?.batting.games == 1)
     }

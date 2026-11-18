@@ -20,6 +20,10 @@ enum Updater {
         return url.pathExtension == "app" ? url : nil
     }
 
+    /// `blockedReason()`을 한 번만 계산해 둔 값. 서명을 디스크에서 읽으므로 화면을 그릴 때마다 부르지 않는다.
+    /// (실행 중에는 앱 번들의 위치와 서명이 바뀌지 않는다.)
+    static let cachedBlockedReason: String? = blockedReason()
+
     /// 앱 안에서 업데이트할 수 없는 이유. 할 수 있으면 nil.
     static func blockedReason(app: URL? = installedApp) -> String? {
         guard UpdateChecker.isReleaseBuild, let app else { return "배포 파일로 설치한 앱에서만 됩니다." }
@@ -120,15 +124,17 @@ enum Updater {
     /// 이 앱이 꺼지면 새 앱으로 자리를 바꾸고 다시 여는 스크립트를 띄운다. 띄운 뒤 곧바로 앱을 꺼야 한다.
     /// 바꾸다 실패하면 예전 앱을 되돌려 놓는다.
     static func swapAfterExit(fresh: URL, into app: URL, reopen: Bool) throws {
+        // 어느 단계에서 실패하든: 받아 둔 파일을 지우고, 자리에 남아 있는 앱(예전 것이든 새것이든)을 다시 연다.
         let script = """
         pid="$1"; fresh="$2"; app="$3"; reopen="$4"
-        n=0; while kill -0 "$pid" 2>/dev/null && [ $n -lt 100 ]; do sleep 0.2; n=$((n+1)); done
+        finish() { rm -rf "$(dirname "$fresh")"; [ "$reopen" = "1" ] && [ -d "$app" ] && /usr/bin/open "$app"; exit 0; }
+        n=0; while kill -0 "$pid" 2>/dev/null && [ $n -lt 150 ]; do sleep 0.2; n=$((n+1)); done
+        # 앱이 끝내 꺼지지 않았으면 실행 중인 앱을 건드리지 않는다.
+        if kill -0 "$pid" 2>/dev/null; then rm -rf "$(dirname "$fresh")"; exit 0; fi
         old="$app.old-$$"
-        mv "$app" "$old" || exit 1
+        mv "$app" "$old" || finish
         if /usr/bin/ditto "$fresh" "$app"; then rm -rf "$old"; else rm -rf "$app"; mv "$old" "$app"; fi
-        rm -rf "$(dirname "$fresh")"
-        [ "$reopen" = "1" ] && /usr/bin/open "$app"
-        exit 0
+        finish
         """
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")

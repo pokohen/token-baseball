@@ -68,8 +68,15 @@ final class AppModel: ObservableObject {
         let saved = store.loadActiveSlot()
         // 예전에 구단 경영을 하던 채로 껐으면 선수 모드로 연다. 구단 저장 파일은 그대로 둔다.
         self.slot = saved.isCareer ? saved : .baseballPlayer
-        if !saved.isCareer { try? store.saveActiveSlot(slot) }
         loadGame()
+        if !saved.isCareer {
+            try? store.saveActiveSlot(slot)
+            // 쉬고 있던 선수는 그동안 쓴 토큰과 흐른 시간을 받지 않는다 (모드를 바꿀 때와 같다).
+            if game != nil {
+                game?.resume(now: Date())
+                save()
+            }
+        }
     }
 
     func loadGame() {
@@ -119,10 +126,13 @@ final class AppModel: ObservableObject {
         now = Date()
         guard game != nil else { return }
         game?.refreshCharges(now: now)
-        let ready = (game?.charges ?? 0) > 0 && game?.nextMatch() != nil && game?.isMatchLive != true
-        // 경기 기회가 새로 생겼을 때만 알린다. 앱을 켤 때마다 알리지 않는다.
-        if ready, wasMatchReady == false { notify("경기를 치를 수 있습니다", "상단바를 눌러 경기를 시작하세요.") }
-        wasMatchReady = ready
+        // 경기 기회가 새로 생겼을 때만 알린다. 앱을 켤 때마다, 또는 기회가 남은 채로 경기가 끝날 때마다 알리지 않는다.
+        // 그래서 경기 중에는 비교하지 않고, 경기 전의 상태와 견준다.
+        if game?.isMatchLive != true {
+            let ready = (game?.charges ?? 0) > 0 && game?.nextMatch() != nil
+            if ready, wasMatchReady == false { notify("경기를 치를 수 있습니다", "상단바를 눌러 경기를 시작하세요.") }
+            wasMatchReady = ready
+        }
         updateStatusTooltip()
     }
 

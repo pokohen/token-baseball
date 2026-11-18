@@ -71,6 +71,9 @@ import Testing
         #expect(game.teams.map(\.name) == teams)
         #expect(game.funds.balance == FundsLedger.startingFunds)
         #expect(game.careerHall?.count == 1)
+        // 오프시즌에 만든 선수의 첫 시즌은 다음 시즌이고, 예전 선수가 사 둔 경기는 넘어오지 않는다.
+        #expect(game.career?.firstSeason == 2)
+        #expect(game.extraMatchPending == nil)
         for _ in 0..<8 { try auto.playOne(&game) }
         #expect(game.season == 2)
     }

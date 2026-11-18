@@ -129,22 +129,11 @@ extension Game {
             ensurePlayable(tie.home)
             ensurePlayable(tie.away)
             let tier = min(teams[tie.home].tier, teams[tie.away].tier)
-            let seed = rng.next()
-            if sport == .football {
-                if var match = makeFootballMatch(home: tie.home, away: tie.away, kind: .cup, seed: seed) {
-                    match.runToEnd()
-                    applyFootball(match, tier: tier, countsForStandings: false, competitive: true)
-                    cup.ties[index].homeScore = match.home.goals
-                    cup.ties[index].awayScore = match.away.goals
-                    cup.ties[index].shootout = match.wentToShootout
-                    cup.ties[index].winner = match.result == .homeWin ? tie.home : tie.away
-                }
-            } else if var match = makeMatch(home: tie.home, away: tie.away, kind: .cup, tier: tier, seed: seed) {
-                match.runToEnd()
-                apply(match, tier: tier, countsForStandings: false)
-                cup.ties[index].homeScore = match.home.runs
-                cup.ties[index].awayScore = match.away.runs
-                cup.ties[index].winner = match.home.runs >= match.away.runs ? tie.home : tie.away
+            if let result = playQuietKnockout(home: tie.home, away: tie.away, kind: .cup, tier: tier, seed: rng.next()) {
+                cup.ties[index].homeScore = result.homeScore
+                cup.ties[index].awayScore = result.awayScore
+                cup.ties[index].shootout = result.shootout
+                cup.ties[index].winner = result.homeWon ? tie.home : tie.away
             }
             // 경기를 만들 수 없으면(선수가 모자란 구단) 강한 쪽이 올라간다.
             if cup.ties[index].winner == nil {

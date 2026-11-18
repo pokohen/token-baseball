@@ -119,15 +119,19 @@ extension Game {
               let me = players[career.playerID]
         else { throw GameError("이미 사라진 제안입니다.") }
 
-        players[me.id]?.contract = Contract(salary: offer.salary, seasonsLeft: offer.years)
         let club = teams[offer.teamID]
         if offer.kind == .renewal {
+            players[me.id]?.contract = Contract(salary: offer.salary, seasonsLeft: offer.years)
             post("\(club.name)과(와) \(offer.years)시즌 재계약했습니다. 연봉 ₩\(offer.salary.formatted()).")
         } else {
+            // 소속이 생긴 것으로 먼저 적어야, 구단에 들어갈 때 라이벌이 새 리그에 맞게 정해진다.
+            let wasFreeAgent = career.isFreeAgent
+            self.career?.isFreeAgent = false
             joinCareerClub(offer.teamID)
             players[me.id]?.contract = Contract(salary: offer.salary, seasonsLeft: offer.years)
             self.career?.trust = Balance.careerStartTrust
-            self.career?.isFreeAgent = false
+            // 무소속으로 시즌을 맞았으면 목표가 예전 구단 기준이다. 새 구단에 맞게 다시 받는다.
+            if wasFreeAgent, phase == .regular { assignCareerGoal(announce: true) }
             post("\(club.tier.displayName) \(club.name)(으)로 옮겼습니다. \(offer.years)시즌, 연봉 ₩\(offer.salary.formatted()). 예상 입지: \(offer.role.rawValue).")
         }
         self.career?.offers = []

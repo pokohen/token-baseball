@@ -184,26 +184,13 @@ extension Game {
                 let home = entry.nextHome, away = entry.nextAway
                 ensurePlayable(home)
                 ensurePlayable(away)
-                let seed = rng.next()
-                if sport == .football {
-                    guard var match = makeFootballMatch(
-                        home: home, away: away, kind: .playoff, seed: seed,
-                        rules: footballPlayoffRules(entry, home: home))
-                    else { series[index].upperWins = 2; break }
-                    match.runToEnd()
-                    applyFootball(match, tier: entry.upperTier, countsForStandings: false, competitive: true)
-                    recordPlayoffGame(
-                        index, home: home, homeScore: match.home.goals, awayScore: match.away.goals,
-                        shootoutHomeWon: match.wentToShootout ? match.result == .homeWin : nil)
-                } else {
-                    guard var match = makeMatch(
-                        home: home, away: away, kind: .playoff, tier: entry.upperTier, seed: seed)
-                    else { series[index].upperWins = 2; break }
-                    match.runToEnd()
-                    // 기록에는 넣지 않지만 선발 등판은 남겨서 같은 투수가 연달아 나오지 않게 한다.
-                    apply(match, tier: entry.upperTier, countsForStandings: false)
-                    recordPlayoffGame(index, home: home, homeScore: match.home.runs, awayScore: match.away.runs)
-                }
+                guard let result = playQuietKnockout(
+                    home: home, away: away, kind: .playoff, tier: entry.upperTier, seed: rng.next(),
+                    footballRules: sport == .football ? footballPlayoffRules(entry, home: home) : nil)
+                else { series[index].upperWins = 2; break }
+                recordPlayoffGame(
+                    index, home: home, homeScore: result.homeScore, awayScore: result.awayScore,
+                    shootoutHomeWon: result.shootout ? result.homeWon : nil)
             }
         }
     }

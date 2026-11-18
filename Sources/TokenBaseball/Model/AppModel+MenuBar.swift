@@ -37,12 +37,12 @@ extension AppModel {
     }
 
     var menuBarText: String {
-        guard let game else { return "Token Baseball" }
+        guard let game else { return "Token Sport" }
         return game.menuBarText(now: now, todayTokens: todayTokens)
     }
 
     var tooltip: String {
-        game?.menuBarTooltip(now: now, todayTokens: todayTokens) ?? "Token Baseball"
+        game?.menuBarTooltip(now: now, todayTokens: todayTokens) ?? "Token Sport"
     }
 
     /// 지금 보여줄 훈련 모습.

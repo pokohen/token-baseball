@@ -133,10 +133,12 @@ public struct CareerRecord: Codable, Equatable, Sendable {
     public var peakAbility: Double
     public var bestTier: LeagueTier
     public var earnings: Int
+    /// 끝까지 치른 시즌 수. (예전 기록에는 없어서 시즌 번호로 어림한다.)
+    public var seasonsPlayed: Int? = nil
 
     public var averageRating: Double? { ratedGames == 0 ? nil : ratingTotal / Double(ratedGames) }
 
-    public var seasons: Int { lastSeason - firstSeason + 1 }
+    public var seasons: Int { seasonsPlayed ?? max(1, lastSeason - firstSeason + 1) }
 
     /// 명예의 전당에 적히는 칭호: 얼마나 높이 올라갔고 무엇을 받았는지로 정한다.
     public var honor: String {

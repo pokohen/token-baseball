@@ -145,4 +145,15 @@ import Testing
         #expect(game.refreshCareerRival(seasonStart: true) != nil)
         #expect(game.careerRival?.id != first.id)
     }
+
+    @Test func 출전하지_않은_날에는_실전_경험이_다음_경기로_넘어간다() {
+        var game = make(.starter)
+        game.extraMatchPending = true
+        _ = game.settleCareer(kind: .regular, performance: nil)
+        #expect(game.extraMatchPending == true)
+        let before = game.myPlayer!.ability
+        let lines = game.settleCareer(kind: .regular, performance: performance(7))
+        #expect(game.extraMatchPending == nil)
+        #expect(game.myPlayer!.ability > before && lines.contains { $0.contains("실전 경험") })
+    }
 }
