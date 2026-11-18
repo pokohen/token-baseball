@@ -91,6 +91,21 @@ public struct SaveStore: Sendable {
         try slot.rawValue.write(to: activeSportURL, atomically: true, encoding: .utf8)
     }
 
+    /// 초기화: 저장 파일을 지우지 않고 같은 폴더의 `backups/<이름>/`으로 옮긴다. 옮긴 곳을 돌려준다 (파일이 없으면 `nil`).
+    /// 되돌리려면 그 파일을 원래 폴더로 다시 옮기면 된다.
+    @discardableResult
+    public func moveToBackup(named name: String) throws -> URL? {
+        guard exists else { return nil }
+        let folder = fileURL.deletingLastPathComponent()
+            .appendingPathComponent("backups", isDirectory: true)
+            .appendingPathComponent(name, isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let target = folder.appendingPathComponent(fileURL.lastPathComponent)
+        if FileManager.default.fileExists(atPath: target.path) { try FileManager.default.removeItem(at: target) }
+        try FileManager.default.moveItem(at: fileURL, to: target)
+        return target
+    }
+
     /// 저장 파일이 없으면 `nil`. 파일이 깨졌으면 오류를 던진다 (조용히 새 게임으로 덮어쓰지 않기 위해).
     public func load() throws -> GameSave? {
         guard FileManager.default.fileExists(atPath: fileURL.path) else { return nil }

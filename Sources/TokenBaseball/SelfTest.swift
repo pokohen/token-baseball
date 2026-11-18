@@ -149,6 +149,18 @@ enum SelfTest {
         model.apply(.upToDate)
         check("업데이트: 최신이면 지움", model.update == nil)
 
+        // 10. 초기화: 지금 모드만, 그리고 전체
+        let resetSlot = model.slot
+        let resetFile = model.store.fileURL.lastPathComponent
+        let others = SaveSlot.allCases.filter { $0 != resetSlot && model.hasSave(slot: $0) }
+        let backup = model.reset(all: false, now: Date(timeIntervalSince1970: 1_000))
+        check("초기화: 지금 모드가 비었다", model.game == nil && !exists(resetFile) && model.slot == resetSlot, model.message ?? "")
+        check("초기화: 다른 모드는 그대로", !others.isEmpty && others.allSatisfy { model.hasSave(slot: $0) })
+        check("초기화: 백업에 남는다", backup.map { FileManager.default.fileExists(atPath: $0.appendingPathComponent(resetFile).path) } ?? false)
+        check("초기화: 다시 켜도 비어 있다", AppModel(store: model.baseStore).game == nil)
+        model.reset(all: true, now: Date(timeIntervalSince1970: 2_000))
+        check("전체 초기화: 모두 비었다", SaveSlot.allCases.allSatisfy { !model.hasSave(slot: $0) } && model.game == nil, model.message ?? "")
+
         print(failures == 0 ? "SELFTEST 통과" : "SELFTEST 실패 \(failures)건")
         return failures == 0
     }

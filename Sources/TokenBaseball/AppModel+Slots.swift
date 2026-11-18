@@ -106,4 +106,41 @@ extension AppModel {
         }
         pollUsage()
     }
+
+    /// 초기화: 지금 모드만, 또는 모든 모드를 처음부터 다시 시작한다.
+    /// 저장 파일은 지우지 않고 `backups/<날짜-시각>/`으로 옮겨 둔다. 옮긴 폴더를 돌려준다.
+    @discardableResult
+    func reset(all: Bool, now: Date = Date()) -> URL? {
+        pendingSave?.cancel()
+        matchTask?.cancel()
+        matchTask = nil
+        matchGeneration += 1
+        // 초기화 직전 상태까지 백업에 담는다.
+        save()
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        let name = formatter.string(from: now)
+        var folder: URL?
+        do {
+            for target in all ? SaveSlot.allCases : [slot] {
+                if let moved = try baseStore.sibling(slot: target).moveToBackup(named: name) {
+                    folder = moved.deletingLastPathComponent()
+                }
+            }
+        } catch {
+            message = "초기화하지 못했습니다: \(error.localizedDescription)"
+            loadGame()
+            if game?.isMatchLive == true { runMatchLoop() }
+            return nil
+        }
+        game = nil
+        loadError = nil
+        message = nil
+        wasMatchReady = nil
+        todayTokens = 0
+        recentRate = 0
+        updateStatusTooltip()
+        return folder
+    }
 }

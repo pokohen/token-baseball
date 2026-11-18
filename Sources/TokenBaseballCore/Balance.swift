@@ -361,7 +361,7 @@ public enum Balance {
     public static let careerStartSlot = 5
     public static let careerStartTrust = 40.0
     /// 경기와 경기 사이에 할 수 있는 훈련 횟수.
-    public static let careerSessionsPerMatch = 2
+    public static let careerSessionsPerMatch = 5
     /// 이 나이부터는 훈련으로 능력치를 올릴 수 없다.
     public static let careerTrainingAgeLimit = 31
     /// 포지션별 훈련 한도 나이: 성장이 멈추는 나이와 같다.
