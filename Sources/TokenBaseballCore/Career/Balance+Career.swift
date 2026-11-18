@@ -2,6 +2,30 @@ import Foundation
 
 /// 선수 모드에서 조정할 수 있는 수치.
 extension Balance {
+    // 컨디션, 기세, 라이벌, 실전 경험
+
+    /// 평점이 이 값 이상이면 "활약", 이 값 이하면 "부진"으로 센다.
+    public static let careerStreakGood = 7.0
+    public static let careerStreakBad = 5.5
+    /// 이 경기 수만큼 이어지면 기세(또는 슬럼프)가 붙는다.
+    public static let careerStreakLength = 3
+    /// 기세가 능력치에 주는 변화 (0.02 = 2%).
+    public static let careerMomentum = 0.02
+    /// 기세가 붙어 있을 때 경기로 얻는 명성의 배수.
+    public static let careerMomentumFame = 1.25
+    /// 라이벌은 내 능력보다 이만큼 높은 선수에 가장 가까운 선수로 고른다.
+    public static let careerRivalEdge = 2.0
+    /// 라이벌은 나보다 이 나이 차이 안쪽의 또래를 먼저 고른다.
+    public static let careerRivalAgeGap = 6
+    /// 새 시즌에 내가 이만큼 넘게 앞서 있으면 라이벌을 바꾼다.
+    public static let careerRivalOutgrown = 5.0
+    /// 라이벌과의 맞대결에서 이기면 오르는 명성.
+    public static let careerRivalFame = 1.0
+    /// 토큰으로 치른 경기에서 얻는 능력: 기본 + (평점 − 6) × 평점당, 최대까지.
+    public static let careerExtraMatchBase = 0.05
+    public static let careerExtraMatchPerRating = 0.08
+    public static let careerExtraMatchMax = 0.3
+
     public static let careerStartAge = 16
     /// 내 선수의 잠재력. 숨겨져 있다.
     public static let careerPotential = 75.0...90.0

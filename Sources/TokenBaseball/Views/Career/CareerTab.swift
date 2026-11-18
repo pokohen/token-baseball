@@ -11,6 +11,7 @@ struct CareerTab: View {
             if let career = game.career, let me = game.myPlayer {
                 if !career.offers.isEmpty { offers(career) }
                 contract(career, me)
+                CareerRivalCard(game: game, career: career, me: me)
                 CareerActivityCard(game: game, career: career)
                 season(career, me)
                 history(career, me)
