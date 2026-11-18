@@ -2,6 +2,19 @@ import Foundation
 
 /// 선수 모드에서 조정할 수 있는 수치.
 extension Balance {
+    // 컵대회
+
+    /// 1라운드를 쉬는 구단 수 (1부에서 강한 순서로).
+    public static let cupByes = 4
+    /// 컵 라운드가 열리는 때: 리그를 이만큼 치른 뒤 (1라운드, 32강, 16강, 8강, 준결승, 결승).
+    public static let cupAfterRounds = [4, 10, 16, 22, 28, 33]
+    /// 컵 경기에서 이겨 올라갈 때 오르는 명성, 윗 리그 구단을 잡으면 리그 차이 하나마다 더 오르는 명성.
+    public static let cupWinFame = 1.0
+    public static let cupUpsetFame = 2.0
+    public static let cupChampionFame = 12.0
+    public static let cupRunnerUpFame = 5.0
+    public static let cupChampionTrust = 5.0
+
     // 컨디션, 기세, 라이벌, 실전 경험
 
     /// 평점이 이 값 이상이면 "활약", 이 값 이하면 "부진"으로 센다.

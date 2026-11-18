@@ -49,6 +49,8 @@ struct RootView: View {
                 OnboardingView(bankrupt: model.game?.isBankrupt == true)
             }
         }
+        // 설정에서 야구/축구를 바꾸면 그 모드의 홈부터 보여 준다.
+        .onChange(of: model.slot) { _, _ in tab = .home }
         .onAppear { model.setPopoverVisible(true) }
         .onDisappear { model.setPopoverVisible(false) }
     }

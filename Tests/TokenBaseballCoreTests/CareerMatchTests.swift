@@ -7,10 +7,13 @@ import Testing
     func 타자는_매_경기_선발로_나온다(position: Position) throws {
         var game = TestCareer.make(position, seed: 3)
         var auto = CareerAuto()
-        for played in 1...8 {
+        // 컵 경기에도 선발로 나오지만, 시즌 기록에는 리그 경기만 들어간다.
+        var league = 0
+        for _ in 1...8 {
+            if game.nextMatch()?.kind == .regular { league += 1 }
             try auto.playOne(&game)
             let me = try #require(game.myPlayer)
-            #expect(me.batting.games == played)
+            #expect(me.batting.games == league)
             #expect(game.career?.lastRating != nil)
         }
         #expect(try #require(game.myPlayer).batting.plateAppearances >= 16)

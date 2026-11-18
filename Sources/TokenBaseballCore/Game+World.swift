@@ -35,7 +35,12 @@ extension Game {
                     post("이번 시즌 후 계약이 끝나는 선수: \(leaving.joined(separator: ", ")). 재계약하지 않으면 떠납니다.")
                 }
             }
+            if isCareer {
+                if round >= Balance.roundsPerSeason { finishCupQuietly() } else { openCupRoundIfDue() }
+            }
             if round >= Balance.roundsPerSeason { endRegularSeason() }
+        case .cup:
+            finishCupRound()
         case .playoff:
             advancePlayoffs()
         case .friendly:

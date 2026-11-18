@@ -7,7 +7,7 @@ extension Game {
 
     func footballRules(for kind: MatchKind, home: TeamID) -> FootballRules {
         FootballRules(
-            mustHaveWinner: kind == .playoff,
+            mustHaveWinner: kind == .playoff || kind == .cup,
             homeEdge: Balance.stadiumHomeEdge[teams[home].stadiumLevel - 1])
     }
 
@@ -149,6 +149,13 @@ extension Game {
             applyFootball(state, tier: userTier, countsForStandings: false)
             summary += settle(.friendly)
             friendliesPlayed += 1
+        case .cup:
+            applyFootball(state, tier: userTier, countsForStandings: false, competitive: true)
+            let roundName = cup?.roundName ?? ""
+            recordCupTie(
+                home: state.home.teamID, homeScore: state.home.goals, awayScore: state.away.goals,
+                homeWon: state.result == .homeWin, shootout: state.wentToShootout)
+            summary += settleCareerCupTie(won: userWon, opponent: theirs.teamID, roundName: roundName)
         }
 
         if isCareer { summary += settleCareerFootballMatch(kind: match.kind, state: state, userIsHome: userIsHome) }
