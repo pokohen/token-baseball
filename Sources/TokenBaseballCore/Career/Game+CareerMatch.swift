@@ -114,6 +114,7 @@ extension Game {
         // 선발 투수는 등판하지 않는 날에 훈련을 한 번 더 한다.
         career.sessionsLeft = Balance.careerSessionsPerMatch + (me.position == .starter && performance == nil ? 1 : 0)
         career.activityDone = nil
+        career.lastCritical = nil
         career.matchesAtClub += 1
         career.subMinute = nil
         career.lastRating = performance?.rating

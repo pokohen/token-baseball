@@ -178,6 +178,10 @@ public struct Career: Codable, Equatable, Sendable {
     public var goal: CareerGoal?
     /// 축구: 경기 전에 고른 플레이 스타일. nil이면 균형.
     public var style: PlayStyle?
+    /// 방금 한 훈련이 크리티컬이었으면 그 내용 한 줄. 다음 훈련이나 경기 뒤에 지워진다. (예전 저장 파일에는 없다.)
+    public var lastCritical: String?
+    /// 지금까지 터진 크리티컬 횟수.
+    public var criticalCount: Int?
     /// 이번 경기 사이에 명성 활동을 했는지. (예전 저장 파일에는 없어서 Optional이다.)
     public var activityDone: Bool?
     /// 축구: 이번 경기에 선발이 아니면 교체로 들어갈 시간(분). 선발이거나 야구면 nil.

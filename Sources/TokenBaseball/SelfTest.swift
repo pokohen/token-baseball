@@ -147,7 +147,8 @@ enum SelfTest {
             && !UpdateChecker.isVersion("0.2.0", newerThan: "0.2.0") && !UpdateChecker.isVersion("0.1.9", newerThan: "0.2"))
         check("업데이트: 자동 설명 줄 정리", UpdateChecker.cleanNote("배속 추가 by @someone in https://github.com/o/r/pull/3") == "배속 추가"
             && UpdateChecker.cleanNote("그냥 줄") == "그냥 줄")
-        check("업데이트: 번들 없이는 앱 안 업데이트 불가", Updater.blockedReason() != nil)
+        // 배포 파일로 설치한 앱에서만 앱 안 업데이트가 된다.
+        check("업데이트: 앱 안 업데이트는 배포 앱에서만", UpdateChecker.isReleaseBuild || Updater.blockedReason() != nil)
         model.apply(UpdateChecker.parse(ahead))
         check("업데이트: 앱에 표시", model.update?.count == 3 && model.updateStatus != nil)
         model.apply(.upToDate)
