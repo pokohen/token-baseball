@@ -116,7 +116,7 @@ public struct CareerSeason: Codable, Equatable, Sendable {
     public var averageRating: Double? { ratedGames == 0 ? nil : ratingTotal / Double(ratedGames) }
 }
 
-/// 은퇴한 선수의 커리어 기록 (기록실).
+/// 은퇴한 선수의 커리어 기록 (명예의 전당).
 public struct CareerRecord: Codable, Equatable, Sendable {
     public var name: String
     public var position: Position
@@ -133,8 +133,21 @@ public struct CareerRecord: Codable, Equatable, Sendable {
     public var peakAbility: Double
     public var bestTier: LeagueTier
     public var earnings: Int
+    /// 끝까지 치른 시즌 수. (예전 기록에는 없어서 시즌 번호로 어림한다.)
+    public var seasonsPlayed: Int? = nil
 
     public var averageRating: Double? { ratedGames == 0 ? nil : ratingTotal / Double(ratedGames) }
+
+    public var seasons: Int { seasonsPlayed ?? max(1, lastSeason - firstSeason + 1) }
+
+    /// 명예의 전당에 적히는 칭호: 얼마나 높이 올라갔고 무엇을 받았는지로 정한다.
+    public var honor: String {
+        switch bestTier {
+        case .pro: awards.isEmpty ? "1부 스타" : "전설"
+        case .semiPro, .amateur: awards.isEmpty ? "프로 선수" : "프로 스타"
+        default: awards.isEmpty ? "동네 스타" : "시민 리그의 영웅"
+        }
+    }
 }
 
 /// 선수 모드의 상태. 구단 모드에서는 `Game.career`가 nil이다.

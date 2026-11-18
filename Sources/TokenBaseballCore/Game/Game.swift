@@ -78,7 +78,7 @@ public struct Game: Codable, Equatable, Sendable {
 
     // 선수 모드. 구단 모드와 예전 저장 파일에는 없다.
     public internal(set) var career: Career?
-    /// 은퇴한 내 선수들의 기록실.
+    /// 은퇴한 내 선수들의 명예의 전당.
     public internal(set) var careerHall: [CareerRecord]?
 
     // MARK: 읽기

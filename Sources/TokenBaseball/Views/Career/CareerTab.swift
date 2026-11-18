@@ -17,14 +17,7 @@ struct CareerTab: View {
                 history(career, me)
                 rivals(me)
             }
-            if let hall = game.careerHall, !hall.isEmpty {
-                Card("기록실") {
-                    ForEach(Array(hall.enumerated()), id: \.offset) { _, record in
-                        Text("\(record.name) · \(record.position.label) · \(record.firstSeason)~\(record.lastSeason)시즌 · 최고 \(record.bestTier.displayName)")
-                            .font(.callout)
-                    }
-                }
-            }
+            CareerHallCard(game: game)
         }
     }
 
@@ -49,18 +42,21 @@ struct CareerTab: View {
                 HStack {
                     Button("이적 요청") { model.perform { try $0.requestCareerTransfer() } }
                         .disabled(!game.tradeWindowOpen || career.transferRequested)
-                    if game.canRetireCareer {
-                        Button("은퇴") { confirmRetire = true }.disabled(confirmRetire)
-                    }
+                    Button("은퇴") { confirmRetire = true }
+                        .disabled(confirmRetire || !game.canRetireCareer)
+                        .help(game.careerRetireBlockedReason ?? "은퇴하고 명예의 전당에 기록을 남깁니다")
                 }
                 if confirmRetire {
                     InlineConfirm(
-                        message: "은퇴할까요? 되돌릴 수 없습니다. 기록은 기록실에 남고, 같은 세계에서 새 선수로 시작할 수 있습니다.",
+                        message: "은퇴할까요? 되돌릴 수 없습니다. 기록은 명예의 전당에 남고, 같은 세계에서 새 선수로 시작할 수 있습니다.",
                         confirmTitle: "은퇴", cancel: { confirmRetire = false }
                     ) {
                         confirmRetire = false
                         model.perform { try $0.retireCareer() }
                     }
+                }
+                if let reason = game.careerRetireBlockedReason {
+                    Text("은퇴: \(reason)").note()
                 }
                 Text(career.transferRequested
                     ? "이적을 요청해 두었습니다. 이적 기간 동안 제안이 더 자주 옵니다."

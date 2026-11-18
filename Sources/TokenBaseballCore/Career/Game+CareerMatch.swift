@@ -170,12 +170,11 @@ extension Game {
         lines += updateCareerForm(&career, performance: performance, kind: kind)
         self.career = career
         // 토큰으로 사서 치른 경기는 실전 경험으로 능력이 조금 오른다.
-        if extraMatchPending == true {
+        // 내 선수가 나오지 않은 날(선발 투수가 쉬는 날, 벤치, 출장 정지)이면 다음에 나온 경기에서 받는다.
+        if extraMatchPending == true, let performance {
             extraMatchPending = nil
-            if let performance {
-                let gained = applyCareerExtraMatchGain(rating: performance.rating)
-                if gained > 0 { lines.append("실전 경험: 능력 +\(String(format: "%.2f", gained))") }
-            }
+            let gained = applyCareerExtraMatchGain(rating: performance.rating)
+            if gained > 0 { lines.append("실전 경험: 능력 +\(String(format: "%.2f", gained))") }
         }
         let ability = players[me.id]?.ability ?? me.ability
         self.career?.peakAbility = max(career.peakAbility, ability)

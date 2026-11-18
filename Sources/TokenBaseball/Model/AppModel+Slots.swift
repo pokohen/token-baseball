@@ -18,20 +18,19 @@ extension AppModel {
         guard target != slot else { return }
         pendingSave?.cancel()
         save()
-        matchTask?.cancel()
-        matchTask = nil
-        matchGeneration += 1
+        // 칸을 적는 데 실패하면 여기서 돌아간다. 진행 중인 경기는 그대로 이어진다.
         do {
             try baseStore.saveActiveSlot(target)
         } catch {
             message = "바꾸지 못했습니다: \(error.localizedDescription)"
             return
         }
+        matchTask?.cancel()
+        matchTask = nil
+        matchGeneration += 1
         slot = target
         message = nil
-        wasMatchReady = nil
-        todayTokens = 0
-        recentRate = 0
+        clearSlotCounters()
         loadGame()
         if game != nil {
             game?.resume(now: Date())
@@ -39,6 +38,13 @@ extension AppModel {
         }
         if game?.isMatchLive == true { runMatchLoop() }
         pollUsage()
+    }
+
+    /// 저장 칸마다 따로 세는 화면용 값(오늘 쓴 토큰, 최근 속도, 경기 가능 알림 기준)을 비운다.
+    func clearSlotCounters() {
+        wasMatchReady = nil
+        todayTokens = 0
+        recentRate = 0
     }
 
     func createClub(_ setup: Game.ClubSetup, sport chosen: Sport? = nil) {
@@ -68,20 +74,18 @@ extension AppModel {
         // 지금 진행하던 것은 저장해 두고 떠난다.
         pendingSave?.cancel()
         save()
-        matchTask?.cancel()
-        matchTask = nil
         do {
             try baseStore.saveActiveSlot(target)
         } catch {
             message = "만들지 못했습니다: \(error.localizedDescription)"
             return false
         }
+        matchTask?.cancel()
+        matchTask = nil
         matchGeneration += 1
         slot = target
         game = nil
-        todayTokens = 0
-        recentRate = 0
-        wasMatchReady = nil
+        clearSlotCounters()
         return true
     }
 
@@ -137,9 +141,7 @@ extension AppModel {
         game = nil
         loadError = nil
         message = nil
-        wasMatchReady = nil
-        todayTokens = 0
-        recentRate = 0
+        clearSlotCounters()
         updateStatusTooltip()
         return folder
     }

@@ -69,8 +69,8 @@ struct SettingsTab: View {
 
             Card {
                 Text(game.sport == .football
-                    ? "Token Baseball은 실제 리그·구단과 무관한 비공식 팬 프로젝트입니다. 등장하는 구단과 선수는 모두 가상입니다."
-                    : "Token Baseball은 KBO 및 각 구단과 무관한 비공식 팬 프로젝트입니다. 등장하는 구단과 선수는 모두 가상입니다.").note()
+                    ? "Token Sport는 실제 리그·구단과 무관한 비공식 팬 프로젝트입니다. 등장하는 구단과 선수는 모두 가상입니다."
+                    : "Token Sport는 KBO 및 각 구단과 무관한 비공식 팬 프로젝트입니다. 등장하는 구단과 선수는 모두 가상입니다.").note()
                 Button("앱 종료") {
                     model.save()
                     NSApplication.shared.terminate(nil)

@@ -37,7 +37,7 @@ extension Game {
     /// 지금 이 훈련을 할 수 없는 이유. 할 수 있으면 nil.
     public func careerTrainingBlockedReason(_ key: Attributes.Key) -> String? {
         guard let career, !career.retired, let me = players[career.playerID] else { return "선수가 없습니다." }
-        guard let weight = Attributes.weights(for: me.position).first(where: { $0.0 == key })?.1 else {
+        guard Attributes.weights(for: me.position).contains(where: { $0.0 == key }) else {
             return "이 포지션에서는 올릴 수 없는 능력치입니다."
         }
         if me.age >= Balance.careerTrainingAgeLimit(me.position) {
@@ -52,7 +52,6 @@ extension Game {
         if let ceiling = careerLeagueCeiling, me.ability >= ceiling {
             return "지금 리그에서는 더 오르지 않습니다 (능력 \(Int(ceiling))까지). 윗 리그로 올라가야 합니다."
         }
-        _ = weight
         let cost = careerTrainingCost(key)
         if funds.balance < cost { return "훈련 포인트가 모자랍니다. \(Format.tokens(cost)) P가 필요합니다." }
         return nil
@@ -72,8 +71,9 @@ extension Game {
         let critical = forced ?? rng.chance(Balance.careerCriticalChance)
         var gain = careerTrainingGain(key)
         if critical {
-            // 세 배까지. 다만 한계(잠재력)와 최고치 99는 넘지 않는다.
-            let room = max(1, (me.potential - me.ability) / Balance.careerTrainingStep)
+            // 세 배까지. 다만 한계(잠재력)와 최고치 99는 넘지 않고, 리그 한도도 보통 훈련 한 번만큼만 넘는다.
+            let limit = min(me.potential, (careerLeagueCeiling ?? 99) + Balance.careerTrainingStep)
+            let room = max(1, (limit - me.ability) / Balance.careerTrainingStep)
             gain = min(gain * min(Balance.careerCriticalMultiplier, room), 99 - me.attributes[key])
         }
         me.attributes[key] = min(99, me.attributes[key] + gain)

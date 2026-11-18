@@ -45,7 +45,16 @@ enum Snapshot {
         model.game = game
         try? SaveStore(fileURL: directory.appendingPathComponent("demo-save.json")).save(GameSave(game: game))
         render(TabContent(tab: .match, game: game).padding(12), model, directory, "3-중계")
-        render(Text(model.menuBarText).padding(8), model, directory, "4-상단바", width: nil)
+        render(
+            HStack(spacing: 10) {
+                MenuBarLabel(model: model)
+                Image(nsImage: BallSprite.menuBarImage(.baseball))
+                Image(nsImage: BallSprite.menuBarImage(.football))
+                BallIcon(sport: .baseball)
+                BallIcon(sport: .football)
+                ChargeMarks(sport: position.sport, charges: 2)
+            }
+            .padding(8), model, directory, "4-상단바", width: nil)
     }
 
     static func renderAll(model: AppModel, to directory: URL, sport: Sport) {
@@ -89,8 +98,13 @@ enum Snapshot {
         render(TabContent(tab: .match, game: game).padding(12), model, directory, "3-중계")
         render(
             HStack(spacing: 4) {
-                Image(nsImage: Sprites.image(sport == .football ? .shooting : .batting, frame: 0))
-                Text(model.menuBarText)
+                MenuBarLabel(model: model)
+                Image(nsImage: BallSprite.menuBarImage(sport))
+                BallIcon(sport: .baseball, size: 36)
+                BallIcon(sport: .football, size: 36)
+                BallIcon(sport: .baseball)
+                BallIcon(sport: .football)
+                ChargeMarks(sport: sport, charges: 2)
                 ForEach(Array(Sprites.Drill.allCases.enumerated()), id: \.offset) { _, drill in
                     Image(nsImage: Sprites.image(drill, frame: 0))
                     Image(nsImage: Sprites.image(drill, frame: 1))

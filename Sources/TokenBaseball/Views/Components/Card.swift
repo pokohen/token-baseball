@@ -5,11 +5,17 @@ import TokenBaseballCore
 struct Card<Content: View>: View {
     var title: String?
     var trailing: String?
+    /// 제목 줄 오른쪽에 글자 대신 놓을 그림 (예: 남은 경기 기회).
+    var accessory: AnyView?
     @ViewBuilder var content: Content
 
-    init(_ title: String? = nil, trailing: String? = nil, @ViewBuilder content: () -> Content) {
+    init(
+        _ title: String? = nil, trailing: String? = nil, accessory: AnyView? = nil,
+        @ViewBuilder content: () -> Content
+    ) {
         self.title = title
         self.trailing = trailing
+        self.accessory = accessory
         self.content = content()
     }
 
@@ -22,6 +28,7 @@ struct Card<Content: View>: View {
                     if let trailing {
                         Text(trailing).font(.caption).foregroundStyle(.secondary)
                     }
+                    if let accessory { accessory }
                 }
             }
             content

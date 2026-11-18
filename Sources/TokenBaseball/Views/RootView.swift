@@ -38,6 +38,10 @@ struct RootView: View {
                     Text(error).multilineTextAlignment(.center).textSelection(.enabled)
                     Text("파일을 옮기거나 지운 뒤 앱을 다시 실행해 주세요. 덮어쓰지 않도록 게임을 시작하지 않았습니다.").note()
                         .multilineTextAlignment(.center)
+                    // 한 모드의 파일이 깨져도 다른 모드는 계속 할 수 있어야 한다.
+                    ForEach(model.selectableSlots.filter { $0 != model.slot }, id: \.self) { other in
+                        Button("\(other.label)\(other.isCareer ? "로" : "으로") 가기") { model.switchSlot(to: other) }
+                    }
                     Button("종료") { NSApplication.shared.terminate(nil) }
                 }
                 .padding(24)

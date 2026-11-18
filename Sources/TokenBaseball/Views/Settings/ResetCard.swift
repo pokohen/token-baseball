@@ -33,7 +33,7 @@ struct ResetCard: View {
                 }
             case .all:
                 InlineConfirm(
-                    message: "모든 모드를 처음부터 다시 시작할까요? 만들어 둔 선수가 모두 사라집니다. 저장 파일은 지우지 않고 backups 폴더로 옮겨 둡니다.",
+                    message: "모든 모드를 처음부터 다시 시작할까요? 만들어 둔 선수가 모두 사라집니다 (예전에 만든 구단 저장 파일도 함께 옮깁니다). 저장 파일은 지우지 않고 backups 폴더로 옮겨 둡니다.",
                     confirmTitle: "전체 초기화", cancel: { pending = nil }
                 ) {
                     pending = nil

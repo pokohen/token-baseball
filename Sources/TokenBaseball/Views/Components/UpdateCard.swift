@@ -50,7 +50,7 @@ struct UpdateCard: View {
                         .padding(.top, 4)
                     }
                 }
-                if update.download != nil, Updater.blockedReason() == nil {
+                if update.download != nil, Updater.cachedBlockedReason == nil {
                     HStack {
                         Button(model.updateProgress ?? "지금 업데이트") { model.installUpdate() }
                             .buttonStyle(.borderedProminent)

@@ -61,7 +61,12 @@ extension AppModel {
                 self.updateProgress = "다시 여는 중…"
                 self.pendingSave?.cancel()
                 self.save()
-                try Updater.swapAfterExit(fresh: fresh, into: app, reopen: true)
+                do {
+                    try Updater.swapAfterExit(fresh: fresh, into: app, reopen: true)
+                } catch {
+                    try? FileManager.default.removeItem(at: fresh.deletingLastPathComponent())
+                    throw error
+                }
                 NSApplication.shared.terminate(nil)
             } catch {
                 self?.updateProgress = nil

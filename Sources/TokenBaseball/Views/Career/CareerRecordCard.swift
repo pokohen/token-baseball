@@ -5,7 +5,7 @@ struct CareerRecordCard: View {
     let record: CareerRecord
 
     var body: some View {
-        Card("\(record.name) · \(record.position.label)", trailing: "\(record.firstSeason)~\(record.lastSeason)시즌") {
+        Card("\(record.name) · \(record.position.label)", trailing: "\(record.honor) · \(record.seasons)시즌") {
             KeyValueRow(key: "은퇴 나이", value: "\(record.retiredAge)세")
             KeyValueRow(key: "거쳐 간 구단", value: "\(record.clubs.count)곳")
             Text(record.clubs.joined(separator: " → ")).note()
