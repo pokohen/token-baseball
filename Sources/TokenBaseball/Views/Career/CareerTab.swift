@@ -50,10 +50,16 @@ struct CareerTab: View {
                     Button("이적 요청") { model.perform { try $0.requestCareerTransfer() } }
                         .disabled(!game.tradeWindowOpen || career.transferRequested)
                     if game.canRetireCareer {
-                        Button("은퇴") { confirmRetire = true }
-                            .confirmationDialog("은퇴할까요? 되돌릴 수 없습니다.", isPresented: $confirmRetire) {
-                                Button("은퇴", role: .destructive) { model.perform { try $0.retireCareer() } }
-                            }
+                        Button("은퇴") { confirmRetire = true }.disabled(confirmRetire)
+                    }
+                }
+                if confirmRetire {
+                    InlineConfirm(
+                        message: "은퇴할까요? 되돌릴 수 없습니다. 기록은 기록실에 남고, 같은 세계에서 새 선수로 시작할 수 있습니다.",
+                        confirmTitle: "은퇴", cancel: { confirmRetire = false }
+                    ) {
+                        confirmRetire = false
+                        model.perform { try $0.retireCareer() }
                     }
                 }
                 Text(career.transferRequested
