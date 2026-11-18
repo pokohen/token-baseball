@@ -58,15 +58,34 @@ extension Game {
         return nil
     }
 
-    /// 훈련 포인트(토큰)를 써서 능력치 하나를 +1 올린다. 경기와 경기 사이에 세 번까지 할 수 있다.
+    /// 훈련 포인트(토큰)를 써서 능력치 하나를 올린다. 경기와 경기 사이에 정해진 횟수만큼 할 수 있다.
+    /// 100번에 한 번꼴로 크리티컬이 터져 같은 포인트로 세 배 오른다.
     public mutating func trainCareer(_ key: Attributes.Key) throws {
+        try trainCareer(key, critical: nil)
+    }
+
+    /// `critical`을 주면 크리티컬 여부를 정해 놓고 훈련한다 (테스트용). nil이면 확률대로.
+    mutating func trainCareer(_ key: Attributes.Key, critical forced: Bool?) throws {
         if let reason = careerTrainingBlockedReason(key) { throw GameError(reason) }
         guard var career, var me = players[career.playerID] else { return }
         funds.spend(careerTrainingCost(key), .training)
-        me.attributes[key] = min(99, me.attributes[key] + careerTrainingGain(key))
+        let critical = forced ?? rng.chance(Balance.careerCriticalChance)
+        var gain = careerTrainingGain(key)
+        if critical {
+            // 세 배까지. 다만 한계(잠재력)와 최고치 99는 넘지 않는다.
+            let room = max(1, (me.potential - me.ability) / Balance.careerTrainingStep)
+            gain = min(gain * min(Balance.careerCriticalMultiplier, room), 99 - me.attributes[key])
+        }
+        me.attributes[key] = min(99, me.attributes[key] + gain)
         players[me.id] = me
         career.sessionsLeft -= 1
         career.trainingCount += 1
+        if critical {
+            career.criticalCount = (career.criticalCount ?? 0) + 1
+            career.lastCritical = "크리티컬! \(CareerDrill.name(key, sport: sport))이(가) 아주 잘됐습니다: +\(String(format: "%.1f", gain))"
+        } else {
+            career.lastCritical = nil
+        }
         // 꾸준히 훈련하면 감독도 조금씩 알아준다.
         career.trust = min(100, career.trust + 0.1)
         career.peakAbility = max(career.peakAbility, me.ability)

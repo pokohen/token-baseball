@@ -401,6 +401,9 @@ public enum Balance {
     public static let careerNaturalGrowth = 0.3
     /// 훈련 한 번에 오르는 능력(CA).
     public static let careerTrainingStep = 0.25
+    /// 훈련이 "크리티컬"로 터질 확률과, 터졌을 때 오르는 양의 배수. 포인트는 똑같이 든다.
+    public static let careerCriticalChance = 0.01
+    public static let careerCriticalMultiplier = 3.0
     /// 훈련으로는 지금 리그 강도 범위의 위쪽 끝 + 이 값까지만 오른다.
     public static let careerLeagueHeadroom = 5.0
 

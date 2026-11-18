@@ -10,6 +10,11 @@ struct CareerTrainingTab: View {
             if let career = game.career, let me = game.myPlayer {
                 Card("훈련", trailing: "남은 횟수 \(career.sessionsLeft)/\(Balance.careerSessionsPerMatch)") {
                     KeyValueRow(key: "훈련 포인트", value: "\(game.funds.balance.formatted()) P")
+                    if let critical = career.lastCritical {
+                        Label(critical, systemImage: "sparkles")
+                            .font(.callout.weight(.semibold)).foregroundStyle(Theme.warn)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                     Divider()
                     ForEach(game.careerTrainableKeys, id: \.self) { key in
                         drillRow(key, me)
@@ -34,7 +39,7 @@ struct CareerTrainingTab: View {
                     KeyValueRow(key: "능력", value: "\(Int(me.ability)) (\(me.grade))")
                     KeyValueRow(key: "시즌 시작 때보다", value: String(format: "%+.1f", me.ability - me.abilityAtSeasonStart))
                     KeyValueRow(key: "최고 능력", value: "\(Int(career.peakAbility))")
-                    KeyValueRow(key: "지금까지 훈련", value: "\(career.trainingCount)회")
+                    KeyValueRow(key: "지금까지 훈련", value: "\(career.trainingCount)회 (크리티컬 \(career.criticalCount ?? 0)회)")
                     Text("어떤 훈련이든 능력은 같은 양만큼 오릅니다. 훈련하지 않아도 경기를 뛰면 조금씩 큽니다. \(Balance.declineStartAge(me.position))세부터는 시즌마다 능력치가 크게 떨어집니다.").note()
                 }
             }
@@ -72,6 +77,6 @@ struct CareerTrainingTab: View {
             return "지금 리그에서 배울 수 있는 만큼 다 배웠습니다 (능력 \(Int(ceiling))). 윗 리그 구단으로 옮기거나 구단이 승격하면 다시 훈련할 수 있습니다."
         }
         if career.sessionsLeft <= 0 { return "오늘 훈련을 마쳤습니다. 다음 경기를 치르면 다시 \(Balance.careerSessionsPerMatch)번 훈련할 수 있습니다." }
-        return "경기와 경기 사이에 \(Balance.careerSessionsPerMatch)번까지 훈련합니다. 어떤 훈련이든 능력이 \(Balance.careerTrainingStep)씩 오르고, 그 능력치가 높을수록 포인트가 많이 듭니다. 쓰지 않은 포인트는 그대로 남습니다."
+        return "경기와 경기 사이에 \(Balance.careerSessionsPerMatch)번까지 훈련합니다. 어떤 훈련이든 능력이 \(Balance.careerTrainingStep)씩 오르고, 그 능력치가 높을수록 포인트가 많이 듭니다. 100번에 한 번꼴로 크리티컬이 터져 세 배 오릅니다. 쓰지 않은 포인트는 그대로 남습니다."
     }
 }
