@@ -21,6 +21,7 @@ struct LeagueTab: View {
                 standings
             }
             if shown == game.userTier { promotion }
+            if let cup = game.cup { CupCard(game: game, cup: cup) }
             leaders
             awards
         }

@@ -97,12 +97,15 @@ public struct TierMove: Codable, Equatable, Sendable {
 
 public enum MatchKind: String, Codable, Sendable {
     case regular, playoff, friendly
+    /// 컵대회 (선수 모드). 단판이고 반드시 승부가 난다.
+    case cup
 
     public var label: String {
         switch self {
         case .regular: "정규시즌"
         case .playoff: "승강 플레이오프"
         case .friendly: "친선 경기"
+        case .cup: "컵대회"
         }
     }
 }

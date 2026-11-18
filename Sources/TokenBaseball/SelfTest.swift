@@ -35,7 +35,7 @@ enum SelfTest {
 
         // 1. 처음 켰을 때
         var model = AppModel(store: store, sources: UsageSources())
-        check("처음: 게임 없음", model.game == nil && model.slot == .baseball)
+        check("처음: 게임 없음", model.game == nil && model.slot == .baseballPlayer)
 
         // 2. 축구 선수 만들기 → 훈련 → 스타일 → 경기
         model.createCareer(CareerSetup(name: "점검 공격수", position: .forward, hometown: "부산"))
@@ -94,6 +94,12 @@ enum SelfTest {
         model = AppModel(store: store, sources: UsageSources())
         check("다시 켬: 마지막 칸", model.slot == .baseballPlayer && model.game?.myPlayer?.name == "점검 투수", model.loadError ?? "")
         check("다시 켬: 오류 없음", model.loadError == nil, model.loadError ?? "")
+        // 구단 경영을 하던 채로 껐어도 선수 모드로 열리고, 구단 저장 파일은 남는다
+        try? store.saveActiveSlot(.football)
+        model = AppModel(store: store, sources: UsageSources())
+        check("구단 모드로 껐어도 선수 모드로 연다", model.slot == .baseballPlayer && model.game?.myPlayer?.name == "점검 투수")
+        check("구단 저장 파일은 그대로", exists("save-football.json") && exists("save.json"))
+        check("고를 수 있는 모드는 선수 둘", model.selectableSlots == [.baseballPlayer, .footballPlayer])
 
         // 8. 경기 도중에 껐다 켰을 때
         model.switchSlot(to: .footballPlayer)

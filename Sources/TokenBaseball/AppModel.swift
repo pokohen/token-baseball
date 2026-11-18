@@ -47,16 +47,8 @@ final class AppModel: ObservableObject {
     /// 앱 안 업데이트가 실패한 이유.
     @Published var updateError: String?
 
-    /// 구단 경영 모드를 고를 수 있게 보일지. 지금은 선수 키우기를 먼저 다듬고 있어서 기본은 숨김이다.
-    @Published var showsClubModes: Bool = UserDefaults.standard.bool(forKey: "showClubModes") {
-        didSet { UserDefaults.standard.set(showsClubModes, forKey: "showClubModes") }
-    }
-
-    /// 고를 수 있는 모드. 선수 모드는 언제나 보이고, 구단 모드는 설정에서 켰을 때만 보인다.
-    /// (지금 하고 있는 구단은 숨겨도 그대로 할 수 있다.)
-    var selectableSlots: [SaveSlot] {
-        showsClubModes ? [.baseballPlayer, .footballPlayer, .baseball, .football] : [.baseballPlayer, .footballPlayer]
-    }
+    /// 고를 수 있는 모드. 구단 경영(야구 구단, 축구 구단)은 코드는 남아 있지만 앱에서는 뺐다.
+    let selectableSlots: [SaveSlot] = [.baseballPlayer, .footballPlayer]
 
     /// 공 하나에 걸리는 시간 (1배속 기준).
     static let pitchInterval: Duration = .seconds(3)
@@ -73,7 +65,10 @@ final class AppModel: ObservableObject {
     init(store: SaveStore = AppModel.defaultStore(), sources: UsageSources = UsageSources()) {
         self.baseStore = store
         self.sources = sources
-        self.slot = store.loadActiveSlot()
+        let saved = store.loadActiveSlot()
+        // 예전에 구단 경영을 하던 채로 껐으면 선수 모드로 연다. 구단 저장 파일은 그대로 둔다.
+        self.slot = saved.isCareer ? saved : .baseballPlayer
+        if !saved.isCareer { try? store.saveActiveSlot(slot) }
         loadGame()
     }
 

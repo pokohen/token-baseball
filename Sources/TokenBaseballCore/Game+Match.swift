@@ -17,6 +17,12 @@ extension Game {
         if let career, career.retired || career.isFreeAgent { return nil }
         switch phase {
         case .regular:
+            // 컵 라운드를 치를 때가 됐으면 리그보다 먼저 치른다.
+            if let tie = pendingCupTie, let cup {
+                return NextMatch(
+                    kind: .cup, opponent: tie.opponent(of: userTeamID), userIsHome: tie.home == userTeamID,
+                    label: "컵대회 \(cup.roundName)")
+            }
             guard round < Balance.roundsPerSeason,
                   let fixture = schedules[userTier.index][round].first(where: { $0.involves(userTeamID) })
             else { return nil }
@@ -51,8 +57,8 @@ extension Game {
 
     func rules(for kind: MatchKind, tier: LeagueTier, home: TeamID) -> MatchRules {
         MatchRules(
-            coldGame: tier.isCitizen && kind != .playoff,
-            maxInnings: kind == .playoff ? nil : 11,
+            coldGame: tier.isCitizen && kind != .playoff && kind != .cup,
+            maxInnings: kind == .playoff || kind == .cup ? nil : 11,
             homeEdge: Balance.stadiumHomeEdge[teams[home].stadiumLevel - 1])
     }
 
@@ -90,7 +96,7 @@ extension Game {
         ensurePlayable(next.opponent)
         let home = next.userIsHome ? userTeamID : next.opponent
         let away = next.userIsHome ? next.opponent : userTeamID
-        let tier = next.kind == .friendly ? min(userTier, teams[next.opponent].tier) : userTier
+        let tier = next.kind == .friendly || next.kind == .cup ? min(userTier, teams[next.opponent].tier) : userTier
         // 친선 경기 규칙은 두 구단 중 윗 리그를 따른다 (콜드게임은 시민 구단끼리만).
         if sport == .football {
             try startFootballMatch(next, home: home, away: away, tier: tier, now: now)
@@ -187,6 +193,13 @@ extension Game {
             summary += settleUserMatch(
                 kind: .friendly, myScore: mine.runs, theirScore: theirs.runs, opponent: theirs.teamID, userIsHome: userIsHome)
             friendliesPlayed += 1
+        case .cup:
+            apply(state, tier: userTier, countsForStandings: false)
+            let roundName = cup?.roundName ?? ""
+            recordCupTie(
+                home: state.home.teamID, homeScore: state.home.runs, awayScore: state.away.runs,
+                homeWon: state.home.runs > state.away.runs)
+            summary += settleCareerCupTie(won: mine.runs > theirs.runs, opponent: theirs.teamID, roundName: roundName)
         }
 
         if isCareer { summary += settleCareerMatch(kind: match.kind, state: state, userIsHome: userIsHome) }
@@ -285,6 +298,8 @@ extension Game {
             if won { fameGain += Balance.fameWin * 2 }
         case .friendly:
             if won, teams[opponent].tier < tier { fameGain += Balance.fameFriendlyUpset }
+        case .cup:
+            break
         }
         if fameGain != 0 {
             teams[userTeamID].fame = max(0, teams[userTeamID].fame + fameGain)

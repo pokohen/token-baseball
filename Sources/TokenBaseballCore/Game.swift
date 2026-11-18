@@ -73,6 +73,8 @@ public struct Game: Codable, Equatable, Sendable {
     public internal(set) var extraMatchesBought: Int?
     /// 토큰으로 산 경기 기회를 아직 쓰지 않았는지. 선수 모드에서는 그 경기에서 실전 경험을 얻는다.
     public internal(set) var extraMatchPending: Bool?
+    /// 이번 시즌 컵대회 (선수 모드에서만 열린다. 예전 저장 파일에는 없다).
+    public internal(set) var cup: Cup?
 
     // 선수 모드. 구단 모드와 예전 저장 파일에는 없다.
     public internal(set) var career: Career?
