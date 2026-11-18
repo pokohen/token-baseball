@@ -35,8 +35,7 @@ struct UpdateCard: View {
         Card("업데이트", trailing: UpdateChecker.isReleaseBuild
             ? "지금 \(UpdateChecker.appVersion)" : UpdateChecker.buildCommit.map { "지금 \(String($0.prefix(7)))" }) {
             if let update = model.update {
-                Label(update.version.map { "새 버전 \($0)이(가) 나왔습니다" } ?? "새 버전이 있습니다 (변경 \(update.count)건)",
-                      systemImage: "arrow.down.circle.fill")
+                Label(update.headline, systemImage: "arrow.down.circle.fill")
                     .font(.callout.weight(.medium)).foregroundStyle(Color.accentColor)
                 if !update.notes.isEmpty || !update.titles.isEmpty {
                     DisclosureGroup("업데이트 내용 (\(max(update.notes.count, update.titles.count))건)", isExpanded: $showNotes) {

@@ -24,7 +24,7 @@ extension AppModel {
             updateStatus = "최신 버전입니다."
         case .available(let found):
             update = found
-            updateStatus = found.version.map { "새 버전 \($0)이(가) 나왔습니다." } ?? "새 버전이 있습니다 (변경 \(found.count)건)."
+            updateStatus = found.headline + "."
             // 같은 업데이트는 한 번만 알린다.
             if UpdateChecker.notifiedHead != found.head {
                 UpdateChecker.notifiedHead = found.head

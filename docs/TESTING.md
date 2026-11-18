@@ -235,7 +235,7 @@ TOKEN_BASEBALL_SAVE=/tmp/tb-test/save.json TOKEN_BASEBALL_SNAPSHOT=/tmp/tb-snap 
 
 ## 재미와 속도 (정답이 없는 것)
 
-며칠 해 보고 판단할 것들이다. 수치는 `Sources/TokenBaseballCore/Balance.swift`의 "선수 모드" 부분에 모여 있다.
+며칠 해 보고 판단할 것들이다. 수치는 `Sources/TokenBaseballCore/Career/Balance+Career.swift`에 모여 있다.
 
 - [ ] 성장 속도: 평소 쓰는 토큰 양으로 한 시즌에 능력이 얼마나 오르는가. 너무 빠르거나 느리면 훈련 횟수(경기 사이 5번)와 비용을 고친다
 - [ ] 훈련 비용: 포인트가 계속 남는가, 계속 모자란가

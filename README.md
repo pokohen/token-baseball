@@ -152,18 +152,21 @@ Sources/
     Match/             경기 시뮬레이션 (야구는 투구 단위, 축구는 20초 단위)
     Players/           선수 생성, 능력·잠재력
     Club/              자금 장부
-    Career/            선수 모드 (내 선수, 훈련, 평점, 계약, 시즌 흐름)
+    Career/            선수 모드 (내 선수, 훈련, 명성 활동, 평점, 계약, 시즌 흐름, 선수 모드 수치)
     Persistence/       저장
     Game*.swift        게임 전체 상태와 명령 (경기, 세계 시뮬레이션, 시즌, 구단, 이적 시장)
-    Balance.swift      조정할 수 있는 수치 모음
+    Balance.swift      조정할 수 있는 수치 모음 (선수 모드 수치는 Career/Balance+Career.swift)
   TokenBaseball/       macOS 앱 (상단바, 팝오버, 설정)
-    AppModel*.swift    앱 상태 (본체, 저장 칸 전환, 토큰 읽기, 경기 진행, 상단바)
+    AppModel*.swift    앱 상태 (본체, 저장 칸 전환·초기화, 토큰 읽기, 경기 진행, 상단바, 업데이트)
+    UpdateChecker.swift 새 버전 확인 / Updater.swift 앱 안에서 업데이트 (내려받기, 서명·공증 검사, 교체)
+    Headless.swift     화면 없이 한 가지만 하고 끝내는 확인용 실행 (자가 점검, 업데이트 확인)
     Views/             홈·구단·설정 탭, 처음 화면
     Views/Components/  여러 화면이 같이 쓰는 조각 (카드, 줄, 알림 배너, 소식, 다음 경기, 문자 중계, 선수 줄 등)
     Views/Match/       경기 탭, 야구·축구 중계, 경기 전 방침
     Views/Players/     선수 탭 (로스터, 라인업, 영입·이적)
     Views/League/      리그 탭
-    Views/Career/      선수 모드 화면 (선수 만들기, 홈, 훈련, 커리어)
+    Views/Career/      선수 모드 화면 (선수 만들기, 홈, 훈련, 커리어, 명성 활동)
+    Views/Settings/    설정 탭의 카드 (이름 바꾸기, 초기화)
 Tests/
   TokenBaseballCoreTests/
 ```
