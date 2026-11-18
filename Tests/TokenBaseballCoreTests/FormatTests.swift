@@ -20,8 +20,11 @@ import Testing
         #expect(Format.tokens(999_999) == "1.0M")
         #expect(Format.tokens(1_000) == "1.0K")
         #expect(Format.tokens(999) == "999")
-        #expect(Format.countdown(23 * 60) == "0:23")
-        #expect(Format.countdown(3600) == "1:00")
+        #expect(Format.countdown(23 * 60) == "23분")
+        #expect(Format.countdown(22 * 60 + 1) == "23분")
+        #expect(Format.countdown(3600) == "1시간")
+        #expect(Format.countdown(65 * 60) == "1시간 5분")
+        #expect(Format.countdown(20) == "1분 미만")
     }
 
     @Test func 상단바는_설정한_숫자_하나를_보여주고_경기_상황은_늘_보여준다() throws {
@@ -41,7 +44,7 @@ import Testing
         #expect(ended.hasPrefix("⚾ 경기 종료 "))
         #expect(ended.contains(try #require(game.lastResult).label))
         game.acknowledgeResult()
-        #expect(game.menuBarText(now: now.addingTimeInterval(37 * 60), todayTokens: 0) == "0:23")
+        #expect(game.menuBarText(now: now.addingTimeInterval(37 * 60), todayTokens: 0) == "경기까지 23분")
         #expect(game.menuBarTooltip(now: now, todayTokens: 5_000).contains("오늘 사용량 5.0K"))
     }
 }

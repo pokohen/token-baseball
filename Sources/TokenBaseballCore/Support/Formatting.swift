@@ -24,10 +24,12 @@ public enum Format {
         return "\(count)"
     }
 
-    /// 남은 시간: `0:23`.
+    /// 남은 시간을 말로: `23분`, `1시간 5분`, `1시간`. 1분이 안 남았으면 `1분 미만`.
     public static func countdown(_ seconds: TimeInterval) -> String {
+        guard seconds >= 60 else { return "1분 미만" }
         let minutes = Int((seconds / 60).rounded(.up))
-        return "\(minutes / 60):\(String(format: "%02d", minutes % 60))"
+        if minutes < 60 { return "\(minutes)분" }
+        return minutes % 60 == 0 ? "\(minutes / 60)시간" : "\(minutes / 60)시간 \(minutes % 60)분"
     }
 }
 
@@ -65,7 +67,7 @@ extension Game {
         case .nextMatch:
             if ready { return "경기 가능" }
             guard nextMatch() != nil, let wait = timeToNextCharge(now: now) else { return "—" }
-            return Format.countdown(wait)
+            return "경기까지 " + Format.countdown(wait)
         }
     }
 
@@ -77,7 +79,7 @@ extension Game {
         ]
         let marks = chargeMarks
         if let wait = timeToNextCharge(now: now) {
-            lines.append("경기 기회 \(marks) (다음 \(Format.countdown(wait)))")
+            lines.append("경기 기회 \(marks) (다음 기회까지 \(Format.countdown(wait)))")
         } else {
             lines.append("경기 기회 \(marks)")
         }

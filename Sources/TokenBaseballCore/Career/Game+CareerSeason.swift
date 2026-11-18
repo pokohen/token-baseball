@@ -39,6 +39,7 @@ extension Game {
         }
         self.career = career
         if let goal = career.goal, !career.isFreeAgent { post("시즌 목표: \(goal.label).") }
+        if let line = refreshCareerRival(seasonStart: true) { post(line) }
     }
 
     /// 정규시즌이 끝날 때: 시즌 기록을 커리어에 옮기고 목표를 채웠는지 본다.

@@ -61,7 +61,10 @@ extension Game {
         else {
             throw GameError("경기를 시작할 수 없습니다.")
         }
-        if isCareer { decorateCareerFootball(&state, userIsHome: next.userIsHome) }
+        if isCareer {
+            decorateCareerFootball(&state, userIsHome: next.userIsHome)
+            applyCareerForm(&state, userIsHome: next.userIsHome)
+        }
         // 같은 라운드의 내 리그 다른 경기는 함께 돌아가며 "타 구장 소식"으로 보인다.
         var others: [FootballMatch] = []
         if next.kind == .regular {

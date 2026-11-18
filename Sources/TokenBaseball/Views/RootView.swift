@@ -84,7 +84,7 @@ struct RootView: View {
                 } label: {
                     HStack {
                         Image(systemName: "arrow.down.circle.fill")
-                        Text(update.version.map { "새 버전 \($0)이(가) 나왔습니다" } ?? "새 버전이 있습니다 (변경 \(update.count)건)").font(.callout)
+                        Text(update.headline).font(.callout)
                         Spacer()
                         Text("설정에서 보기").font(.caption)
                         Image(systemName: "chevron.right").font(.caption)

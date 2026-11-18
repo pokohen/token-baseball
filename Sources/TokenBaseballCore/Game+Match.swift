@@ -96,9 +96,10 @@ extension Game {
             try startFootballMatch(next, home: home, away: away, tier: tier, now: now)
             return
         }
-        guard let state = makeMatch(home: home, away: away, kind: next.kind, tier: tier, seed: rng.next()) else {
+        guard var state = makeMatch(home: home, away: away, kind: next.kind, tier: tier, seed: rng.next()) else {
             throw GameError("경기를 시작할 수 없습니다.")
         }
+        if isCareer { applyCareerForm(&state, userIsHome: next.userIsHome) }
 
         // 같은 라운드의 내 리그 다른 경기는 함께 돌아가며 "타 구장 소식"으로 보인다.
         var others: [MatchState] = []

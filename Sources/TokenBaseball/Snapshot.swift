@@ -38,6 +38,7 @@ enum Snapshot {
         for tab in AppTab.allCases {
             render(TabContent(tab: tab, game: game).padding(12), model, directory, "1-\(tab.title(career: true))")
         }
+        render(ResetCard(game: game, pending: .slot).padding(12), model, directory, "5-초기화-확인")
         try? game.startMatch(now: now.addingTimeInterval(10 * 3600))
         // 축구는 교체로 들어간 뒤의 장면이 나오도록 후반까지 돌린다.
         for _ in 0..<(position.sport == .football ? 255 : 140) { game.stepMatch() }

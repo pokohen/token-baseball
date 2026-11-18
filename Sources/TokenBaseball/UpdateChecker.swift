@@ -23,6 +23,11 @@ enum UpdateChecker {
         var download: URL? = nil
         /// 변경 내용 전체 (titles는 앞의 몇 줄만).
         var notes: [String] = []
+
+        /// 화면에 보이는 한 줄 제목.
+        var headline: String {
+            version.map { "새 버전 \($0)이(가) 나왔습니다" } ?? "새 버전이 있습니다 (변경 \(count)건)"
+        }
     }
 
     enum Outcome: Equatable, Sendable {
@@ -73,30 +78,20 @@ enum UpdateChecker {
     }
 
     static func check() async -> Outcome {
-        if isReleaseBuild { return await checkRelease() }
+        if isReleaseBuild {
+            // 배포 버전 확인: GitHub Releases의 최신 버전이 이 앱보다 높은지. 올라온 배포가 없으면(404) 최신이다.
+            return await fetch("releases/latest", notFound: .upToDate) { parseRelease($0, current: appVersion) }
+        }
         guard let commit = buildCommit else {
             return .unknown("앱 번들로 실행할 때만 확인할 수 있습니다 (Scripts/make-app.sh로 만든 앱).")
         }
-        guard let url = URL(string: "https://api.github.com/repos/\(repository)/compare/\(commit)...HEAD") else {
-            return .unknown("저장소 주소가 올바르지 않습니다.")
-        }
-        var request = URLRequest(url: url, timeoutInterval: 15)
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("TokenSport-update-check", forHTTPHeaderField: "User-Agent")
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-            if status == 404 { return .unknown("이 빌드의 커밋이 저장소에 없습니다 (직접 고친 빌드).") }
-            guard status == 200 else { return .unknown("GitHub가 응답하지 않았습니다 (\(status)).") }
-            return parse(data)
-        } catch {
-            return .unknown("확인하지 못했습니다: \(error.localizedDescription)")
-        }
+        return await fetch(
+            "compare/\(commit)...HEAD", notFound: .unknown("이 빌드의 커밋이 저장소에 없습니다 (직접 고친 빌드)."), parse: parse)
     }
 
-    /// 배포 버전 확인: GitHub Releases의 최신 버전이 이 앱보다 높은지.
-    static func checkRelease() async -> Outcome {
-        guard let url = URL(string: "https://api.github.com/repos/\(repository)/releases/latest") else {
+    /// GitHub API에 한 번 묻고 응답을 읽는다.
+    private static func fetch(_ path: String, notFound: Outcome, parse: (Data) -> Outcome) async -> Outcome {
+        guard let url = URL(string: "https://api.github.com/repos/\(repository)/\(path)") else {
             return .unknown("저장소 주소가 올바르지 않습니다.")
         }
         var request = URLRequest(url: url, timeoutInterval: 15)
@@ -105,9 +100,9 @@ enum UpdateChecker {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-            if status == 404 { return .upToDate }
+            if status == 404 { return notFound }
             guard status == 200 else { return .unknown("GitHub가 응답하지 않았습니다 (\(status)).") }
-            return parseRelease(data, current: appVersion)
+            return parse(data)
         } catch {
             return .unknown("확인하지 못했습니다: \(error.localizedDescription)")
         }

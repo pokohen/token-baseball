@@ -88,6 +88,7 @@ extension Game {
         userTeamID = team
         if self.career?.clubs.last != teams[team].name { self.career?.clubs.append(teams[team].name) }
         self.career?.matchesAtClub = 0
+        refreshCareerRival()
         if teams[team].tier < career.bestTier { self.career?.bestTier = teams[team].tier }
     }
 

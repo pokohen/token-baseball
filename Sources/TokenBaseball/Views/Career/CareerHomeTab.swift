@@ -56,10 +56,31 @@ struct CareerHomeTab: View {
             }
             Meter(label: "감독 신뢰", value: career.trust, color: career.trust < Balance.careerRenewalTrust ? Theme.loss : .accentColor)
             Meter(label: "명성", value: career.fame, color: Theme.warn)
+            form(career)
             if let rating = career.lastRating, let line = career.lastLine {
                 KeyValueRow(key: "지난 경기", value: "평점 \(String(format: "%.1f", rating)) · \(line)")
             }
         }
+    }
+
+    /// 다음 경기의 컨디션, 기세, 연속 기록.
+    @ViewBuilder private func form(_ career: Career) -> some View {
+        let condition = game.careerCondition
+        KeyValueRow(
+            key: "다음 경기 컨디션", value: condition.label + percent(condition.modifier),
+            valueColor: condition.modifier > 0 ? Theme.win : condition.modifier < 0 ? Theme.loss : .primary)
+        if let streak = game.careerStreakText {
+            KeyValueRow(
+                key: game.careerStreak > 0 ? "기세" : "슬럼프", value: streak + percent(game.careerMomentum),
+                valueColor: game.careerStreak > 0 ? Theme.win : Theme.loss)
+        }
+        if (career.run ?? 0) >= 2 || (career.bestRun ?? 0) >= 3 {
+            KeyValueRow(key: game.careerRunLabel, value: "\(career.run ?? 0)경기 (최고 \(career.bestRun ?? 0)경기)")
+        }
+    }
+
+    private func percent(_ modifier: Double) -> String {
+        modifier == 0 ? "" : " (능력 \(modifier > 0 ? "+" : "−")\(Int((abs(modifier) * 100).rounded()))%)"
     }
 
     @ViewBuilder private func notices(_ career: Career) -> some View {

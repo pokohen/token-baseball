@@ -178,6 +178,14 @@ public struct Career: Codable, Equatable, Sendable {
     public var goal: CareerGoal?
     /// 축구: 경기 전에 고른 플레이 스타일. nil이면 균형.
     public var style: PlayStyle?
+    /// 다음 경기의 컨디션. nil이면 보통. (이 아래 값들은 예전 저장 파일에 없어서 Optional이다.)
+    public var condition: CareerCondition?
+    /// 연속 활약(+) 또는 연속 부진(−) 경기 수.
+    public var streak: Int?
+    /// 연속 기록 (타자: 안타, 투수: 무자책, 축구: 공격포인트, 골키퍼: 무실점)과 개인 최고.
+    public var run: Int?
+    public var bestRun: Int?
+    public var rival: CareerRival?
     /// 방금 한 훈련이 크리티컬이었으면 그 내용 한 줄. 다음 훈련이나 경기 뒤에 지워진다. (예전 저장 파일에는 없다.)
     public var lastCritical: String?
     /// 지금까지 터진 크리티컬 횟수.

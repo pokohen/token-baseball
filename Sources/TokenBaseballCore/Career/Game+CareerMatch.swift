@@ -9,6 +9,8 @@ extension Game {
         public var line: String
         /// 축구: 뛴 시간(분). 야구는 nil.
         public var minutes: Int? = nil
+        /// 연속 기록에 들어가는 일을 했는지 (타자: 안타, 투수: 무자책, 축구: 골·도움, 골키퍼: 무실점).
+        public var scored: Bool? = nil
     }
 
     /// 이 경기에서 내 선수가 한 일과 평점 (1.0~10.0, 6.0이 "무난했다"). 나오지 않았으면 nil.
@@ -31,7 +33,7 @@ extension Game {
             if line.runsBattedIn > 0 { text += " \(line.runsBattedIn)타점" }
             if line.walks > 0 { text += " \(line.walks)볼넷" }
             if line.steals > 0 { text += " \(line.steals)도루" }
-            return CareerPerformance(rating: clamp(rating + teamShift, 1, 10), line: text)
+            return CareerPerformance(rating: clamp(rating + teamShift, 1, 10), line: text, scored: line.hits > 0)
         }
         if let index = side.pitchers.firstIndex(where: { $0.playerID == playerID && $0.hasEntered }) {
             let line = side.pitchers[index].line
@@ -53,7 +55,7 @@ extension Game {
             if line.wins > 0 { text += " 승리" }
             if line.losses > 0 { text += " 패전" }
             if line.saves > 0 { text += " 세이브" }
-            return CareerPerformance(rating: clamp(rating + teamShift, 1, 10), line: text)
+            return CareerPerformance(rating: clamp(rating + teamShift, 1, 10), line: text, scored: line.earnedRuns == 0)
         }
         return nil
     }
@@ -89,8 +91,10 @@ extension Game {
         let mine = userIsHome ? state.home : state.away
         let theirs = userIsHome ? state.away : state.home
         let result = mine.runs > theirs.runs ? 1 : mine.runs < theirs.runs ? -1 : 0
+        let rival = career.rival.flatMap { Self.careerPerformance(playerID: $0.playerID, in: theirs, result: -result) }
         return settleCareer(
-            kind: kind, performance: Self.careerPerformance(playerID: career.playerID, in: mine, result: result))
+            kind: kind, performance: Self.careerPerformance(playerID: career.playerID, in: mine, result: result),
+            rival: rival)
     }
 
     /// 내 경기 정산 (축구).
@@ -100,14 +104,21 @@ extension Game {
         let theirs = userIsHome ? state.away : state.home
         let won = state.result == (userIsHome ? .homeWin : .awayWin)
         let result = won ? 1 : state.result == .draw ? 0 : -1
+        let rival = career.rival.flatMap {
+            Self.careerFootballPerformance(playerID: $0.playerID, in: theirs, conceded: mine.goals, result: -result)
+        }
         return settleCareer(
             kind: kind,
             performance: Self.careerFootballPerformance(
-                playerID: career.playerID, in: mine, conceded: theirs.goals, result: result))
+                playerID: career.playerID, in: mine, conceded: theirs.goals, result: result),
+            rival: rival)
     }
 
     /// 평점에 따라 감독 신뢰, 명성, 연봉을 정산한다. 훈련 횟수도 다시 채운다.
-    mutating func settleCareer(kind: MatchKind, performance: CareerPerformance?) -> [String] {
+    /// `rival`: 상대 구단에 라이벌이 있고 그 선수가 뛰었으면 그 평점.
+    mutating func settleCareer(
+        kind: MatchKind, performance: CareerPerformance?, rival: CareerPerformance? = nil
+    ) -> [String] {
         guard var career, !career.retired, let me = players[career.playerID] else { return [] }
         var lines: [String] = []
 
@@ -135,8 +146,10 @@ extension Game {
                 // 축구는 평점이 6점대에 몰려 있어서 기준을 낮추고 크게 반영한다.
                 let football = me.position.sport == .football
                 let rarity = me.position == .starter ? 3.0 : football ? 2.0 : 1.0
+                // 기세가 붙어 있으면 이름이 더 빨리 알려진다.
+                let momentum = (career.streak ?? 0) >= Balance.careerStreakLength ? Balance.careerMomentumFame : 1
                 if career.fame < cap {
-                    career.fame += max(0, performance.rating - (football ? 6.3 : 6.5)) * 0.8 * rarity
+                    career.fame += max(0, performance.rating - (football ? 6.3 : 6.5)) * 0.8 * rarity * momentum
                         * (cap - career.fame) / cap
                 }
             }
@@ -153,8 +166,20 @@ extension Game {
             career.earnings += pay
             lines.append("연봉 ₩\(pay.formatted())")
         }
-        career.peakAbility = max(career.peakAbility, me.ability)
+        if kind != .friendly { lines += settleCareerRival(&career, mine: performance, rival: rival) }
+        lines += updateCareerForm(&career, performance: performance, kind: kind)
         self.career = career
+        // 토큰으로 사서 치른 경기는 실전 경험으로 능력이 조금 오른다.
+        if extraMatchPending == true {
+            extraMatchPending = nil
+            if let performance {
+                let gained = applyCareerExtraMatchGain(rating: performance.rating)
+                if gained > 0 { lines.append("실전 경험: 능력 +\(String(format: "%.2f", gained))") }
+            }
+        }
+        let ability = players[me.id]?.ability ?? me.ability
+        self.career?.peakAbility = max(career.peakAbility, ability)
+        if let line = refreshCareerRival() { lines.append(line) }
         return lines
     }
 
@@ -195,6 +220,7 @@ extension Game {
             if detail.tackles + detail.clearances > 0 { text += " 수비 \(detail.tackles + detail.clearances)" }
         }
         if line.redCards > 0 { text += " 퇴장" } else if line.yellowCards > 0 { text += " 경고" }
-        return CareerPerformance(rating: clamp(6 + delta * weight, 1, 10), line: text, minutes: minutes)
+        let scored = entry.natural == .goalkeeper ? line.conceded == 0 : line.goals + line.assists > 0
+        return CareerPerformance(rating: clamp(6 + delta * weight, 1, 10), line: text, minutes: minutes, scored: scored)
     }
 }

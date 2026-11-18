@@ -71,6 +71,8 @@ public struct Game: Codable, Equatable, Sendable {
 
     /// 마지막으로 경기 기회가 저절로 생긴 뒤에 토큰으로 산 경기 수 (살수록 비싸진다). 예전 저장 파일에는 없다.
     public internal(set) var extraMatchesBought: Int?
+    /// 토큰으로 산 경기 기회를 아직 쓰지 않았는지. 선수 모드에서는 그 경기에서 실전 경험을 얻는다.
+    public internal(set) var extraMatchPending: Bool?
 
     // 선수 모드. 구단 모드와 예전 저장 파일에는 없다.
     public internal(set) var career: Career?
@@ -206,6 +208,7 @@ public struct Game: Codable, Equatable, Sendable {
         if let reason = extraMatchBlockedReason { throw GameError(reason) }
         funds.spend(extraMatchCost, .extraMatch)
         extraMatchesBought = (extraMatchesBought ?? 0) + 1
+        if isCareer { extraMatchPending = true }
         charges += 1
     }
 
