@@ -155,6 +155,31 @@ enum SelfTest {
             && UpdateChecker.cleanNote("그냥 줄") == "그냥 줄")
         // 배포 파일로 설치한 앱에서만 앱 안 업데이트가 된다.
         check("업데이트: 앱 안 업데이트는 배포 앱에서만", UpdateChecker.isReleaseBuild || Updater.blockedReason() != nil)
+        // 자리 바꾸기: 예전 이름으로 설치된 앱은 새 이름으로 바뀌고, 새 이름의 앱은 제자리에서 바뀐다.
+        func swapCheck(installedAs name: String) -> Bool {
+            let fm = FileManager.default
+            let root = directory.appendingPathComponent("swap-\(UUID().uuidString)", isDirectory: true)
+            let installed = root.appendingPathComponent("apps/\(name)", isDirectory: true)
+            let fresh = root.appendingPathComponent("work/\(Updater.appName)", isDirectory: true)
+            try? fm.createDirectory(at: installed, withIntermediateDirectories: true)
+            try? fm.createDirectory(at: fresh, withIntermediateDirectories: true)
+            try? "old".write(to: installed.appendingPathComponent("mark"), atomically: true, encoding: .utf8)
+            try? "new".write(to: fresh.appendingPathComponent("mark"), atomically: true, encoding: .utf8)
+            // 이미 끝난 프로세스 번호를 주면 기다리지 않고 바로 바꾼다.
+            try? Updater.swapAfterExit(fresh: fresh, into: installed, reopen: false, waitingFor: 99_999_999)
+            let target = root.appendingPathComponent("apps/\(Updater.appName)/mark")
+            for _ in 0..<50 {
+                if (try? String(contentsOf: target, encoding: .utf8)) == "new",
+                   !fm.fileExists(atPath: fresh.path) { break }
+                Thread.sleep(forTimeInterval: 0.1)
+            }
+            let names = (try? fm.contentsOfDirectory(atPath: root.appendingPathComponent("apps").path)) ?? []
+            let ok = names == [Updater.appName] && (try? String(contentsOf: target, encoding: .utf8)) == "new"
+            try? fm.removeItem(at: root)
+            return ok
+        }
+        check("업데이트: 예전 이름의 앱은 새 이름으로 바뀐다", swapCheck(installedAs: Updater.legacyAppName))
+        check("업데이트: 새 이름의 앱은 제자리에서 바뀐다", swapCheck(installedAs: Updater.appName))
         model.apply(UpdateChecker.parse(ahead))
         check("업데이트: 앱에 표시", model.update?.count == 3 && model.updateStatus != nil)
         model.apply(.upToDate)

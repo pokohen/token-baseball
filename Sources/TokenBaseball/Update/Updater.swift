@@ -125,19 +125,35 @@ enum Updater {
         }
     }
 
+    /// 새 앱을 놓을 자리. 예전 이름("Token Baseball.app")으로 설치돼 있으면 같은 폴더에 새 이름으로 놓는다.
+    static func destination(for app: URL) -> URL {
+        app.lastPathComponent == legacyAppName
+            ? app.deletingLastPathComponent().appendingPathComponent(appName, isDirectory: true) : app
+    }
+
     /// 이 앱이 꺼지면 새 앱으로 자리를 바꾸고 다시 여는 스크립트를 띄운다. 띄운 뒤 곧바로 앱을 꺼야 한다.
-    /// 바꾸다 실패하면 예전 앱을 되돌려 놓는다.
-    static func swapAfterExit(fresh: URL, into app: URL, reopen: Bool) throws {
+    /// 바꾸다 실패하면 예전 앱을 되돌려 놓는다. 예전 이름으로 설치된 앱은 이때 새 이름으로 바뀐다.
+    static func swapAfterExit(
+        fresh: URL, into app: URL, reopen: Bool, waitingFor pid: Int32 = ProcessInfo.processInfo.processIdentifier
+    ) throws {
         // 어느 단계에서 실패하든: 받아 둔 파일을 지우고, 자리에 남아 있는 앱(예전 것이든 새것이든)을 다시 연다.
         let script = """
-        pid="$1"; fresh="$2"; app="$3"; reopen="$4"
-        finish() { rm -rf "$(dirname "$fresh")"; [ "$reopen" = "1" ] && [ -d "$app" ] && /usr/bin/open "$app"; exit 0; }
+        pid="$1"; fresh="$2"; app="$3"; reopen="$4"; dest="$5"
+        finish() {
+            rm -rf "$(dirname "$fresh")"
+            if [ "$reopen" = "1" ]; then
+                if [ -d "$dest" ]; then /usr/bin/open "$dest"; elif [ -d "$app" ]; then /usr/bin/open "$app"; fi
+            fi
+            exit 0
+        }
         n=0; while kill -0 "$pid" 2>/dev/null && [ $n -lt 150 ]; do sleep 0.2; n=$((n+1)); done
         # 앱이 끝내 꺼지지 않았으면 실행 중인 앱을 건드리지 않는다.
         if kill -0 "$pid" 2>/dev/null; then rm -rf "$(dirname "$fresh")"; exit 0; fi
         old="$app.old-$$"
         mv "$app" "$old" || finish
-        if /usr/bin/ditto "$fresh" "$app"; then rm -rf "$old"; else rm -rf "$app"; mv "$old" "$app"; fi
+        # 이름이 바뀌는 경우: 새 이름의 자리에 이미 무엇이 있으면 치운다.
+        [ "$dest" != "$app" ] && rm -rf "$dest"
+        if /usr/bin/ditto "$fresh" "$dest"; then rm -rf "$old"; else rm -rf "$dest"; mv "$old" "$app"; fi
         finish
         """
         let process = Process()
@@ -145,7 +161,8 @@ enum Updater {
         // 한 번 더 띄워서(&) 이 앱이 꺼져도 남아 있게 한다.
         process.arguments = [
             "-c", "/bin/sh -c \"$0\" sh \"$@\" >/dev/null 2>&1 &", script,
-            String(ProcessInfo.processInfo.processIdentifier), fresh.path, app.path, reopen ? "1" : "0",
+            String(pid), fresh.path, app.path, reopen ? "1" : "0",
+            destination(for: app).path,
         ]
         try process.run()
         process.waitUntilExit()

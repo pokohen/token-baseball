@@ -47,10 +47,19 @@ codesign --verify --strict --deep "$APP"
 DMG="build/TokenSports-$VERSION.dmg"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
-cp -R "$APP" "$STAGE/"
-ln -s /Applications "$STAGE/Applications"
+mkdir "$STAGE/root" "$STAGE/mnt"
+cp -R "$APP" "$STAGE/root/"
+ln -s /Applications "$STAGE/root/Applications"
+# 0.7.1까지의 앱은 "앱 안에서 업데이트"할 때 배포 파일 안에서 예전 이름("Token Baseball.app")을 찾는다.
+# 그 이름으로 새 앱을 가리키는 링크를 넣어 두면 예전 앱도 그대로 업데이트된다 (ditto가 링크를 따라가 앱을 복사한다).
+# Finder에서는 보이지 않게 숨긴다. 숨김 표시는 쓸 수 있는 이미지에서만 붙으므로, 먼저 그렇게 만들고 압축한다.
+ln -s "Token Sports.app" "$STAGE/root/Token Baseball.app"
 rm -f "$DMG"
-hdiutil create -quiet -volname "Token Sports $VERSION" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
+hdiutil create -quiet -volname "Token Sports $VERSION" -srcfolder "$STAGE/root" -ov -format UDRW -fs HFS+ "$STAGE/rw.dmg"
+hdiutil attach "$STAGE/rw.dmg" -nobrowse -quiet -mountpoint "$STAGE/mnt"
+chflags -h hidden "$STAGE/mnt/Token Baseball.app"
+hdiutil detach "$STAGE/mnt" -quiet
+hdiutil convert -quiet "$STAGE/rw.dmg" -format UDZO -o "$DMG" -ov
 codesign --force --timestamp --sign "$IDENTITY" "$DMG"
 
 if [ -n "${TB_SKIP_NOTARIZE:-}" ]; then
