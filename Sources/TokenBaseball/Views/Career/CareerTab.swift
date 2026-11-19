@@ -11,6 +11,7 @@ struct CareerTab: View {
             if let career = game.career, let me = game.myPlayer {
                 if !career.offers.isEmpty { offers(career) }
                 contract(career, me)
+                CareerScoutCard(game: game, career: career)
                 CareerRivalCard(game: game, career: career, me: me)
                 CareerActivityCard(game: game, career: career)
                 season(career, me)
@@ -59,9 +60,9 @@ struct CareerTab: View {
                     Text("은퇴: \(reason)").note()
                 }
                 Text(career.transferRequested
-                    ? "이적을 요청해 두었습니다. 이적 기간 동안 제안이 더 자주 옵니다."
+                    ? "이적을 요청해 두었습니다. 이적 기간 동안 스카우트가 더 잘 오고, 더 낮은 관심도에서도 제안합니다."
                     : game.tradeWindowOpen
-                    ? "이적을 요청하면 제안이 더 자주 오지만 감독 신뢰가 10 떨어집니다. 이적 기간마다 한 번."
+                    ? "이적을 요청하면 스카우트들의 관심이 오르고 제안의 문턱이 낮아지지만, 감독 신뢰가 10 떨어집니다. 이적 기간마다 한 번."
                     : "지금은 이적 기간이 아닙니다 (정규시즌 \(Balance.tradeDeadlineRound)라운드까지, 그리고 오프시즌).").note()
             }
         }

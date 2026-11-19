@@ -46,6 +46,32 @@ extension Balance {
     public static let careerExtraMatchPerRating = 0.08
     public static let careerExtraMatchMax = 0.3
 
+    // 스카우트
+
+    /// 한 번에 나를 지켜보는 구단 수.
+    public static let careerScoutMax = 3
+    /// 이 관심도를 넘은 구단이 이적 기간에 제안한다. 이적을 요청했으면, 계약이 끝났으면 문턱이 낮아진다.
+    public static let careerScoutOfferInterest = 70.0
+    public static let careerScoutOfferInterestRequested = 50.0
+    public static let careerScoutOfferInterestExpired = 35.0
+    /// 관심도는 (평점 − 기준) × 이 값만큼 움직인다. 기준은 명성의 기준(야구 6.5, 축구·농구 6.3)보다 이만큼 낮다.
+    public static let careerScoutPerRating = 8.0
+    /// 선발 투수는 나오는 경기가 적어서 한 경기가 이만큼 크게 반영된다 (명성과 같다).
+    public static let careerScoutStarterPitcher = 3.0
+    public static let careerScoutBaselineSlack = 0.3
+    /// 그 구단에 가면 주전(또는 주전 경쟁)일 때 경기마다 더 쌓이는 관심도.
+    public static let careerScoutFitStarter = 3.5
+    public static let careerScoutFitRotation = 1.2
+    /// 경기마다 새 스카우트가 지켜보기 시작할 기본 확률.
+    public static let careerScoutArrival = 0.12
+    /// 스카우트가 다음 경기를 직접 보러 올 확률과, 그 경기에서 관심도가 움직이는 배수.
+    public static let careerScoutVisitChance = 0.3
+    public static let careerScoutVisitMultiplier = 2.0
+    /// 이적을 요청하면 모든 스카우트의 관심도가 이만큼 오른다.
+    public static let careerScoutRequestBoost = 10.0
+    /// 새 시즌에 남는 관심도의 비율.
+    public static let careerScoutSeasonKeep = 0.85
+
     public static let careerStartAge = 16
     /// 내 선수의 타고난 재능: 시작 능력과 잠재력(성장 한계)이 선수마다 이 범위에서 다르게 정해진다.
     /// 잠재력의 숫자는 숨겨져 있고, 재능 등급으로만 알려 준다.
