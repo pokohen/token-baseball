@@ -24,7 +24,7 @@ enum ReviewGame {
 }
 
 @Suite struct FootballPromotionTests {
-    @Test func 잉글랜드식으로_두_팀이_올라가고_두_팀이_내려간다() {
+    @Test func 잉글랜드식으로_세_팀이_올라가고_세_팀이_내려간다() {
         var game = ReviewGame.football()
         ReviewGame.fillStandings(&game, userRank: 8)
         let before = LeagueTier.allCases.map { tier in game.rankedStandings(tier).map(\.teamID) }
@@ -34,12 +34,35 @@ enum ReviewGame {
             #expect(game.teams(in: tier).count == Balance.teamsPerLeague(.football))
             let ranked = before[tier.index]
             if let lower = tier.lower {
-                // 맨 아래 두 팀은 자동 강등
+                // 맨 아래 세 팀(18~20위)은 자동 강등
+                #expect(ranked.suffix(3).allSatisfy { game.teams[$0].tier == lower })
+                #expect(ranked.dropLast(3).allSatisfy { game.teams[$0].tier != lower })
+            }
+            if let upper = tier.upper {
+                // 1위와 2위는 자동 승격, 3~6위 중 플레이오프를 이긴 한 팀이 승격
+                #expect(game.teams[ranked[0]].tier == upper)
+                #expect(game.teams[ranked[1]].tier == upper)
+                #expect(ranked[2...5].filter { game.teams[$0].tier == upper }.count == 1)
+                #expect(ranked[6...].allSatisfy { game.teams[$0].tier != upper })
+            }
+        }
+    }
+
+    @Test func 열_팀_리그로_치른_시즌은_예전대로_두_팀이_오르내린다() {
+        var game = Game.newGame(
+            setup: .init(city: "서울", name: "서울 시민 FC"), now: TestGame.start, seed: 81, sport: .football, leagueSize: 10)
+        ReviewGame.fillStandings(&game, userRank: 8)
+        let before = LeagueTier.allCases.map { tier in game.rankedStandings(tier).map(\.teamID) }
+        game.endRegularSeason()
+        #expect(game.phase == .offseason)
+        for tier in LeagueTier.allCases {
+            #expect(game.teams(in: tier).count == 10)
+            let ranked = before[tier.index]
+            if let lower = tier.lower {
                 #expect(ranked.suffix(2).allSatisfy { game.teams[$0].tier == lower })
                 #expect(ranked.dropLast(2).allSatisfy { game.teams[$0].tier != lower })
             }
             if let upper = tier.upper {
-                // 1위는 자동 승격, 2~5위 중 플레이오프를 이긴 한 팀이 승격
                 #expect(game.teams[ranked[0]].tier == upper)
                 #expect(ranked[1...4].filter { game.teams[$0].tier == upper }.count == 1)
                 #expect(ranked[5...].allSatisfy { game.teams[$0].tier != upper })
@@ -66,7 +89,8 @@ enum ReviewGame {
             game.players[id]?.potential = 60
         }
         game.teams[game.userTeamID].stadiumLevel = 2
-        ReviewGame.fillStandings(&game, userRank: 2)
+        // 3위로 마치면 플레이오프다 (1위와 2위는 바로 올라간다).
+        ReviewGame.fillStandings(&game, userRank: 3)
         game.endRegularSeason()
         #expect(game.phase == .playoff)
 

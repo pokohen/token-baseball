@@ -27,6 +27,13 @@ struct LeagueTab: View {
         }
     }
 
+    /// 축구의 승격·강등 규칙 한 줄. 20팀 리그는 세 팀, 그보다 작은 리그는 두 팀이 오르내린다.
+    private func footballRuleText(teams: Int) -> String {
+        let direct = Balance.footballAutoPromotions(teams: teams)
+        let up = direct == 1 ? "1위는" : "1~\(direct)위는"
+        return "\(up) 자동 승격, \(direct + 1)~\(direct + 4)위는 승격 플레이오프(한 팀 승격), 맨 아래 \(direct + 1)팀(\(teams - direct)~\(teams)위)은 자동 강등."
+    }
+
     private var standings: some View {
         let rows = game.rankedStandings(shown)
         return VStack(spacing: 4) {
@@ -72,7 +79,7 @@ struct LeagueTab: View {
                 if openTeam == team.id { TeamDetail(game: game, team: team, row: row) }
             }
             Text(game.sport == .football
-                ? "팀을 누르면 선수단을 볼 수 있습니다. 1위는 자동 승격, 2~5위는 승격 플레이오프(한 팀 승격), 맨 아래 두 팀(\(rows.count - 1)위와 \(rows.count)위)은 자동 강등."
+                ? "팀을 누르면 선수단을 볼 수 있습니다. \(footballRuleText(teams: rows.count))"
                 : "팀을 누르면 선수단을 볼 수 있습니다. 1위는 자동 승격, 2위와 3위는 와일드카드를 거쳐 윗 리그 9위와 승강 플레이오프, 10위는 자동 강등.").note()
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -91,7 +98,7 @@ struct LeagueTab: View {
                 } else {
                     Text("시즌이 끝날 때까지 경기장을 Lv\(level)로 올리지 못하면, 1위를 해도 승격 자격이 다음 순위 팀으로 넘어갑니다. 구단 탭에서 업그레이드합니다.").note()
                 }
-                Text("신청은 필요 없습니다. 1위는 자동 승격, 2~5위는 승격 플레이오프(준결승 두 경기 합산, 결승 중립 구장 단판)를 치릅니다.").note()
+                Text("신청은 필요 없습니다. \(footballRuleText(teams: game.rankedStandings(game.userTier).count)) 플레이오프는 준결승 두 경기 합산, 결승 중립 구장 단판입니다.").note()
             }
         } else if !game.isCareer, let requirement = game.promotionRequirement {
             Card("승강 플레이오프 신청") {
