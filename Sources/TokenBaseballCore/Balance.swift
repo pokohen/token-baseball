@@ -8,7 +8,7 @@ public enum Balance {
     public static let roundsPerSeason = 36
     /// 종목별 리그 크기. 야구는 10팀이 네 번씩 만나 36라운드, 축구는 20팀이 두 번씩 만나 38라운드다.
     public static func teamsPerLeague(_ sport: Sport) -> Int {
-        sport == .football ? 10 : teamsPerLeague
+        sport == .football ? 20 : teamsPerLeague
     }
     /// 같은 상대와 홈·원정을 몇 번 도는지. 20팀 리그는 한 번(38라운드), 그보다 작으면 두 번.
     public static func scheduleRepeats(teams: Int) -> Int { teams >= 20 ? 1 : 2 }

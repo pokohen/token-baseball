@@ -240,6 +240,7 @@ extension Game {
                 players[id] = player
             }
         }
+        expandLeaguesIfNeeded()
         startSeasonSchedules()
         post("\(season)번째 시즌 시작! \(userTier.displayName) 리그.")
         careerStartSeason()

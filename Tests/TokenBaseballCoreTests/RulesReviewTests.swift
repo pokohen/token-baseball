@@ -15,11 +15,11 @@ enum ReviewGame {
             if tier == game.userTier { order.insert(game.userTeamID, at: userRank - 1) }
             for (place, id) in order.enumerated() {
                 let index = game.standings[tier.index].firstIndex { $0.teamID == id }!
-                game.standings[tier.index][index].wins = 30 - place * 3
-                game.standings[tier.index][index].losses = 6 + place * 3
+                game.standings[tier.index][index].wins = order.count - place
+                game.standings[tier.index][index].losses = game.roundsPerSeason - (order.count - place)
             }
         }
-        game.round = Balance.roundsPerSeason
+        game.round = game.roundsPerSeason
     }
 }
 
@@ -31,18 +31,18 @@ enum ReviewGame {
         game.endRegularSeason()
         #expect(game.phase == .offseason)
         for tier in LeagueTier.allCases {
-            #expect(game.teams(in: tier).count == Balance.teamsPerLeague)
+            #expect(game.teams(in: tier).count == Balance.teamsPerLeague(.football))
             let ranked = before[tier.index]
             if let lower = tier.lower {
-                // 9위와 10위는 자동 강등
-                #expect(game.teams[ranked[8]].tier == lower)
-                #expect(game.teams[ranked[9]].tier == lower)
+                // 맨 아래 두 팀은 자동 강등
+                #expect(ranked.suffix(2).allSatisfy { game.teams[$0].tier == lower })
+                #expect(ranked.dropLast(2).allSatisfy { game.teams[$0].tier != lower })
             }
             if let upper = tier.upper {
                 // 1위는 자동 승격, 2~5위 중 플레이오프를 이긴 한 팀이 승격
                 #expect(game.teams[ranked[0]].tier == upper)
                 #expect(ranked[1...4].filter { game.teams[$0].tier == upper }.count == 1)
-                #expect(ranked[5...9].allSatisfy { game.teams[$0].tier != upper })
+                #expect(ranked[5...].allSatisfy { game.teams[$0].tier != upper })
             }
         }
     }

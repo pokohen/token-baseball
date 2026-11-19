@@ -34,9 +34,7 @@ extension Game {
         for tier in LeagueTier.allCases {
             for slot in 0..<leagueSize {
                 let id = game.teams.count
-                let identity = tier == .pro
-                    ? NameGenerator.proTeams(sport)[slot]
-                    : NameGenerator.cpuTeam(tier: tier, taken: taken, sport: sport, &game.rng)
+                let identity = game.newTeamIdentity(tier: tier, slot: slot, taken: taken)
                 taken.insert(identity.name)
                 game.teams.append(Team(
                     id: id, name: identity.name, city: identity.city, tier: tier, isUser: false, season: 1))

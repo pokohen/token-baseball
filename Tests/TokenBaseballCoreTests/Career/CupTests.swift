@@ -17,20 +17,22 @@ import Testing
     }
 
     @Test(arguments: [Position.shortstop, .forward])
-    func 첫_라운드는_네_팀이_쉬고_오십육_팀이_치른다(position: Position) throws {
+    func 첫_라운드는_1부의_강팀이_쉬고_나머지가_치른다(position: Position) throws {
         let game = make(position)
         let cup = try #require(game.cup)
-        #expect(cup.byes.count == 4 && cup.ties.count == 28)
+        // 야구는 60팀 중 네 팀, 축구는 120팀 중 여덟 팀이 쉰다.
+        let football = position.sport == .football
+        #expect(cup.byes.count == (football ? 8 : 4) && cup.ties.count == (football ? 56 : 28))
         #expect(cup.byes.allSatisfy { game.teams[$0].tier == .pro })
         let all = Set(cup.byes + cup.ties.flatMap { [$0.home, $0.away] })
-        #expect(all.count == 60)
+        #expect(all.count == game.teams.count)
         // 아랫 리그 구단이 홈에서 치른다.
         #expect(cup.ties.allSatisfy { game.teams[$0.home].tier >= game.teams[$0.away].tier })
         #expect(game.nextMatch()?.kind == .regular)
     }
 
     @Test(arguments: [Position.shortstop, .starter, .forward, .goalkeeper])
-    func 한_시즌_동안_여섯_라운드를_치르고_우승팀이_나온다(position: Position) throws {
+    func 한_시즌_동안_컵대회를_끝까지_치르고_우승팀이_나온다(position: Position) throws {
         var game = make(position)
         var cupMatches = 0
         var kinds: [MatchKind] = []
@@ -52,12 +54,13 @@ import Testing
             index += 1
         }
         let cup = try #require(game.cup)
-        #expect(cup.isFinished && cup.history.count == 6)
-        #expect(cup.history.map(\.count) == [28, 16, 8, 4, 2, 1])
+        let sizes = position.sport == .football ? [56, 32, 16, 8, 4, 2, 1] : [28, 16, 8, 4, 2, 1]
+        #expect(cup.isFinished && cup.history.count == sizes.count)
+        #expect(cup.history.map(\.count) == sizes)
         #expect(cup.history.allSatisfy { $0.allSatisfy(\.isPlayed) })
-        #expect(cup.champion == cup.history[5][0].winner)
-        #expect(cupMatches >= 1 && cupMatches <= 6)
-        #expect(kinds.filter { $0 == .regular }.count == Balance.roundsPerSeason)
+        #expect(cup.champion == cup.history.last?.first?.winner)
+        #expect(cupMatches >= 1 && cupMatches <= sizes.count)
+        #expect(kinds.filter { $0 == .regular }.count == Balance.roundsPerSeason(position.sport))
         // 내 구단의 길: 진 경기 뒤로는 더 없다.
         let path = cup.path(of: game.userTeamID)
         #expect(path.count == cupMatches)

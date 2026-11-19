@@ -67,11 +67,12 @@ struct AutoManager {
 
 enum Invariants {
     static func check(_ game: Game, _ comment: Comment) {
-        #expect(game.teams.count == 60, comment)
+        let size = Balance.teamsPerLeague(game.sport)
+        #expect(game.teams.count == size * 6, comment)
         var seen: Set<PlayerID> = []
         for tier in LeagueTier.allCases {
             let teams = game.teams(in: tier)
-            #expect(teams.count == 10, "\(comment) \(tier.displayName)")
+            #expect(teams.count == size, "\(comment) \(tier.displayName)")
             for team in teams {
                 let roster = game.roster(of: team.id)
                 #expect(roster.count == team.roster.count, "\(comment) 없는 선수가 로스터에 있음")

@@ -29,7 +29,7 @@ struct CupCard: View {
                 Divider()
                 row(round: "결승", tie: final, highlightMine: false)
             }
-            Text("여섯 리그 60개 구단이 모두 나오는 단판 승부입니다. 매 라운드 다시 추첨하고, 아랫 리그 구단이 홈에서 치릅니다. 비기면 끝날 때까지 갑니다\(game.sport == .football ? " (연장, 승부차기)" : " (연장)"). 이기면 명성이 오르고, 윗 리그 구단을 잡으면 더 많이 오릅니다. 리그 순위와 시즌 기록에는 들어가지 않습니다.")
+            Text("여섯 리그 \(game.teams.count)개 구단이 모두 나오는 단판 승부입니다. 매 라운드 다시 추첨하고, 아랫 리그 구단이 홈에서 치릅니다. 비기면 끝날 때까지 갑니다\(game.sport == .football ? " (연장, 승부차기)" : " (연장)"). 이기면 명성이 오르고, 윗 리그 구단을 잡으면 더 많이 오릅니다. 리그 순위와 시즌 기록에는 들어가지 않습니다.")
                 .note().fixedSize(horizontal: false, vertical: true)
         }
         .font(.callout)
