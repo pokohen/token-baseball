@@ -19,7 +19,7 @@ extension Game {
         // 순위 상금. 시즌 도중에 다시 창단한 구단은 치른 경기가 적어 순위 상금을 받지 않는다.
         let myRank = rank(of: userTeamID)
         let myGames = standings[userTier.index].first { $0.teamID == userTeamID }.map { $0.wins + $0.losses + $0.draws } ?? 0
-        let fullSeason = myGames >= Balance.roundsPerSeason / 2
+        let fullSeason = myGames >= roundsPerSeason / 2
         let prize = isCareer || isBankrupt || !fullSeason ? 0 : Balance.prizeMoney(userTier, rank: myRank)
         if !isBankrupt {
             post("정규시즌 종료. \(userTeam.name)은(는) \(userTier.displayName) \(myRank)위로 마쳤습니다.")

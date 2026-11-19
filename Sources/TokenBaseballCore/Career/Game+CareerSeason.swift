@@ -200,7 +200,7 @@ extension Game {
         guard !name.isEmpty else { throw GameError("선수 이름을 입력해 주세요.") }
         guard setup.sport == sport else { throw GameError("이 세계에서는 \(sport.label) 선수만 만들 수 있습니다.") }
         let ranked = rankedStandings(.citizenAmateur)
-        let club = ranked[min(Balance.careerStartSlot, ranked.count - 1)].teamID
+        let club = ranked[ranked.count / 2].teamID
         var cleaned = setup
         cleaned.name = name
         createCareerPlayer(cleaned, team: club)

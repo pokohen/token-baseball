@@ -18,14 +18,19 @@ extension Game {
 
     /// 새 게임: 6개 리그 60팀을 만들고, 내 시민 구단을 6부에 넣는다.
     public static func newGame(setup: ClubSetup, now: Date, seed: UInt64, sport: Sport = .baseball) -> Game {
+        newGame(setup: setup, now: now, seed: seed, sport: sport, leagueSize: Balance.teamsPerLeague(sport))
+    }
+
+    /// `leagueSize`: 리그마다 몇 팀인지. 예전 크기의 세계를 시험할 때만 따로 준다.
+    static func newGame(setup: ClubSetup, now: Date, seed: UInt64, sport: Sport, leagueSize: Int) -> Game {
         var game = Game(funds: FundsLedger(startedAt: now), rng: SeededRNG(seed: seed), chargeAnchor: now)
         if sport != .baseball { game.sportChoice = sport }
         var taken: Set<String> = [setup.name]
 
         for tier in LeagueTier.allCases {
-            for slot in 0..<Balance.teamsPerLeague {
+            for slot in 0..<leagueSize {
                 let id = game.teams.count
-                let isUser = tier == .citizenAmateur && slot == Balance.teamsPerLeague - 1
+                let isUser = tier == .citizenAmateur && slot == leagueSize - 1
                 if isUser {
                     var team = Team(
                         id: id, name: setup.name, city: setup.city, tier: tier, isUser: true, season: 1)
@@ -124,7 +129,8 @@ extension Game {
         leagueStartAverage = []
         for tier in LeagueTier.allCases {
             let ids = teams(in: tier).map(\.id)
-            schedules.append(ScheduleBuilder.build(teams: ids, &rng))
+            schedules.append(ScheduleBuilder.build(
+                teams: ids, repeats: Balance.scheduleRepeats(teams: ids.count), &rng))
             standings.append(ids.map { StandingRow(teamID: $0) })
             leagueStartAverage.append(cpuAverageStrength(tier))
         }

@@ -6,6 +6,16 @@ public enum Balance {
 
     public static let teamsPerLeague = 10
     public static let roundsPerSeason = 36
+    /// 종목별 리그 크기. 야구는 10팀이 네 번씩 만나 36라운드, 축구는 20팀이 두 번씩 만나 38라운드다.
+    public static func teamsPerLeague(_ sport: Sport) -> Int {
+        sport == .football ? 10 : teamsPerLeague
+    }
+    /// 같은 상대와 홈·원정을 몇 번 도는지. 20팀 리그는 한 번(38라운드), 그보다 작으면 두 번.
+    public static func scheduleRepeats(teams: Int) -> Int { teams >= 20 ? 1 : 2 }
+    public static func roundsPerSeason(_ sport: Sport) -> Int {
+        let teams = teamsPerLeague(sport)
+        return (teams - 1) * 2 * scheduleRepeats(teams: teams)
+    }
     /// 승강 플레이오프 신청 마감 라운드.
     public static let applicationDeadlineRound = 27
     /// 시즌 중 트레이드 마감 (이 라운드까지 가능).

@@ -18,7 +18,7 @@ struct NextMatchCard: View {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(next.label).font(.title2.bold().monospacedDigit())
                     if next.kind == .regular {
-                        Text("/ 전체 \(Balance.roundsPerSeason)라운드").font(.callout).foregroundStyle(.secondary)
+                        Text("/ 전체 \(game.roundsPerSeason)라운드").font(.callout).foregroundStyle(.secondary)
                     }
                     Spacer()
                     Text("\(game.season)시즌").note()

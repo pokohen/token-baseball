@@ -23,7 +23,7 @@ extension Game {
                     kind: .cup, opponent: tie.opponent(of: userTeamID), userIsHome: tie.home == userTeamID,
                     label: "컵대회 \(cup.roundName)")
             }
-            guard round < Balance.roundsPerSeason,
+            guard round < roundsPerSeason,
                   let fixture = schedules[userTier.index][round].first(where: { $0.involves(userTeamID) })
             else { return nil }
             return NextMatch(

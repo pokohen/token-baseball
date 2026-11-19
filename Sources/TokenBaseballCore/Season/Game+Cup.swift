@@ -15,11 +15,11 @@ public struct CupTie: Codable, Equatable, Sendable {
     public var isPlayed: Bool { winner != nil }
 }
 
-/// 컵대회: 여섯 리그 60개 구단이 모두 나오는 단판 승부. 선수 모드에서만 열린다.
-/// 지난 대회 위쪽 네 팀이 아니라 1부의 강한 네 팀이 1라운드를 쉬고, 그 뒤로는 매 라운드 다시 추첨한다.
+/// 컵대회: 여섯 리그의 모든 구단(야구 60개, 축구 120개)이 나오는 단판 승부. 선수 모드에서만 열린다.
+/// 1부의 강한 팀들(야구 네 팀, 축구 여덟 팀)이 1라운드를 쉬고, 그 뒤로는 매 라운드 다시 추첨한다.
 public struct Cup: Codable, Equatable, Sendable {
     public var season: Int
-    /// 지금 치를(또는 치르는 중인) 라운드. 0 = 1라운드. 대회가 끝나면 `Cup.roundNames.count`.
+    /// 지금 치를(또는 치르는 중인) 라운드. 0 = 1라운드. 대회가 끝나면 치른 라운드 수.
     public var roundIndex = 0
     /// 지금 라운드의 대진.
     public var ties: [CupTie] = []
@@ -31,10 +31,31 @@ public struct Cup: Codable, Equatable, Sendable {
     public var isDue = false
     public var champion: TeamID?
 
-    public static let roundNames = ["1라운드", "32강", "16강", "8강", "준결승", "결승"]
+    /// 라운드 이름: 쉬는 구단이 있는 첫 라운드는 "1라운드", 그 뒤로는 남은 구단 수로 부른다.
+    public static func roundName(ties: Int, first: Bool) -> String {
+        if first, ties != 1 { return "1라운드" }
+        switch ties {
+        case ...1: return "결승"
+        case 2: return "준결승"
+        default: return "\(ties * 2)강"
+        }
+    }
 
     public var isFinished: Bool { champion != nil }
-    public var roundName: String { Self.roundNames[min(roundIndex, Self.roundNames.count - 1)] }
+    public var roundName: String {
+        isFinished ? "결승" : Self.roundName(ties: ties.count, first: roundIndex == 0)
+    }
+    /// 이 대회의 전체 라운드 수 (60팀이면 6, 120팀이면 7).
+    public var totalRounds: Int {
+        if isFinished { return history.count }
+        var alive = ties.count * 2 + byes.count
+        var rounds = history.count
+        while alive > 1 {
+            alive = (alive + 1) / 2
+            rounds += 1
+        }
+        return rounds
+    }
 
     /// 아직 대회에 남아 있는지.
     public func isAlive(_ team: TeamID) -> Bool {
@@ -46,7 +67,9 @@ public struct Cup: Codable, Equatable, Sendable {
     public func path(of team: TeamID) -> [(round: String, tie: CupTie)] {
         var result: [(String, CupTie)] = []
         for (index, round) in history.enumerated() {
-            if let tie = round.first(where: { $0.involves(team) }) { result.append((Self.roundNames[index], tie)) }
+            if let tie = round.first(where: { $0.involves(team) }) {
+                result.append((Self.roundName(ties: round.count, first: index == 0), tie))
+            }
         }
         if !isFinished, let tie = ties.first(where: { $0.involves(team) && $0.isPlayed }) {
             result.append((roundName, tie))
@@ -62,9 +85,9 @@ extension Game {
     mutating func ensureCup() {
         guard isCareer, cup?.season != season else { return }
         var fresh = Cup(season: season)
-        // 1부에서 가장 강한 네 팀은 1라운드를 쉰다 (60팀 → 32팀).
+        // 1부에서 가장 강한 팀들은 1라운드를 쉰다 (60팀이면 네 팀이 쉬어 32팀, 120팀이면 여덟 팀이 쉬어 64팀이 남는다).
         let seeds = teams(in: .pro).sorted { (strength(of: $0.id), -$0.id) > (strength(of: $1.id), -$1.id) }
-            .prefix(Balance.cupByes).map(\.id)
+            .prefix(Balance.cupByes(entrants: teams.count)).map(\.id)
         fresh.byes = Array(seeds)
         fresh.ties = drawCup(teams.map(\.id).filter { !seeds.contains($0) })
         cup = fresh
@@ -90,8 +113,11 @@ extension Game {
 
     /// 다음 컵 라운드가 리그 몇 라운드 뒤에 열리는지. 대회가 끝났으면 nil.
     public var nextCupLeagueRound: Int? {
-        guard let cup, !cup.isFinished, cup.roundIndex < Balance.cupAfterRounds.count else { return nil }
-        return Balance.cupAfterRounds[cup.roundIndex]
+        guard let cup, !cup.isFinished else { return nil }
+        let timetable = Balance.cupAfterRounds(total: cup.totalRounds)
+        guard cup.roundIndex < timetable.count else { return nil }
+        // 일정이 짧은 시즌에도 결승은 마지막 리그 라운드 전에 열린다.
+        return min(timetable[cup.roundIndex], roundsPerSeason - 1)
     }
 
     /// 리그 경기를 하나 마친 뒤: 컵 라운드를 치를 때가 됐으면 연다.
@@ -167,7 +193,7 @@ extension Game {
     /// 정규시즌이 끝날 때 대회가 아직 남아 있으면(예전 저장 파일로 시즌 도중에 대회가 생긴 경우) 끝까지 치른다.
     mutating func finishCupQuietly() {
         var guardCount = 0
-        while let cup, !cup.isFinished, guardCount < Cup.roundNames.count {
+        while let cup, !cup.isFinished, guardCount < 10 {
             guardCount += 1
             finishCupRound()
         }

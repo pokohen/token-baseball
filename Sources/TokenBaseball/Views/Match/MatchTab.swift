@@ -32,7 +32,7 @@ struct MatchTab: View {
     }
 
     @ViewBuilder private var schedule: some View {
-        if game.phase == .regular, game.round < Balance.roundsPerSeason {
+        if game.phase == .regular, game.round < game.roundsPerSeason {
             Card("일정") {
                 let upcoming = Array(game.schedules[game.userTier.index].enumerated())
                     .filter { $0.offset >= game.round }.prefix(6)

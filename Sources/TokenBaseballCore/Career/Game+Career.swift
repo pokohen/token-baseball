@@ -22,12 +22,17 @@ extension Game {
 
     /// 새 선수 모드: 6개 리그 60팀을 모두 CPU 구단으로 만들고, 내 선수를 6부 구단에 입단시킨다.
     public static func newCareer(setup: CareerSetup, now: Date, seed: UInt64) -> Game {
+        newCareer(setup: setup, now: now, seed: seed, leagueSize: Balance.teamsPerLeague(setup.sport))
+    }
+
+    /// `leagueSize`: 리그마다 몇 팀인지. 예전 크기의 세계를 시험할 때만 따로 준다.
+    static func newCareer(setup: CareerSetup, now: Date, seed: UInt64, leagueSize: Int) -> Game {
         var game = Game(funds: FundsLedger(startedAt: now), rng: SeededRNG(seed: seed), chargeAnchor: now)
         let sport = setup.sport
         if sport != .baseball { game.sportChoice = sport }
         var taken: Set<String> = []
         for tier in LeagueTier.allCases {
-            for slot in 0..<Balance.teamsPerLeague {
+            for slot in 0..<leagueSize {
                 let id = game.teams.count
                 let identity = tier == .pro
                     ? NameGenerator.proTeams(sport)[slot]
@@ -38,7 +43,8 @@ extension Game {
                 game.setUpCPUTeam(id, slot: slot)
             }
         }
-        let club = game.teams(in: .citizenAmateur)[Balance.careerStartSlot].id
+        let sixth = game.teams(in: .citizenAmateur)
+        let club = sixth[sixth.count / 2].id
         game.userTeamID = club
         game.createCareerPlayer(setup, team: club)
         game.startSeasonSchedules()

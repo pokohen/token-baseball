@@ -43,9 +43,9 @@ extension Game {
                 }
             }
             if isCareer {
-                if round >= Balance.roundsPerSeason { finishCupQuietly() } else { openCupRoundIfDue() }
+                if round >= roundsPerSeason { finishCupQuietly() } else { openCupRoundIfDue() }
             }
-            if round >= Balance.roundsPerSeason { endRegularSeason() }
+            if round >= roundsPerSeason { endRegularSeason() }
         case .cup:
             finishCupRound()
         case .playoff:
