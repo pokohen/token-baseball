@@ -46,18 +46,4 @@ import Testing
         for _ in 0..<total where game.rng.chance(Balance.careerCriticalChance) { count += 1 }
         #expect(count > total / 200 && count < total / 50)
     }
-
-    @Test func 크리티컬은_리그_한도를_보통_훈련_한_번만큼만_넘는다() throws {
-        var game = make()
-        let ceiling = try #require(game.careerLeagueCeiling)
-        var me = game.myPlayer!
-        me.potential = 99
-        // 한도 바로 아래까지 올려 둔다.
-        let lift = ceiling - 0.1 - me.ability
-        for key in game.careerTrainableKeys { me.attributes[key] += lift }
-        game.players[me.id] = me
-        #expect(abs(game.myPlayer!.ability - (ceiling - 0.1)) < 0.01)
-        try game.trainCareer(game.careerTrainableKeys[0], critical: true)
-        #expect(game.myPlayer!.ability <= ceiling + Balance.careerTrainingStep + 0.0001)
-    }
 }

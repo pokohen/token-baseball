@@ -8,7 +8,7 @@ struct CareerTrainingTab: View {
     var body: some View {
         VStack(spacing: 10) {
             if let career = game.career, let me = game.myPlayer {
-                Card("훈련", trailing: "남은 횟수 \(career.sessionsLeft)/\(Balance.careerSessionsPerMatch)") {
+                Card("훈련", trailing: sessionsText(career)) {
                     KeyValueRow(key: "훈련 포인트", value: "\(game.funds.balance.formatted()) P")
                     if let critical = career.lastCritical {
                         Label(critical, systemImage: "sparkles")
@@ -69,14 +69,20 @@ struct CareerTrainingTab: View {
         game.sport == .football && key == .speed ? "스피드" : key.label
     }
 
+    private func sessionsText(_ career: Career) -> String {
+        career.sessionsLeft <= 0 && game.careerExtraTrainingEnabled
+            ? "추가 훈련 \(game.careerExtraSessionsUsed)번 · 비용 ×\(String(format: "%.1f", game.careerSessionCostMultiplier))"
+            : "남은 횟수 \(max(0, career.sessionsLeft))/\(Balance.careerSessionsPerMatch)"
+    }
+
     private func trainingNote(_ career: Career, _ me: Player) -> String {
         if me.age >= Balance.careerTrainingAgeLimit(me.position) {
             return "\(Balance.careerTrainingAgeLimit(me.position))세부터는 훈련으로 능력치를 올릴 수 없습니다."
         }
-        if let ceiling = game.careerLeagueCeiling, me.ability >= ceiling {
-            return "지금 리그에서 배울 수 있는 만큼 다 배웠습니다 (능력 \(Int(ceiling))). 윗 리그 구단으로 옮기거나 구단이 승격하면 다시 훈련할 수 있습니다."
+        if career.sessionsLeft <= 0, game.careerExtraTrainingEnabled {
+            return "정해진 \(Balance.careerSessionsPerMatch)번을 다 써서 지금부터는 추가 훈련입니다. 비용이 \(String(format: "%.1f", game.careerSessionCostMultiplier))배이고, 한 번 할 때마다 \(Balance.careerExtraSessionCost)배씩 더 비싸집니다. 다음 경기를 치르면 처음 값으로 돌아갑니다."
         }
-        if career.sessionsLeft <= 0 { return "오늘 훈련을 마쳤습니다. 다음 경기를 치르면 다시 \(Balance.careerSessionsPerMatch)번 훈련할 수 있습니다." }
+        if career.sessionsLeft <= 0 { return "오늘 훈련을 마쳤습니다. 다음 경기를 치르면 다시 \(Balance.careerSessionsPerMatch)번 훈련할 수 있습니다. 설정 탭에서 \"추가 훈련\"을 켜면 더 비싼 값에 이어서 할 수 있습니다." }
         return "경기와 경기 사이에 \(Balance.careerSessionsPerMatch)번까지 훈련합니다. 어떤 훈련이든 능력이 \(Balance.careerTrainingStep)씩 오르고, 그 능력치가 높을수록 포인트가 많이 듭니다. 100번에 한 번꼴로 크리티컬이 터져 세 배 오릅니다. 쓰지 않은 포인트는 그대로 남습니다."
     }
 }

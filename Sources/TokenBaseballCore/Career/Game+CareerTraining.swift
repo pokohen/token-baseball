@@ -20,18 +20,32 @@ extension Game {
         return min(Balance.careerTrainingStep / weight, 99 - me.attributes[key])
     }
 
-    /// 훈련으로 올릴 수 있는 능력의 한도: 지금 리그 강도 범위의 위쪽 끝보다 조금 위. 1부는 한도가 없다.
-    public var careerLeagueCeiling: Double? {
-        guard isCareer, userTier != .pro else { return nil }
-        return Balance.strengthRange(userTier).upperBound + Balance.careerLeagueHeadroom
+    /// 설정: 정해진 횟수를 넘겨서도 훈련할 수 있는지.
+    public var careerExtraTrainingEnabled: Bool { settings.extraTraining ?? false }
+
+    public mutating func setCareerExtraTraining(_ on: Bool) { settings.extraTraining = on ? true : nil }
+
+    /// 이번 경기 사이에 정해진 횟수를 넘겨 한 추가 훈련의 수.
+    public var careerExtraSessionsUsed: Int { max(0, -(career?.sessionsLeft ?? 0)) }
+
+    /// 지금 하는 훈련이 추가 훈련이면 비용에 곱하는 값 (첫 추가 훈련 1.5배, 그다음 2.25배…). 아니면 1.
+    public var careerSessionCostMultiplier: Double {
+        guard let career, career.sessionsLeft <= 0, careerExtraTrainingEnabled else { return 1 }
+        return pow(Balance.careerExtraSessionCost, Double(1 - career.sessionsLeft))
     }
 
-    /// 훈련 한 번에 드는 훈련 포인트. 지금 값이 높을수록, 한계에 가까울수록 비싸다.
+    /// 훈련 횟수를 다 썼고 추가 훈련도 할 수 없는지.
+    var careerSessionsExhausted: Bool {
+        guard let career else { return true }
+        return career.sessionsLeft <= 0 && !careerExtraTrainingEnabled
+    }
+
+    /// 훈련 한 번에 드는 훈련 포인트. 지금 값이 높을수록, 한계에 가까울수록, 추가 훈련일수록 비싸다.
     public func careerTrainingCost(_ key: Attributes.Key) -> Int {
         guard let me = myPlayer else { return 0 }
         var cost = Balance.careerTrainingCost(value: me.attributes[key])
         if me.potential - me.ability <= Balance.careerNearPotentialRoom { cost *= 2 }
-        return price(cost)
+        return price(Int((Double(cost) * careerSessionCostMultiplier).rounded()))
     }
 
     /// 지금 이 훈련을 할 수 없는 이유. 할 수 있으면 nil.
@@ -43,21 +57,18 @@ extension Game {
         if me.age >= Balance.careerTrainingAgeLimit(me.position) {
             return "\(Balance.careerTrainingAgeLimit(me.position))세부터는 훈련으로 능력치를 올릴 수 없습니다."
         }
-        if career.sessionsLeft <= 0 { return "다음 경기를 치르면 다시 훈련할 수 있습니다." }
+        if careerSessionsExhausted { return "다음 경기를 치르면 다시 훈련할 수 있습니다." }
         if me.attributes[key] >= 99 { return "이미 최고치입니다." }
         if me.ability + Balance.careerTrainingStep > me.potential + 0.0001 {
             return "한계에 닿았습니다. 지금은 더 오르지 않습니다."
-        }
-        // 지금 리그 수준을 크게 넘으면 더 배울 것이 없다. 윗 리그로 올라가야 한다.
-        if let ceiling = careerLeagueCeiling, me.ability >= ceiling {
-            return "지금 리그에서는 더 오르지 않습니다 (능력 \(Int(ceiling))까지). 윗 리그로 올라가야 합니다."
         }
         let cost = careerTrainingCost(key)
         if funds.balance < cost { return "훈련 포인트가 모자랍니다. \(Format.tokens(cost)) P가 필요합니다." }
         return nil
     }
 
-    /// 훈련 포인트(토큰)를 써서 능력치 하나를 올린다. 경기와 경기 사이에 정해진 횟수만큼 할 수 있다.
+    /// 훈련 포인트(토큰)를 써서 능력치 하나를 올린다. 경기와 경기 사이에 정해진 횟수만큼 할 수 있고,
+    /// 설정에서 추가 훈련을 켜면 그 뒤로도 점점 비싼 값에 할 수 있다.
     /// 100번에 한 번꼴로 크리티컬이 터져 같은 포인트로 세 배 오른다.
     public mutating func trainCareer(_ key: Attributes.Key) throws {
         try trainCareer(key, critical: nil)
@@ -71,9 +82,8 @@ extension Game {
         let critical = forced ?? rng.chance(Balance.careerCriticalChance)
         var gain = careerTrainingGain(key)
         if critical {
-            // 세 배까지. 다만 한계(잠재력)와 최고치 99는 넘지 않고, 리그 한도도 보통 훈련 한 번만큼만 넘는다.
-            let limit = min(me.potential, (careerLeagueCeiling ?? 99) + Balance.careerTrainingStep)
-            let room = max(1, (limit - me.ability) / Balance.careerTrainingStep)
+            // 세 배까지. 다만 한계(잠재력)와 최고치 99는 넘지 않는다.
+            let room = max(1, (me.potential - me.ability) / Balance.careerTrainingStep)
             gain = min(gain * min(Balance.careerCriticalMultiplier, room), 99 - me.attributes[key])
         }
         me.attributes[key] = min(99, me.attributes[key] + gain)
@@ -92,15 +102,17 @@ extension Game {
         self.career = career
     }
 
-    /// 한계 돌파 훈련에 드는 훈련 포인트.
-    public var careerBreakthroughCost: Int { price(Balance.careerBreakthroughCost) }
+    /// 한계 돌파 훈련에 드는 훈련 포인트. 추가 훈련이면 더 든다.
+    public var careerBreakthroughCost: Int {
+        price(Int((Double(Balance.careerBreakthroughCost) * careerSessionCostMultiplier).rounded()))
+    }
 
     public var careerBreakthroughBlockedReason: String? {
         guard let career, !career.retired, let me = players[career.playerID] else { return "선수가 없습니다." }
         if me.age >= Balance.careerTrainingAgeLimit(me.position) {
             return "\(Balance.careerTrainingAgeLimit(me.position))세부터는 한계를 넓힐 수 없습니다."
         }
-        if career.sessionsLeft <= 0 { return "다음 경기를 치르면 다시 훈련할 수 있습니다." }
+        if careerSessionsExhausted { return "다음 경기를 치르면 다시 훈련할 수 있습니다." }
         if me.potential >= 99 { return "더 넓힐 한계가 없습니다." }
         if funds.balance < careerBreakthroughCost {
             return "훈련 포인트가 모자랍니다. \(Format.tokens(careerBreakthroughCost)) P가 필요합니다."
