@@ -49,7 +49,11 @@ extension Game {
         guard let career, let me = players[career.playerID], let myTeam = me.teamID, team != myTeam else { return false }
         let myTier = teams[myTeam].tier, theirs = teams[team].tier
         let role = careerRole(on: team)
-        if theirs == myTier { return role != .prospect && careerRole(on: myTeam) != .starter }
+        if theirs == myTier {
+            // 계약이 끝난 선수는 지금 주전이어도 데려갈 수 있다 (재계약을 못 받은 선수의 출구).
+            let available = careerRole(on: myTeam) != .starter || me.contract.seasonsLeft <= 0
+            return role != .prospect && available
+        }
         guard theirs == myTier.upper else { return false }
         if role != .prospect { return true }
         return me.age <= 23 && me.ability >= Balance.abilityRange(theirs).lowerBound - 8
@@ -75,7 +79,7 @@ extension Game {
             // 명성과 같은 기준을 쓴다: 야구는 6.5, 축구와 농구는 6.3. 그보다 조금 아래부터 관심이 오른다.
             let baseline = (me.position.sport == .baseball ? 6.5 : 6.3) - Balance.careerScoutBaselineSlack
             // 선발 투수는 나오는 경기가 적어서 한 경기가 더 크게 반영된다.
-            let rarity = me.position == .starter ? 2.0 : 1.0
+            let rarity = me.position == .starter ? Balance.careerScoutStarterPitcher : 1.0
             let weight = kind == .friendly ? 0.5 : 1.0
             for index in scouts.indices {
                 let team = scouts[index].teamID
@@ -109,20 +113,33 @@ extension Game {
 
         // 관심이 식었거나 더는 데려갈 수 없는 구단은 떠난다.
         for scout in scouts where scout.interest <= 0 || !careerScoutEligible(scout.teamID) {
-            if scout.interest <= 0 { lines.append("\(teams[scout.teamID].name) 스카우트가 관심을 거뒀습니다.") }
+            lines.append(scout.interest <= 0
+                ? "\(teams[scout.teamID].name) 스카우트가 관심을 거뒀습니다."
+                : "\(teams[scout.teamID].name) 스카우트가 떠났습니다 (이제 그 구단에는 맞는 자리가 없습니다).")
         }
         scouts.removeAll { $0.interest <= 0 || !careerScoutEligible($0.teamID) }
 
         // 새 스카우트: 명성이 높을수록, 방금 잘했을수록, 이적을 요청했거나 계약이 끝났을수록 잘 온다.
-        if scouts.count < Balance.careerScoutMax, performance != nil || me.contract.seasonsLeft <= 0 {
+        // 자리가 다 찼으면, 가면 주전인 구단만 올 수 있다: 관심이 가장 낮은 "유망주로 보는" 구단을 밀어낸다.
+        let full = scouts.count >= Balance.careerScoutMax
+        let weakest = scouts.indices
+            .filter { careerRole(on: scouts[$0].teamID) != .starter }
+            .min { (scouts[$0].interest, scouts[$0].teamID) < (scouts[$1].interest, scouts[$1].teamID) }
+        if !full || weakest != nil, performance != nil || me.contract.seasonsLeft <= 0 {
             var chance = Balance.careerScoutArrival + career.fame / 250
             if let performance, performance.rating >= 7 { chance += 0.12 }
             if career.transferRequested { chance += 0.3 }
             if me.contract.seasonsLeft <= 0 { chance += 0.4 }
             if rng.chance(min(0.9, chance)) {
                 let watching = Set(scouts.map(\.teamID))
-                let candidates = teams.map(\.id).filter { !watching.contains($0) && careerScoutEligible($0) }
+                let candidates = teams.map(\.id).filter {
+                    !watching.contains($0) && careerScoutEligible($0) && (!full || careerRole(on: $0) == .starter)
+                }
                 if !candidates.isEmpty {
+                    if full, let weakest {
+                        lines.append("\(teams[scouts[weakest].teamID].name) 스카우트가 다른 구단에 밀려 떠났습니다.")
+                        scouts.remove(at: weakest)
+                    }
                     let myTier = teams[userTeamID].tier
                     // 윗 리그 구단이 더 자주 온다. 가면 주전인 구단도 눈여겨본다.
                     let pick = candidates[rng.weighted(candidates.map { id in

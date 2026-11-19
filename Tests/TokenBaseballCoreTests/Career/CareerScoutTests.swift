@@ -127,6 +127,46 @@ import Testing
         // 두 단계 위 리그는 지켜보지 않는다.
         let far = try #require(game.teams(in: .citizenPro).first).id
         #expect(!game.careerScoutEligible(far))
+        // 계약이 끝났으면 주전이어도 같은 리그 구단이 데려갈 수 있다.
+        game.players[id]?.contract.seasonsLeft = 0
+        #expect(game.careerScoutEligible(same))
+        #expect(game.careerScoutOfferThreshold == Balance.careerScoutOfferInterestExpired)
+    }
+
+    @Test func 자리가_다_차면_주전으로_쓸_구단이_관심_낮은_구단을_밀어낸다() throws {
+        var game = TestCareer.make(.shortstop, seed: 74)
+        let id = try #require(game.career?.playerID)
+        // 5부의 약한 구단에서는 주전, 강한 구단에서는 주전 경쟁쯤 되는 능력으로 맞춘다.
+        let upper = game.teams(in: .citizenSemiPro)
+        func bar(_ team: Team) -> Double {
+            game.roster(of: team.id).filter { $0.position == .shortstop }.map(\.ability).max() ?? 0
+        }
+        let sorted = upper.sorted { bar($0) < bar($1) }
+        let level = (bar(sorted[2]) + bar(sorted[3])) / 2
+        for (key, _) in Attributes.weights(for: .shortstop) { game.players[id]?.attributes[key] = level }
+        game.players[id]?.potential = 90
+        let notStarter = sorted.filter { game.careerRole(on: $0.id) != .starter && game.careerScoutEligible($0.id) }
+        try #require(notStarter.count >= 3)
+        #expect(sorted.contains { game.careerRole(on: $0.id) == .starter })
+        game.career?.scouts = notStarter.prefix(3).enumerated().map { index, team in
+            CareerScout(teamID: team.id, interest: Double(30 + index * 10))
+        }
+        game.career?.fame = 100
+        let me = try #require(game.myPlayer)
+        var replaced = false
+        for _ in 0..<40 where !replaced {
+            var career = try #require(game.career)
+            let lines = game.updateCareerScouts(
+                &career, me: me, performance: .init(rating: 6.2, line: ""), kind: .regular)
+            #expect((career.scouts?.count ?? 0) <= Balance.careerScoutMax)
+            if lines.contains(where: { $0.contains("밀려 떠났습니다") }) {
+                replaced = true
+                #expect(career.scouts?.contains { game.careerRole(on: $0.teamID) == .starter } == true)
+                // 밀려난 것은 관심이 가장 낮던 구단이다.
+                #expect(career.scouts?.contains { $0.teamID == notStarter[0].id } == false)
+            }
+        }
+        #expect(replaced)
     }
 
     @Test func 한_시즌을_돌리면_스카우트가_오가고_저장해도_그대로다() throws {
