@@ -107,6 +107,8 @@ import Testing
                 #expect(roster.allSatisfy { $0.position.sport == .basketball }, "\(team.name)")
                 #expect(roster.count >= Balance.basketballStarters, "\(team.name) \(roster.count)명")
                 #expect(roster.count <= game.rosterLimit(tier), "\(team.name) \(roster.count)명")
+                // 포지션이 한쪽으로 쏠리지 않는다: 다섯 포지션에 적어도 한 명씩 있다.
+                #expect(Set(roster.map(\.position)).count == 5, "\(team.name) \(roster.map(\.position.rawValue))")
             }
         }
         let career = try #require(game.career)
@@ -122,6 +124,23 @@ import Testing
         defer { try? FileManager.default.removeItem(at: url) }
         try SaveStore(fileURL: url).save(GameSave(game: game))
         #expect(try SaveStore(fileURL: url).load()?.game == game)
+    }
+
+    @Test func 벤치에서_한_시즌을_보내도_감독_신뢰가_무너지지_않는다() throws {
+        for (position, seed) in [(Position.shootingGuard, UInt64(42)), (.smallForward, 41), (.center5, 42)] {
+            var game = TestCareer.make(position, seed: seed)
+            var clock = TestGame.start
+            while game.season == 1, game.phase == .regular, game.nextMatch() != nil {
+                clock = clock.addingTimeInterval(3600)
+                try game.startMatch(now: clock)
+                game.runMatchToEnd()
+            }
+            let career = try #require(game.career)
+            // 훈련을 한 번도 하지 않은 벤치 선수: 재계약 기준(30) 아래로 떨어지지 않는다.
+            #expect(career.trust >= Balance.careerRenewalTrust, "\(position.label) 신뢰 \(career.trust)")
+            // 라이벌은 같은 포지션이다.
+            if let rival = game.careerRival { #expect(rival.position == position) }
+        }
     }
 
     @Test func 평점은_포지션과_출전_시간에_따라_고르게_나온다() throws {

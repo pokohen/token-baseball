@@ -156,7 +156,7 @@ extension Game {
     private func isRivalCandidate(_ other: Player, for me: Player) -> Bool {
         guard other.id != me.id, let team = other.teamID, team != userTeamID,
               teams[team].tier == userTier else { return false }
-        if me.position.sport == .football { return other.position == me.position }
+        if me.position.sport != .baseball { return other.position == me.position }
         if me.isPitcher { return other.isPitcher && (other.position == .starter) == (me.position == .starter) }
         return !other.isPitcher && other.position.sport == me.position.sport
     }

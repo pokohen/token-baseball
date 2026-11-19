@@ -91,6 +91,8 @@ enum BasketballSample {
                 #expect(side.players.filter(\.isOnCourt).count == 5)
                 #expect(total.seconds == match.elapsed * 5)
                 #expect(side.players.allSatisfy { $0.line.fouls <= BasketballMatch.foulLimit })
+                // 5반칙으로 물러난 선수는 코트에 남아 있지 않다.
+                #expect(side.players.allSatisfy { !($0.fouledOut && $0.isOnCourt) })
                 #expect(side.players.filter(\.hasPlayed).allSatisfy { $0.line.games == 1 })
             }
             #expect(match.home.pointsByPeriod.count == match.away.pointsByPeriod.count)
@@ -149,6 +151,27 @@ enum BasketballSample {
         restored.runToEnd()
         #expect(restored == one)
         #expect(one.log.count <= 80)
+    }
+
+    @Test func 다섯_번째_반칙이면_내_선수라도_곧바로_물러난다() {
+        var rng = SeededRNG(seed: 13)
+        let a = BasketballSample.side(id: 1, ability: 50, &rng)
+        var h = BasketballSample.side(id: 2, ability: 50, &rng)
+        // 벤치에서 시작해 출전 시간을 보장받는 선수가 코트에 있다가 퇴장당한 상황.
+        let mine = h.players.count - 1
+        h.featured = h.players[mine].playerID
+        h.featuredMinutes = 24
+        BasketballMatch.swap(&h, out: 0, in: mine)
+        h.players[mine].fouledOut = true
+        h.players[mine].line.fouls = BasketballMatch.foulLimit
+        var match = BasketballMatch(away: a, home: h, rules: BasketballRules(), seed: 1)
+        var events: [MatchEvent] = []
+        match.substitute(&events)
+        #expect(match.home.players[mine].isOnCourt == false)
+        #expect(match.home.players.filter(\.isOnCourt).count == 5)
+        match.runToEnd()
+        #expect(match.home.players[mine].isOnCourt == false)
+        #expect(match.home.players[mine].line.seconds == 0)
     }
 
     @Test func 벤치에서_시작한_내_선수는_정해진_시간만큼_뛴다() {

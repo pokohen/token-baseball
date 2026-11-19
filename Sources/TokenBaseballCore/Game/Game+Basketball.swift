@@ -268,10 +268,11 @@ extension Game {
         if line.steals > 0 { text += " \(line.steals)스틸" }
         if line.blocks > 0 { text += " \(line.blocks)블록" }
         if entry.fouledOut { text += " 5반칙 퇴장" }
-        // 감독 신뢰는 90분 경기로 환산한 시간으로 본다 (13분 미만은 짧게 뛴 경기).
+        // 감독 신뢰는 축구의 "30분도 못 뛴 경기"와 같은 규칙으로 본다: 20분 미만이면 짧게 뛴 경기다.
+        // (벤치에서 나온 선수는 평점이 6점 근처에 몰려서, 보통 규칙을 쓰면 신뢰가 내려가기만 한다.)
         return CareerPerformance(
             rating: clamp(6 + delta * weight, 1, 10), line: text,
-            minutes: minutes * 90 / 40, scored: line.points >= 10)
+            minutes: minutes * 3 / 2, scored: line.points >= 10)
     }
 
     /// 내 경기 정산 (농구).

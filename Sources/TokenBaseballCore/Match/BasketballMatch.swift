@@ -216,6 +216,18 @@ public struct BasketballMatch: Codable, Equatable, Sendable {
                 }
             }
 
+            // 다섯 번째 반칙으로 물러난 선수는 곧바로 나간다 (벤치에 뛸 수 있는 선수가 한 명이라도 있으면).
+            for index in side.players.indices where side.players[index].isOnCourt && side.players[index].fouledOut {
+                let bench = side.players.indices.filter { !side.players[$0].isOnCourt && !side.players[$0].fouledOut }
+                let slot = side.players[index].slot
+                guard let incoming = bench.max(by: {
+                    (side.players[$0].natural == slot ? 1 : 0, side.players[$0].energy, -$0)
+                        < (side.players[$1].natural == slot ? 1 : 0, side.players[$1].energy, -$1)
+                }) else { continue }
+                Self.swap(&side, out: index, in: incoming)
+                events.append(MatchEvent(.change, "\(clockLabel) \(side.shortName) 교체: \(side.players[index].name) 나가고 \(side.players[incoming].name) 들어옵니다"))
+            }
+
             // 지친 선수를 쉬게 한다. 마지막 3분과 연장에는 주전을 다시 올린다.
             let closing = (period == Self.quarters && clock >= Self.quarterLength - 180) || isOvertime
             for index in side.players.indices where side.players[index].isOnCourt {
@@ -223,7 +235,7 @@ public struct BasketballMatch: Codable, Equatable, Sendable {
                 if player.playerID == side.featured { continue }
                 let tired = player.energy < (closing ? 0.3 : 0.55)
                 let returning = closing && !player.isStarter
-                guard tired || returning || player.fouledOut else { continue }
+                guard tired || returning else { continue }
                 let candidate = closing
                     ? Self.bestOnBench(side, like: player.slot, except: nil, startersFirst: true, minEnergy: 0.35)
                     : Self.bestOnBench(side, like: player.slot, except: nil, minEnergy: 0.8)

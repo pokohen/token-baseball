@@ -49,9 +49,9 @@ extension Game {
         case .pointGuard:
             career.goal = CareerGoal(kind: .assists, target: 70 + clamp(edge * 3, -30, 60))
         case .shootingGuard, .smallForward:
-            career.goal = CareerGoal(kind: .basketPoints, target: 220 + clamp(edge * 8, -80, 160))
+            career.goal = CareerGoal(kind: .basketPoints, target: 130 + clamp(edge * 6, -50, 200))
         case .powerForward, .center5:
-            career.goal = CareerGoal(kind: .rebounds, target: 110 + clamp(edge * 4, -40, 80))
+            career.goal = CareerGoal(kind: .rebounds, target: 130 + clamp(edge * 4, -40, 120))
         default:
             career.goal = CareerGoal(kind: .hits, target: 26 + clamp(edge, -6, 10))
         }
