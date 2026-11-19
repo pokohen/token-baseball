@@ -214,6 +214,7 @@ extension Game {
         chargeAnchor = now
         careerStartSeason()
         post("\(name), \(teams[club].name)에 입단! \(LeagueTier.citizenAmateur.displayName) 리그에서 새 커리어를 시작합니다.")
+        postCareerTalent()
     }
 
     /// 화면 확인용: 이적 제안을 하나 만든다.
