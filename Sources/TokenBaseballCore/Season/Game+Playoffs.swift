@@ -5,9 +5,10 @@ import Foundation
 /// - 야구 (직접 만든 방식): 상위 10위 자동 강등, 하위 1위 자동 승격.
 ///   하위 2위와 3위가 **승격 와일드카드**(2위 홈, 2위는 1승·3위는 2연승이 필요)를 치르고,
 ///   이긴 팀이 상위 9위와 **승강 플레이오프**(3전 2선승)를 치른다.
-/// - 축구 (잉글랜드 방식): 상위 9위·10위 자동 강등, 하위 1위 자동 승격.
-///   하위 2~5위가 **승격 플레이오프**를 치른다: 준결승은 홈·원정 두 경기 합산(순위가 낮은 팀이 1차전 홈),
+/// - 축구 (잉글랜드 방식): 20팀 리그는 상위 리그의 아래 세 팀 자동 강등, 하위 1위·2위 자동 승격.
+///   하위 3~6위가 **승격 플레이오프**를 치른다: 준결승은 홈·원정 두 경기 합산(순위가 낮은 팀이 1차전 홈),
 ///   결승은 중립 구장 단판. 이긴 한 팀이 승격한다. 상·하위 리그 팀이 맞붙는 승강전은 없다.
+///   (10팀 리그로 치르던 시즌은 예전대로 두 팀이 오르내린다: 1위 자동 승격, 2~5위 플레이오프.)
 extension PlayoffSeries {
     public var kind: Format { format ?? .bestOfThree }
 
@@ -86,11 +87,20 @@ extension Game {
             pendingMoves.append(TierMove(team: tenth, to: lower))
             pendingMoves.append(TierMove(team: champion, to: upper))
 
-            let contenders = Array(eligible.dropFirst())
+            var contenders = Array(eligible.dropFirst())
             if sport == .football {
-                guard !contenders.isEmpty else { continue }
-                // 한 팀이 더 올라가므로 9위도 자동 강등이다.
-                pendingMoves.append(TierMove(team: ninth, to: lower))
+                // 20팀 리그는 2위도 바로 올라가고, 그만큼 한 팀이 더 내려간다.
+                let direct = Balance.footballAutoPromotions(teams: upperRanked.count)
+                for extra in 1..<direct {
+                    guard let next = contenders.first, upperRanked.count - 1 - extra > 0 else { break }
+                    contenders.removeFirst()
+                    pendingMoves.append(TierMove(team: next, to: upper))
+                    pendingMoves.append(TierMove(team: upperRanked[upperRanked.count - 1 - extra], to: lower))
+                }
+                let moved = pendingMoves.filter { $0.to == lower && upperRanked.contains($0.team) }.count
+                guard !contenders.isEmpty, upperRanked.count > moved else { continue }
+                // 플레이오프로 한 팀이 더 올라가므로 그 위의 한 팀도 자동 강등이다.
+                pendingMoves.append(TierMove(team: upperRanked[upperRanked.count - 1 - moved], to: lower))
                 let four = Array(contenders.prefix(4))
                 switch four.count {
                 case 4:
@@ -221,7 +231,7 @@ extension Game {
                         pendingMoves.append(TierMove(team: only, to: upper))
                     }
                 } else if stage == .final, let winner = here[0].winner {
-                    // 축구 결승: 이긴 팀이 승격한다 (9위는 이미 강등으로 정해졌다).
+                    // 축구 결승: 이긴 팀이 승격한다 (그만큼 내려갈 팀은 이미 정해졌다).
                     pendingMoves.append(TierMove(team: winner, to: upper))
                 } else if let entry = here.first, entry.lowerWins > entry.upperWins {
                     // 야구 승강 플레이오프: 하위 리그 팀이 이기면 두 팀이 자리를 바꾼다.

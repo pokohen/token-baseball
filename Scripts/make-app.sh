@@ -1,6 +1,7 @@
 #!/bin/bash
-# Token Baseball.app 번들을 만든다. 번들로 실행해야 알림이 나온다.
-# 사용법: Scripts/make-app.sh  →  build/Token Baseball.app
+# Token Sports.app 번들을 만든다. 번들로 실행해야 알림이 나온다.
+# 사용법: Scripts/make-app.sh  →  build/Token Sports.app
+# (실행 파일 이름과 번들 식별자는 예전 그대로 TokenBaseball이다. 바꾸면 알림 권한과 저장 폴더가 끊긴다.)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -14,7 +15,9 @@ VERSION="${TB_VERSION:-0.1.0}"
 
 swift build -c release ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"}
 BIN="$(swift build -c release ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"} --show-bin-path)/TokenBaseball"
-APP="build/Token Baseball.app"
+APP="build/Token Sports.app"
+# 이름을 바꾸기 전에 만든 번들이 남아 있으면 지운다.
+rm -rf "build/Token Baseball.app"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
@@ -27,8 +30,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key><string>Token Baseball</string>
-    <key>CFBundleDisplayName</key><string>Token Baseball</string>
+    <key>CFBundleName</key><string>Token Sports</string>
+    <key>CFBundleDisplayName</key><string>Token Sports</string>
     <key>CFBundleIdentifier</key><string>app.tokenbaseball.TokenBaseball</string>
     <key>CFBundleExecutable</key><string>TokenBaseball</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>

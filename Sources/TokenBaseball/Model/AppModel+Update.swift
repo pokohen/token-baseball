@@ -30,7 +30,7 @@ extension AppModel {
                 UpdateChecker.notifiedHead = found.head
                 if game?.settings.notificationsEnabled ?? true {
                     Notifier.send(
-                        title: "Token Sport 새 버전",
+                        title: "Token Sports 새 버전",
                         body: (found.titles.first ?? "변경 \(found.count)건") + " — 설정 탭에서 업데이트 방법을 확인하세요")
                 }
             }

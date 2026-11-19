@@ -12,7 +12,9 @@ enum Updater {
         init(_ message: String) { self.message = message }
     }
 
-    static let appName = "Token Baseball.app"
+    static let appName = "Token Sports.app"
+    /// 0.7.1까지 쓰던 번들 이름. 예전 배포 파일 안에는 앱이 이 이름으로 들어 있다.
+    static let legacyAppName = "Token Baseball.app"
 
     /// 지금 실행 중인 앱 번들. 번들 없이 실행했으면 nil.
     static var installedApp: URL? {
@@ -101,7 +103,9 @@ enum Updater {
                 throw Failure("내려받은 파일을 열지 못했습니다.")
             }
             let fresh = work.appendingPathComponent(appName, isDirectory: true)
-            let copied = run("/usr/bin/ditto", [mount.appendingPathComponent(appName).path, fresh.path]).status == 0
+            let inside = [appName, legacyAppName].map { mount.appendingPathComponent($0) }
+                .first { FileManager.default.fileExists(atPath: $0.path) }
+            let copied = inside.map { run("/usr/bin/ditto", [$0.path, fresh.path]).status == 0 } ?? false
             run("/usr/bin/hdiutil", ["detach", mount.path, "-quiet", "-force"])
             guard copied else { throw Failure("내려받은 파일 안에 앱이 없습니다.") }
 

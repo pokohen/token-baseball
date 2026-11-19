@@ -1,11 +1,11 @@
-<img src="docs/images/app-icon.png" alt="Token Sport 아이콘" width="96">
+<img src="docs/images/app-icon.png" alt="Token Sports 아이콘" width="96">
 
-# Token Sport
+# Token Sports
 
 AI 코딩 도구에서 쓴 토큰이 **훈련 포인트**가 되는 macOS 메뉴바 선수 키우기 게임.
 **야구 선수**나 **축구 선수** 한 명이 되어, 16세에 6부 시민 구단에 입단하고, 코딩하며 쌓인 포인트로 훈련해 1부 프로 리그의 스타까지 올라간다.
 
-> Token Sport는 **KBO를 비롯한 실제 리그·구단과 무관한 비공식 팬 프로젝트**입니다. 등장하는 구단과 선수는 모두 가상입니다.
+> Token Sports는 **KBO를 비롯한 실제 리그·구단과 무관한 비공식 팬 프로젝트**입니다. 등장하는 구단과 선수는 모두 가상입니다.
 
 <img src="docs/images/baseball-player/home.png" alt="야구 선수 홈 화면" width="270"> <img src="docs/images/baseball-player/training.png" alt="훈련 화면" width="270"> <img src="docs/images/football-player/live.png" alt="축구 경기 중계" width="270">
 
@@ -46,7 +46,7 @@ curl -fsSL https://raw.githubusercontent.com/pokohen/token-sport/main/Scripts/in
 - 배포 파일이 아직 없으면 소스를 `~/.token-sport`에 받아 이 맥에서 앱을 만든다. 이때는 Xcode 16 이상이 필요하고 1~2분 걸린다.
 - **업데이트도 같은 명령**이다. 선수 저장 파일은 건드리지 않는다.
 - 아직 배포되지 않은 최신 변경까지 쓰고 싶으면 끝에 `-s -- --build`를 붙인다 (`… | bash -s -- --build`). 소스로 직접 만든다.
-- 지우려면 응용 프로그램 폴더에서 Token Baseball을 휴지통에 넣는다. 저장 파일은 `~/Library/Application Support/TokenBaseball`에 남는다.
+- 지우려면 응용 프로그램 폴더에서 Token Sports를 휴지통에 넣는다. 저장 파일은 `~/Library/Application Support/TokenBaseball`에 남는다.
 
 [GitHub Releases](https://github.com/pokohen/token-sport/releases)에서 `.dmg`를 직접 받아, 열고, 앱을 응용 프로그램 폴더로 끌어다 놓아도 된다.
 
@@ -72,18 +72,18 @@ git을 쓰지 않으면 GitHub 저장소 페이지의 **Code → Download ZIP**�
 Scripts/make-app.sh
 ```
 
-`build/Token Baseball.app`이 생긴다. 처음에는 빌드에 1~2분 걸린다.
+`build/Token Sports.app`이 생긴다. 처음에는 빌드에 1~2분 걸린다.
 
 **3. 실행**
 
 ```sh
-open "build/Token Baseball.app"
+open "build/Token Sports.app"
 ```
 
 - 상단바(메뉴 막대)에 아이콘이 생긴다. Dock에는 나타나지 않는다.
 - 아이콘을 누르면 야구 선수와 축구 선수 중에 고르는 화면이 나온다.
 - 처음 실행하면 알림을 허용할지 묻는다. 경기 종료와 득점 소식을 알림으로 받는다.
-- 계속 쓰려면 앱을 응용 프로그램 폴더로 옮긴다: `cp -R "build/Token Baseball.app" /Applications/`
+- 계속 쓰려면 앱을 응용 프로그램 폴더로 옮긴다: `cp -R "build/Token Sports.app" /Applications/`
 - 맥을 켤 때 자동으로 실행하려면 **시스템 설정 → 일반 → 로그인 항목**에 앱을 추가한다.
 - 끝낼 때는 설정 탭의 **앱 종료**를 누른다.
 

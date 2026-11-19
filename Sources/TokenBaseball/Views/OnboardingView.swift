@@ -85,7 +85,7 @@ struct OnboardingView: View {
                     }
                 }
             } else {
-                Text("Token Sport").font(.title2.bold())
+                Text("Token Sports").font(.title2.bold())
                 Text("평소처럼 AI 코딩을 하면 쓴 토큰이 훈련 포인트로 쌓입니다. 야구 선수나 축구 선수 한 명이 되어, 그 포인트로 훈련하고 경기에 나서며 6부 시민 구단에서 1부 프로 리그의 스타까지 올라가 보세요.")
                 Card("토큰 사용량을 읽는 곳") {
                     Text(model.sources.claudeCode.root.path).font(.caption.monospaced()).textSelection(.enabled)

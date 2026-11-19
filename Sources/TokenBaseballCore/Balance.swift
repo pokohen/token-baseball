@@ -10,6 +10,10 @@ public enum Balance {
     public static func teamsPerLeague(_ sport: Sport) -> Int {
         sport == .football ? 20 : teamsPerLeague
     }
+    /// 축구: 한 리그 경계에서 플레이오프 없이 바로 승격하는 팀 수. 20팀 리그는 잉글랜드처럼 두 팀(그 아래 네 팀이
+    /// 플레이오프로 한 팀 더, 아래 세 팀 강등), 그보다 작은 리그(예전 10팀 저장 파일의 남은 시즌)는 한 팀이다.
+    public static func footballAutoPromotions(teams: Int) -> Int { teams >= 20 ? 2 : 1 }
+
     /// 같은 상대와 홈·원정을 몇 번 도는지. 20팀 리그는 한 번(38라운드), 그보다 작으면 두 번.
     public static func scheduleRepeats(teams: Int) -> Int { teams >= 20 ? 1 : 2 }
     public static func roundsPerSeason(_ sport: Sport) -> Int {

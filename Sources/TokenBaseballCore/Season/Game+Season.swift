@@ -35,7 +35,7 @@ extension Game {
         // 승강: 리그 경계마다 자동 승격·강등과 플레이오프를 정한다.
         setUpPlayoffs()
 
-        if !isCareer, !isBankrupt, userTier != .pro, !canPromote(userTeamID), myRank <= (sport == .football ? 5 : 3) {
+        if !isCareer, !isBankrupt, userTier != .pro, !canPromote(userTeamID), myRank <= (sport == .football ? Balance.footballAutoPromotions(teams: teams(in: userTier).count) + 4 : 3) {
             post(sport == .football
                 ? "구장 등급이 모자라 승격 자격이 다음 순위 팀으로 넘어갔습니다. 경기장을 Lv\(Balance.promotionStadiumLevel(from: userTier))까지 올려야 합니다."
                 : "승강 플레이오프를 신청하지 않아 승격 자격이 다음 순위 팀으로 넘어갔습니다.")
