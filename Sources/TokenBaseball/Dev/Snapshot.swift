@@ -29,6 +29,7 @@ enum Snapshot {
             game.runMatchToEnd()
         }
         game.generateDemoCareerOffer()
+        game.generateDemoCareerScouts()
         model.game = game
         model.todayTokens = 12_000_000
 

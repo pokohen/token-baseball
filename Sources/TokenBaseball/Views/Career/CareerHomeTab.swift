@@ -29,6 +29,15 @@ struct CareerHomeTab: View {
                 }
                 NextMatchCard(game: game, goToMatch: goToMatch)
                 if let note = appearanceNote(me) { Text(note).note().frame(maxWidth: .infinity, alignment: .leading) }
+                if let visitor = game.careerScoutVisitor, !game.isMatchLive {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Image(systemName: "binoculars.fill").accessibilityHidden(true)
+                        Text("\(visitor.tier.displayName) \(visitor.name) 스카우트가 다음 경기를 직접 보러 옵니다.")
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .font(.callout.weight(.medium)).foregroundStyle(Theme.warn)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
             NewsCard(game: game)
         }

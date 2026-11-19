@@ -22,6 +22,7 @@ extension Game {
             players[me.id]?.suspendedMatches = nil
         }
         self.career = career
+        refreshCareerScoutsForSeason()
         assignCareerGoal(announce: !career.isFreeAgent)
         if let line = refreshCareerRival(seasonStart: true) { post(line) }
         ensureCup()
@@ -141,6 +142,7 @@ extension Game {
             players[me.id]?.teamID = nil
         }
         self.career?.isFreeAgent = true
+        clearCareerScouts()
         let tryouts = makeCareerTryoutOffers()
         self.career?.offers = tryouts
         post("계약이 끝나 무소속이 되었습니다. 입단 제안 중 하나를 골라야 경기에 나설 수 있습니다.")
@@ -199,6 +201,8 @@ extension Game {
         career.retired = true
         career.isFreeAgent = false
         career.offers = []
+        career.scouts = nil
+        career.scoutVisit = nil
         self.career = career
         post("\(me.name) 은퇴. \(career.history.count)시즌의 커리어가 명예의 전당에 남습니다.")
     }

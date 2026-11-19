@@ -239,6 +239,9 @@ public struct Career: Codable, Equatable, Sendable {
     public var criticalCount: Int?
     /// 이번 경기 사이에 명성 활동을 했는지. (예전 저장 파일에는 없어서 Optional이다.)
     public var activityDone: Bool?
+    /// 나를 지켜보는 스카우트들과, 다음 경기를 직접 보러 오는 스카우트의 구단. (예전 저장 파일에는 없다.)
+    public var scouts: [CareerScout]?
+    public var scoutVisit: TeamID?
     /// 타고난 재능: 처음 만들어졌을 때의 능력. (예전 저장 파일에는 없다.)
     public var startAbility: Double?
     /// 축구: 이번 경기에 선발이 아니면 교체로 들어갈 시간(분). 선발이거나 야구면 nil.

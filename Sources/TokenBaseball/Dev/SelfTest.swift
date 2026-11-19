@@ -52,6 +52,12 @@ enum SelfTest {
         check("축구 선수: 스타일", model.game?.career?.style == .greedy)
         playOne(model, label: "축구 선수 2")
         check("축구 선수: 평점 또는 미출전 기록", model.game?.lastResult?.summary.isEmpty == false)
+        // 스카우트: 붙이고, 저장했다가 다시 읽어도 남아 있다
+        model.perform { $0.generateDemoCareerScouts() }
+        let scoutCount = model.game?.careerScouts.count ?? 0
+        model.save()
+        let reloaded = (try? model.store.load())?.game
+        check("축구 선수: 스카우트가 저장된다", scoutCount > 0 && reloaded?.careerScouts.count == scoutCount)
 
         // 2-1. 농구 선수 만들기 → 훈련 → 경기 (다른 칸에서 바로)
         model.createCareer(CareerSetup(

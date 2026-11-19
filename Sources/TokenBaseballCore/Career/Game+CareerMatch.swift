@@ -172,6 +172,7 @@ extension Game {
             lines.append("연봉 ₩\(pay.formatted())")
         }
         if kind != .friendly { lines += settleCareerRival(&career, mine: performance, rival: rival) }
+        lines += updateCareerScouts(&career, me: me, performance: performance, kind: kind)
         lines += updateCareerForm(&career, performance: performance, kind: kind)
         self.career = career
         // 토큰으로 사서 치른 경기는 실전 경험으로 능력이 조금 오른다.
