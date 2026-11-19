@@ -16,10 +16,12 @@ struct CareerForm: View {
             TextField("선수 이름", text: $setup.name).textFieldStyle(.roundedBorder)
             ChoiceGrid(items: CareerSetup.footballPositions, selection: $setup.position, columns: 4) { $0.label }
             Text(positionNote).note()
+            startPoints
             Text("출신 (연고지)").font(.callout.weight(.medium))
             ChoiceGrid(items: NameGenerator.userCities, selection: $setup.hometown, columns: 4) { $0 }
         }
         .font(.callout)
+        .onChange(of: setup.position) { setup.points = [:] }
         .onAppear { if setup.position.sport != .football { setup.position = .forward } }
     }
 
@@ -42,6 +44,7 @@ struct CareerForm: View {
             let positions = pitcher ? CareerSetup.pitcherPositions : CareerSetup.batterPositions
             ChoiceGrid(items: positions, selection: $setup.position, columns: pitcher ? 2 : 3) { $0.label }
             Text(positionNote).note()
+            startPoints
 
             HStack {
                 Picker("타석", selection: $setup.bats) {
@@ -60,9 +63,41 @@ struct CareerForm: View {
             ChoiceGrid(items: NameGenerator.userCities, selection: $setup.hometown, columns: 4) { $0 }
         }
         .font(.callout)
+        .onChange(of: setup.position) { setup.points = [:] }
         .onAppear {
             if setup.position.sport != .baseball { setup.position = .shortstop }
             pitcher = setup.position.isPitcher
+        }
+    }
+
+    /// 시작 포인트: 내 포지션의 능력치에 직접 나눠 넣는다.
+    private var startPoints: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("시작 포인트").font(.callout.weight(.medium))
+                Spacer()
+                Text("남은 포인트 \(setup.pointsLeft) / \(Balance.careerStartPoints)")
+                    .font(.callout.monospacedDigit())
+                    .foregroundStyle(setup.pointsLeft > 0 ? Color.accentColor : Color.secondary)
+            }
+            ForEach(Attributes.weights(for: setup.position).map(\.0), id: \.self) { key in
+                let count = setup.points[key] ?? 0
+                HStack(spacing: 8) {
+                    Text(key.label)
+                    Spacer()
+                    Text(count > 0 ? "+\(Int(Double(count) * Balance.careerStartPointValue))" : "—")
+                        .monospacedDigit()
+                        .foregroundStyle(count > 0 ? Color.accentColor : Color.secondary)
+                    Button { setup.points[key] = count - 1 } label: { Image(systemName: "minus") }
+                        .disabled(count <= 0)
+                        .accessibilityLabel("\(key.label) 포인트 빼기")
+                    Button { setup.points[key] = count + 1 } label: { Image(systemName: "plus") }
+                        .disabled(setup.pointsLeft <= 0 || count >= Balance.careerStartPointsPerStat)
+                        .accessibilityLabel("\(key.label) 포인트 넣기")
+                }
+                .controlSize(.small)
+            }
+            Text("포인트 하나에 그 능력치가 +\(Int(Balance.careerStartPointValue)) 오릅니다 (능력치 하나에 \(Balance.careerStartPointsPerStat)개까지). 시작 능력과 성장 한계는 타고난 재능이라 선수마다 다르게 정해지고, 입단하면 스카우트 평가로 알려 줍니다.").note()
         }
     }
 

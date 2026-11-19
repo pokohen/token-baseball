@@ -19,7 +19,7 @@ struct CareerRivalCard: View {
                     Spacer()
                     VStack(alignment: .trailing, spacing: 1) {
                         Text("능력 \(Int(rival.ability))").font(.callout.monospacedDigit())
-                        Text(gapText(rival)).note()
+                        Text("내 능력 \(Int(me.ability))").note()
                     }
                 }
                 Divider()
@@ -33,10 +33,5 @@ struct CareerRivalCard: View {
 
     private func line(_ player: Player) -> String {
         CareerText.record(player, batting: player.batting, pitching: player.pitching, football: player.football)
-    }
-
-    private func gapText(_ rival: Player) -> String {
-        let gap = Int((me.ability - rival.ability).rounded())
-        return gap == 0 ? "나와 같다" : gap > 0 ? "내가 \(gap) 앞선다" : "나보다 \(-gap) 높다"
     }
 }

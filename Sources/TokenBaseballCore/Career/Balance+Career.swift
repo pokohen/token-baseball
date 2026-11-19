@@ -40,8 +40,16 @@ extension Balance {
     public static let careerExtraMatchMax = 0.3
 
     public static let careerStartAge = 16
-    /// 내 선수의 잠재력. 숨겨져 있다.
-    public static let careerPotential = 75.0...90.0
+    /// 내 선수의 타고난 재능: 시작 능력과 잠재력(성장 한계)이 선수마다 이 범위에서 다르게 정해진다.
+    /// 잠재력의 숫자는 숨겨져 있고, 재능 등급으로만 알려 준다.
+    public static let careerStartAbility = 15.0...30.0
+    public static let careerPotential = 68.0...95.0
+    /// 선수를 만들 때 직접 나눠 넣는 시작 포인트의 수와, 포인트 하나에 오르는 능력치.
+    public static let careerStartPoints = 5
+    public static let careerStartPointValue = 3.0
+    /// 능력치 하나에 넣을 수 있는 시작 포인트. 비중이 큰 능력치 하나(골키퍼의 골키핑 등)에 몰아넣어
+    /// 포지션마다 시작 능력이 크게 벌어지는 것을 막는다 (다섯 개를 가장 좋게 넣으면 능력 +3.5 ~ +5.4).
+    public static let careerStartPointsPerStat = 2
     /// 6부 리그 열 구단 중 몇 번째 구단에 입단하는지 (0이 가장 강한 구단).
     public static let careerStartSlot = 5
     public static let careerStartTrust = 40.0

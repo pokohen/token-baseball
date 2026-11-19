@@ -14,11 +14,21 @@ struct NextMatchCard: View {
                 Button("중계 보기", action: goToMatch)
             } else if let next = game.nextMatch() {
                 let opponent = game.teams[next.opponent]
+                // 몇 번째 경기인지 크게 적는다.
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(next.label).font(.title2.bold().monospacedDigit())
+                    if next.kind == .regular {
+                        Text("/ 전체 \(Balance.roundsPerSeason)라운드").font(.callout).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Text("\(game.season)시즌").note()
+                }
+                .accessibilityElement(children: .combine)
                 HStack {
                     EmblemView(team: opponent, size: 28)
                     VStack(alignment: .leading) {
                         Text("\(next.userIsHome ? "홈" : "원정") vs \(opponent.name)").font(.callout.weight(.medium))
-                        Text("\(next.label) · \(opponent.tier.displayName) · 강도 \(Int(game.strength(of: opponent.id)))\(game.sport == .football ? " · \(game.formation(of: opponent.id).label)" : "")").note()
+                        Text("\(opponent.tier.displayName) · 강도 \(Int(game.strength(of: opponent.id)))\(game.sport == .football ? " · \(game.formation(of: opponent.id).label)" : "")").note()
                     }
                     Spacer()
                     Button("경기 시작") {

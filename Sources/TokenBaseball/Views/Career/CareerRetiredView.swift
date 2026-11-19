@@ -15,6 +15,9 @@ struct CareerRetiredView: View {
                 Card("새 선수") {
                     Text("같은 세계에서 새 선수로 다시 시작합니다. 은퇴한 선수의 기록은 명예의 전당에 남습니다.").note()
                     CareerForm(setup: $setup, sport: game.sport)
+                    if setup.pointsLeft > 0 {
+                        Text("시작 포인트가 \(setup.pointsLeft)개 남았습니다. 넣지 않은 포인트는 사라집니다.").note()
+                    }
                     Button("새 커리어 시작") { model.createCareer(setup) }
                         .buttonStyle(.borderedProminent)
                 }

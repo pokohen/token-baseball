@@ -12,6 +12,9 @@ extension Game {
 
     func isMyPlayer(_ id: PlayerID) -> Bool { career?.playerID == id }
 
+    /// 내 선수의 재능 등급 (성장 한계를 대강 알려 준다).
+    public var careerTalent: CareerTalent? { myPlayer.map { CareerTalent(potential: $0.potential) } }
+
     /// 선수 모드에는 기준이 될 "내 구단"이 없으므로 맞춰주기를 끈다.
     var effectiveRubberBand: RubberBand { isCareer ? .off : settings.rubberBand }
 
@@ -41,22 +44,16 @@ extension Game {
         game.startSeasonSchedules()
         game.careerStartSeason()
         game.post("\(setup.name), \(game.teams[club].name)에 입단! \(LeagueTier.citizenAmateur.displayName) 리그에서 커리어를 시작합니다.")
+        game.postCareerTalent()
         return game
     }
 
-    /// 내 선수를 만들어 구단에 넣는다. 능력은 같은 포지션에서 가장 약한 선수 바로 아래다.
+    /// 내 선수를 만들어 구단에 넣는다.
+    /// 시작 능력과 잠재력은 타고난 재능이라 선수마다 다르고, 그 위에 직접 고른 시작 포인트가 더해진다.
     mutating func createCareerPlayer(_ setup: CareerSetup, team: TeamID) {
         let tier = teams[team].tier
-        let range = Balance.abilityRange(tier)
-        let squad = roster(of: team)
-        let reference = squad.filter { $0.position == setup.position }.map(\.ability).min()
-            ?? squad.filter { $0.isPitcher == setup.position.isPitcher && $0.position != .goalkeeper }
-                .map(\.ability).min()
-            ?? range.lowerBound
-        let ability = clamp(reference - 2, range.lowerBound, range.upperBound)
-
         var spec = PlayerFactory.Spec(position: setup.position, tier: tier, season: season)
-        spec.ability = ability...ability
+        spec.ability = Balance.careerStartAbility
         spec.age = Balance.careerStartAge...Balance.careerStartAge
         spec.potential = Balance.careerPotential
         spec.scoutBias = 0
@@ -66,12 +63,26 @@ extension Game {
         player.throwsHand = setup.throwsHand
         player.origin = "\(setup.hometown) 출신 유망주"
         player.traits = []
+        let talent = player.ability
+        for (key, count) in setup.validPoints {
+            player.attributes[key] = min(99, player.attributes[key] + Double(count) * Balance.careerStartPointValue)
+        }
+        player.potential = max(player.potential, player.ability)
+        player.abilityAtSeasonStart = player.ability
         player.contract = Contract(salary: Balance.marketSalary(ability: player.ability), seasonsLeft: 2)
         players[player.id] = player
 
         career = Career(playerID: player.id, season: season)
         career?.peakAbility = player.ability
+        career?.startAbility = talent
         joinCareerClub(team)
+    }
+
+    /// 입단할 때 스카우트가 본 재능을 소식으로 알린다.
+    mutating func postCareerTalent() {
+        guard let me = myPlayer, let talent = careerTalent else { return }
+        let born = career?.startAbility ?? me.ability
+        post("스카우트 평가: \(me.name)의 재능은 \"\(talent.rawValue)\". \(talent.note) (타고난 능력 \(Int(born)))")
     }
 
     /// 내 선수가 구단에 들어간다. 같은 포지션에서 가장 약한 선수의 자리를 넘겨받아 로스터 구성이 그대로 유지된다.

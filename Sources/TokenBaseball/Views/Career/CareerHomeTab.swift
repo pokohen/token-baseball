@@ -54,6 +54,11 @@ struct CareerHomeTab: View {
                     Text("능력 \(Int(me.ability))").note()
                 }
             }
+            if let talent = game.careerTalent {
+                KeyValueRow(
+                    key: "타고난 재능",
+                    value: talent.rawValue + (career.startAbility.map { " · 타고난 능력 \(Int($0))" } ?? ""))
+            }
             Meter(label: "감독 신뢰", value: career.trust, color: career.trust < Balance.careerRenewalTrust ? Theme.loss : .accentColor)
             Meter(label: "명성", value: career.fame, color: Theme.warn)
             form(career)

@@ -8,15 +8,36 @@ public struct CareerSetup: Equatable, Sendable {
     public var throwsHand: Hand
     /// 출신 도시. 선수 소개에만 쓴다.
     public var hometown: String
+    /// 시작 포인트를 어느 능력치에 몇 개 넣었는지. 모두 합쳐 `Balance.careerStartPoints`개, 능력치 하나에 `careerStartPointsPerStat`개까지다.
+    public var points: [Attributes.Key: Int]
 
     public init(
-        name: String, position: Position, bats: Hand = .right, throwsHand: Hand = .right, hometown: String = "서울"
+        name: String, position: Position, bats: Hand = .right, throwsHand: Hand = .right, hometown: String = "서울",
+        points: [Attributes.Key: Int] = [:]
     ) {
         self.name = name
         self.position = position
         self.bats = bats
         self.throwsHand = throwsHand
         self.hometown = hometown
+        self.points = points
+    }
+
+    /// 지금까지 넣은 시작 포인트.
+    public var pointsUsed: Int { validPoints.reduce(0) { $0 + $1.1 } }
+    public var pointsLeft: Int { max(0, Balance.careerStartPoints - pointsUsed) }
+
+    /// 실제로 적용되는 시작 포인트: 내 포지션의 능력치에 넣은 것만, 능력치 하나에 정해진 개수까지,
+    /// 중요한 능력치부터 세어 한도까지만.
+    public var validPoints: [(Attributes.Key, Int)] {
+        var left = Balance.careerStartPoints
+        var result: [(Attributes.Key, Int)] = []
+        for (key, _) in Attributes.weights(for: position) {
+            let count = min(left, Balance.careerStartPointsPerStat, max(0, points[key] ?? 0))
+            if count > 0 { result.append((key, count)) }
+            left -= count
+        }
+        return result
     }
 
     /// 선수 모드에서 고를 수 있는 포지션. 마무리는 세이브 상황에만 나와서 뺐다.
@@ -205,6 +226,8 @@ public struct Career: Codable, Equatable, Sendable {
     public var criticalCount: Int?
     /// 이번 경기 사이에 명성 활동을 했는지. (예전 저장 파일에는 없어서 Optional이다.)
     public var activityDone: Bool?
+    /// 타고난 재능: 처음 만들어졌을 때의 능력. (예전 저장 파일에는 없다.)
+    public var startAbility: Double?
     /// 축구: 이번 경기에 선발이 아니면 교체로 들어갈 시간(분). 선발이거나 야구면 nil.
     var subMinute: Int?
 
@@ -217,6 +240,26 @@ public struct Career: Codable, Equatable, Sendable {
 
     public var seasonAverageRating: Double? {
         seasonRatedGames == 0 ? nil : seasonRatingTotal / Double(seasonRatedGames)
+    }
+}
+
+/// 타고난 재능의 등급. 성장 한계(잠재력)를 대강만 알려 준다.
+public enum CareerTalent: String, Sendable {
+    case genius = "천재", elite = "특급 유망주", promising = "유망주", ordinary = "평범", lateBloomer = "노력파"
+
+    public init(potential: Double) {
+        self = potential >= 90 ? .genius : potential >= 84 ? .elite : potential >= 77 ? .promising
+            : potential >= 71 ? .ordinary : .lateBloomer
+    }
+
+    public var note: String {
+        switch self {
+        case .genius: "1부 리그에서도 최고가 될 수 있는 재능입니다."
+        case .elite: "1부 리그의 스타가 될 수 있는 재능입니다."
+        case .promising: "1부 리그의 주전까지 바라볼 수 있습니다."
+        case .ordinary: "1부 리그에 닿으려면 한계 돌파 훈련이 필요할 수 있습니다."
+        case .lateBloomer: "타고난 한계가 낮습니다. 한계 돌파 훈련으로 넓혀 가야 합니다."
+        }
     }
 }
 

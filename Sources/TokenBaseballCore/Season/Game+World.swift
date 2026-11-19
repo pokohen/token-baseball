@@ -5,7 +5,14 @@ extension Game {
     mutating func tick(kind: MatchKind) {
         // 1. 경기 진행은 이미 끝났다 (finishLiveMatch).
         // 2. 모든 선수 성장
+        let before = myPlayer?.ability
         growAllPlayers(scale: kind == .friendly ? Balance.friendlyGrowthFactor : 1.0)
+        // 선수 모드: 이번 경기로 내 선수가 얼마나 컸는지 경기 결과에 적는다.
+        if let before, let after = myPlayer?.ability, after - before >= 0.005 {
+            lastResult?.summary.append("이번 경기 성장: 능력 +\(String(format: "%.2f", after - before))")
+            let peak = max(career?.peakAbility ?? 0, after)
+            career?.peakAbility = peak
+        }
         funds.trainingTokens = 0
         // 3. 컨디션은 경기 결과를 반영할 때 정했다.
         // 4. CPU 구단 운영

@@ -43,6 +43,9 @@ struct OnboardingView: View {
                     Button("\(slot.label) 이어서 하기") { model.switchSlot(to: slot) }
                         .keyboardShortcut(.defaultAction)
                 } else if makingPlayer, step == 2 {
+                    if career.pointsLeft > 0 {
+                        Text("시작 포인트가 \(career.pointsLeft)개 남았습니다").note()
+                    }
                     Button("커리어 시작") { model.createCareer(career) }
                         .keyboardShortcut(.defaultAction)
                 } else if step < 4 {

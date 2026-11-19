@@ -1,3 +1,5 @@
+<img src="docs/images/app-icon.png" alt="Token Sport 아이콘" width="96">
+
 # Token Sport
 
 AI 코딩 도구에서 쓴 토큰이 **훈련 포인트**가 되는 macOS 메뉴바 선수 키우기 게임.
