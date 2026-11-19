@@ -34,6 +34,8 @@ public struct Game: Codable, Equatable, Sendable {
     public internal(set) var live: LiveMatch?
     /// 진행 중인 축구 경기. 야구는 `live`를 쓴다.
     public internal(set) var liveFootball: LiveFootballMatch?
+    /// 진행 중인 농구 경기. (예전 저장 파일에는 없다.)
+    public internal(set) var liveBasketball: LiveBasketballMatch?
     public internal(set) var lastResult: LastResult?
     /// 이번 틱에 뛴 선수의 출전 계수.
     var playedFactor: [PlayerID: Double] = [:]
@@ -87,16 +89,18 @@ public struct Game: Codable, Equatable, Sendable {
     /// 이번 시즌의 정규시즌 라운드 수. 지금 쓰는 일정에서 읽으므로, 예전 크기의 리그로 시작한 시즌도 끝까지 맞는다.
     public var roundsPerSeason: Int { schedules.first?.count ?? Balance.roundsPerSeason(sport) }
     /// 내 경기가 진행 중인지 (종목과 상관없이).
-    public var isMatchLive: Bool { live != nil || liveFootball != nil }
+    public var isMatchLive: Bool { live != nil || liveFootball != nil || liveBasketball != nil }
 
     public func rosterLimit(_ tier: LeagueTier) -> Int { Balance.rosterLimit(tier, sport: sport) }
     func rosterPositions(_ tier: LeagueTier) -> [Position] { PlayerFactory.rosterPositions(tier, sport: sport) }
 
     /// 이 구단이 지금 경기를 치를 수 있는 구성인지.
     public func canField(_ team: Team) -> Bool {
-        sport == .football
-            ? FootballLineupBuilder.build(team: team, players: players) != nil
-            : LineupBuilder.build(team: team, players: players) != nil
+        switch sport {
+        case .football: FootballLineupBuilder.build(team: team, players: players) != nil
+        case .basketball: BasketballLineupBuilder.build(team: team, players: players) != nil
+        case .baseball: LineupBuilder.build(team: team, players: players) != nil
+        }
     }
 
     public var userTeam: Team { teams[userTeamID] }
@@ -120,9 +124,11 @@ public struct Game: Codable, Equatable, Sendable {
     }
 
     public func strength(of team: TeamID) -> Double {
-        sport == .football
-            ? FootballLineupBuilder.strength(team: teams[team], players: players)
-            : LineupBuilder.strength(team: teams[team], players: players)
+        switch sport {
+        case .football: FootballLineupBuilder.strength(team: teams[team], players: players)
+        case .basketball: BasketballLineupBuilder.strength(team: teams[team], players: players)
+        case .baseball: LineupBuilder.strength(team: teams[team], players: players)
+        }
     }
 
     /// 가격 난이도를 곱한 비용.

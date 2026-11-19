@@ -53,6 +53,26 @@ enum SelfTest {
         playOne(model, label: "축구 선수 2")
         check("축구 선수: 평점 또는 미출전 기록", model.game?.lastResult?.summary.isEmpty == false)
 
+        // 2-1. 농구 선수 만들기 → 훈련 → 경기 (다른 칸에서 바로)
+        model.createCareer(CareerSetup(
+            name: "점검 가드", position: .pointGuard, hometown: "대구", points: [.passing: 2, .dribbling: 2, .three: 1]))
+        check("농구 선수: 만들어짐", model.game?.myPlayer?.name == "점검 가드", model.message ?? "")
+        check("농구 선수: 칸", model.slot == .basketballPlayer && exists("save-basketball-player.json"))
+        check("농구 선수: 종목", model.game?.sport == .basketball && model.sport == .basketball)
+        check("농구 선수: 세계", model.game?.teams.count == 60
+            && model.game?.players.values.allSatisfy { $0.position.sport == .basketball } == true)
+        playOne(model, label: "농구 선수 1")
+        if let key = model.game?.careerTrainableKeys.first {
+            let before = model.game?.myPlayer?.ability ?? 0
+            model.perform { try $0.trainCareer(key) }
+            check("농구 선수: 훈련", (model.game?.myPlayer?.ability ?? 0) > before, model.message ?? "")
+        }
+        model.perform { $0.setCareerStyle(.link) }
+        playOne(model, label: "농구 선수 2")
+        check("농구 선수: 기록", (model.game?.myPlayer?.basketball?.games ?? 0) == 2
+            && model.game?.career?.lastRating != nil)
+        check("축구 선수 저장은 그대로", exists("save-football-player.json"))
+
         // 3. 야구 구단으로 전환 (없음 → 창단)
         model.switchSlot(to: .baseball)
         check("야구 구단: 전환하면 창단 화면", model.game == nil && model.slot == .baseball, model.message ?? "")
@@ -99,7 +119,7 @@ enum SelfTest {
         model = AppModel(store: store, sources: UsageSources())
         check("구단 모드로 껐어도 선수 모드로 연다", model.slot == .baseballPlayer && model.game?.myPlayer?.name == "점검 투수")
         check("구단 저장 파일은 그대로", exists("save-football.json") && exists("save.json"))
-        check("고를 수 있는 모드는 선수 둘", model.selectableSlots == [.baseballPlayer, .footballPlayer])
+        check("고를 수 있는 모드는 선수 셋", model.selectableSlots == [.baseballPlayer, .footballPlayer, .basketballPlayer])
 
         // 8. 경기 도중에 껐다 켰을 때
         model.switchSlot(to: .footballPlayer)
