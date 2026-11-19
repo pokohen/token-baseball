@@ -109,6 +109,13 @@ public enum Balance {
             default: return 20
             }
         }
+        if sport == .basketball {
+            switch tier {
+            case .pro: return 16
+            case .semiPro, .amateur: return 15
+            default: return 13
+            }
+        }
         switch tier {
         case .pro: return 28
         case .semiPro, .amateur: return 22
@@ -135,6 +142,14 @@ public enum Balance {
         default: (2, 5, 5, 4)
         }
     }
+
+    /// 농구 CPU 구단의 포지션별 인원 (포인트 가드, 슈팅 가드, 스몰 포워드, 파워 포워드, 센터).
+    public static func basketballShape(_ tier: LeagueTier) -> [Int] {
+        tier.isCitizen ? [2, 2, 2, 2, 2] : [2, 3, 2, 3, 2]
+    }
+    public static let basketballStarters = 5
+    /// 농구: 이 인원 아래로 내려가면 빈자리를 자동으로 채운다.
+    public static let basketballMinSquad = 8
 
     /// 축구: 이 인원 아래로 내려가면 빈자리를 자동으로 채운다.
     public static let footballMinSquad = 14
@@ -314,6 +329,15 @@ public enum Balance {
 
     /// 포지션까지 본 성장 계수. 축구 필드 선수는 전성기가 조금 이르고, 골키퍼는 늦게까지 큰다.
     public static func ageGrowthFactor(_ age: Int, position: Position) -> Double {
+        if position.sport == .basketball {
+            // 농구: 20대 중반까지 크고 서른이면 멈춘다.
+            switch age {
+            case ...22: return 1.5
+            case 23...26: return 1.0
+            case 27...29: return 0.4
+            default: return 0
+            }
+        }
         guard position.sport == .football else { return ageGrowthFactor(age) }
         if position == .goalkeeper {
             switch age {
@@ -333,12 +357,20 @@ public enum Balance {
 
     /// 능력치가 본격적으로 떨어지기 시작하는 나이. 축구 골키퍼는 늦다.
     public static func declineStartAge(_ position: Position) -> Int {
-        position == .goalkeeper ? 35 : position.sport == .football ? 33 : declineStartAge
+        switch position.sport {
+        case .football: position == .goalkeeper ? 35 : 33
+        case .basketball: 33
+        case .baseball: declineStartAge
+        }
     }
 
     /// 그보다 앞서, 몸으로 하는 능력치만 조금씩 내려가기 시작하는 나이.
     public static func earlyDeclineAge(_ position: Position) -> Int {
-        position == .goalkeeper ? 33 : position.sport == .football ? 30 : 31
+        switch position.sport {
+        case .football: position == .goalkeeper ? 33 : 30
+        case .basketball: 30
+        case .baseball: 31
+        }
     }
 
     /// 은퇴를 생각하기 시작하는 나이. 골키퍼는 3년 늦다.

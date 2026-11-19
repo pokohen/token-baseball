@@ -80,6 +80,10 @@ extension Game {
             return Self.careerFootballPerformance(
                 playerID: career.playerID, in: mine, conceded: theirs.goals, result: 0)
         }
+        if let liveBasketball {
+            let mine = liveBasketball.userIsHome ? liveBasketball.state.home : liveBasketball.state.away
+            return Self.careerBasketballPerformance(playerID: career.playerID, in: mine, result: 0)
+        }
         guard let live else { return nil }
         let mine = live.userIsHome ? live.state.home : live.state.away
         return Self.careerPerformance(playerID: career.playerID, in: mine, result: 0)
@@ -144,7 +148,8 @@ extension Game {
                 let cap = Balance.careerFameCap(teams[userTeamID].tier)
                 // 선발 투수는 나오는 경기가 적어서 한 경기가 더 크게 반영된다.
                 // 축구는 평점이 6점대에 몰려 있어서 기준을 낮추고 크게 반영한다.
-                let football = me.position.sport == .football
+                // 농구도 축구처럼 평점이 6점대에 몰린다.
+                let football = me.position.sport != .baseball
                 let rarity = me.position == .starter ? 3.0 : football ? 2.0 : 1.0
                 // 기세가 붙어 있으면 이름이 더 빨리 알려진다.
                 let momentum = (career.streak ?? 0) >= Balance.careerStreakLength ? Balance.careerMomentumFame : 1

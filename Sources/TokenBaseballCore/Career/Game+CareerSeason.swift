@@ -16,6 +16,7 @@ extension Game {
             players[me.id]?.batting = BattingLine()
             players[me.id]?.pitching = PitchingLine()
             if me.position.sport == .football { players[me.id]?.football = FootballLine() }
+            if me.position.sport == .basketball { players[me.id]?.basketball = BasketballLine() }
             players[me.id]?.abilityAtSeasonStart = me.ability
             players[me.id]?.isHot = false
             players[me.id]?.suspendedMatches = nil
@@ -45,6 +46,12 @@ extension Game {
             career.goal = CareerGoal(kind: .matches, target: 24)
         case .goalkeeper:
             career.goal = CareerGoal(kind: .matches, target: 10)
+        case .pointGuard:
+            career.goal = CareerGoal(kind: .assists, target: 70 + clamp(edge * 3, -30, 60))
+        case .shootingGuard, .smallForward:
+            career.goal = CareerGoal(kind: .basketPoints, target: 130 + clamp(edge * 6, -50, 200))
+        case .powerForward, .center5:
+            career.goal = CareerGoal(kind: .rebounds, target: 130 + clamp(edge * 4, -40, 120))
         default:
             career.goal = CareerGoal(kind: .hits, target: 26 + clamp(edge, -6, 10))
         }
@@ -58,7 +65,7 @@ extension Game {
         let won = awards.filter { $0.season == season && $0.isMine }
         career.history.append(CareerSeason(
             season: season, age: me.age, teamName: teams[userTeamID].name, tier: teams[userTeamID].tier,
-            batting: me.batting, pitching: me.pitching, football: me.football,
+            batting: me.batting, pitching: me.pitching, football: me.football, basketball: me.basketball,
             ratedGames: career.seasonRatedGames, ratingTotal: career.seasonRatingTotal,
             awards: won.map(\.title)))
         career.seasonClosed = true
@@ -169,8 +176,10 @@ extension Game {
         var ratedGames = 0
         var ratingTotal = 0.0
         var football = FootballLine()
+        var basketball = BasketballLine()
         for season in career.history {
             football += season.football ?? FootballLine()
+            basketball += season.basketball ?? BasketballLine()
             batting += season.batting
             pitching += season.pitching
             ratedGames += season.ratedGames
@@ -180,6 +189,7 @@ extension Game {
             name: me.name, position: me.position, firstSeason: career.firstSeason, lastSeason: season,
             retiredAge: me.age, clubs: career.clubs, batting: batting, pitching: pitching,
             football: me.position.sport == .football ? football : nil,
+            basketball: me.position.sport == .basketball ? basketball : nil,
             ratedGames: ratedGames, ratingTotal: ratingTotal, awards: career.awards,
             peakAbility: career.peakAbility, bestTier: career.bestTier, earnings: career.earnings,
             seasonsPlayed: career.history.count)

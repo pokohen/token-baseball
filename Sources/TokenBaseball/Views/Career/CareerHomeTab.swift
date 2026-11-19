@@ -40,7 +40,7 @@ struct CareerHomeTab: View {
                 EmblemView(team: game.userTeam, size: 44)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(me.name).font(.headline)
-                    Text(me.position.sport == .football
+                    Text(me.position.sport != .baseball
                         ? "\(me.age)세 · \(me.position.label)"
                         : "\(me.age)세 · \(me.position.label) · \(me.throwsHand.rawValue)투\(me.bats.rawValue)타").note()
                     Text(career.isFreeAgent
@@ -109,6 +109,10 @@ struct CareerHomeTab: View {
             if plan.starts { return "다음 경기에 선발로 나섭니다." }
             if let minute = plan.subMinute { return "다음 경기는 벤치에서 시작합니다. \(minute)분쯤 교체로 들어갑니다." }
             return "다음 경기는 벤치입니다. 골키퍼는 교체로 나오지 않습니다."
+        }
+        if let plan = game.careerBasketballPlan {
+            if plan.starts { return "다음 경기에 선발로 나섭니다." }
+            return "다음 경기는 벤치에서 시작합니다. \(plan.minutes ?? 0)분쯤 뜁니다 (감독 신뢰가 오르면 늘어납니다)."
         }
         switch me.position {
         case .starter:

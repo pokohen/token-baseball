@@ -54,6 +54,9 @@ extension Game {
         if let liveFootball, let score = liveScore {
             return "⚽ \(score.mine):\(score.theirs) \(liveFootball.state.clockLabel)"
         }
+        if let liveBasketball, let score = liveScore {
+            return "🏀 \(score.mine):\(score.theirs) \(liveBasketball.state.clockLabel)"
+        }
         if let lastResult, !lastResult.acknowledged {
             return "\(sport.symbol) 경기 종료 \(lastResult.label)"
         }
@@ -113,6 +116,11 @@ extension Game {
             return liveFootball.userIsHome
                 ? (liveFootball.state.home.goals, liveFootball.state.away.goals)
                 : (liveFootball.state.away.goals, liveFootball.state.home.goals)
+        }
+        if let liveBasketball {
+            return liveBasketball.userIsHome
+                ? (liveBasketball.state.home.points, liveBasketball.state.away.points)
+                : (liveBasketball.state.away.points, liveBasketball.state.home.points)
         }
         return nil
     }

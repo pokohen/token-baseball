@@ -64,7 +64,25 @@ extension Balance {
     public static let careerTrainingAgeLimit = 31
     /// 포지션별 훈련 한도 나이: 성장이 멈추는 나이와 같다.
     public static func careerTrainingAgeLimit(_ position: Position) -> Int {
-        position == .goalkeeper ? 32 : position.sport == .football ? 29 : careerTrainingAgeLimit
+        switch position.sport {
+        case .football: position == .goalkeeper ? 32 : 29
+        case .basketball: 30
+        case .baseball: careerTrainingAgeLimit
+        }
+    }
+    /// 농구: 선발이 아닐 때 벤치에서 나와 뛰는 시간(분, 40분 경기). 감독 신뢰가 높을수록 길다 (신뢰 0이면 8분, 40이면 15분, 90 이상이면 24분).
+    public static func careerBenchMinutes(trust: Double) -> Int {
+        Int(clamp(8 + trust * 0.18, 8, 24))
+    }
+    /// 농구 평점의 포지션별 기준 보정. 시뮬레이션으로 맞춘다.
+    public static func careerBasketballBaseline(_ position: Position) -> Double {
+        switch position {
+        case .pointGuard: -0.3
+        case .shootingGuard: -0.3
+        case .smallForward: -0.25
+        case .powerForward: -0.45
+        default: -0.5
+        }
     }
     public static func careerForcedRetirementAge(_ position: Position) -> Int {
         careerForcedRetirementAge + (position == .goalkeeper ? 3 : 0)

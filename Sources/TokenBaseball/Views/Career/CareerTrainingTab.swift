@@ -71,7 +71,8 @@ struct CareerTrainingTab: View {
 
     /// 주력과 스피드는 같은 능력치다. 종목에 맞는 이름으로 보여 준다.
     private func label(_ key: Attributes.Key) -> String {
-        game.sport == .football && key == .speed ? "스피드" : key.label
+        if game.sport == .basketball, key == .shooting { return "슛" }
+        return game.sport != .baseball && key == .speed ? "스피드" : key.label
     }
 
     private func sessionsText(_ career: Career) -> String {

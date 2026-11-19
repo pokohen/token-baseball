@@ -69,8 +69,14 @@ struct CareerTab: View {
 
     private func season(_ career: Career, _ me: Player) -> some View {
         Card("이번 시즌", trailing: game.userTier.displayName) {
-            KeyValueRow(key: "기록", value: CareerText.record(me, batting: me.batting, pitching: me.pitching, football: me.football))
-            if let line = me.football {
+            KeyValueRow(key: "기록", value: CareerText.record(
+                me, batting: me.batting, pitching: me.pitching, football: me.football, basketball: me.basketball))
+            if let line = me.basketball {
+                KeyValueRow(
+                    key: "출전 시간 · 야투 · 3점슛",
+                    value: "평균 \(String(format: "%.1f", line.minutesPerGame))분 · \(Int((line.fieldGoalRate * 100).rounded()))% · \(Int((line.threeRate * 100).rounded()))%")
+                KeyValueRow(key: "스틸 · 블록 · 실책", value: "\(line.steals) · \(line.blocks) · \(line.turnovers)")
+            } else if let line = me.football {
                 KeyValueRow(key: "유효 슈팅 · 경고 · 퇴장", value: "\(line.shotsOnTarget) · \(line.yellowCards) · \(line.redCards)")
             } else if me.isPitcher {
                 KeyValueRow(key: "이닝 · 탈삼진", value: "\(me.pitching.innings)이닝 · \(me.pitching.strikeouts)개")
@@ -85,7 +91,8 @@ struct CareerTab: View {
         let totals = game.careerTotals
         return Card("통산") {
             KeyValueRow(key: "기록", value: CareerText.record(
-                me, batting: totals.batting, pitching: totals.pitching, football: game.careerFootballTotals))
+                me, batting: totals.batting, pitching: totals.pitching, football: game.careerFootballTotals,
+                basketball: game.careerBasketballTotals))
             KeyValueRow(
                 key: "평균 평점",
                 value: CareerText.rating(totals.ratedGames == 0 ? nil : totals.ratingTotal / Double(totals.ratedGames)))
@@ -97,7 +104,9 @@ struct CareerTab: View {
                 ForEach(career.history.reversed(), id: \.season) { item in
                     VStack(alignment: .leading, spacing: 1) {
                         Text("\(item.season)시즌 · \(item.age)세 · \(item.teamName) (\(item.tier.rawValue)부)").font(.caption.weight(.semibold))
-                        Text(CareerText.record(me, batting: item.batting, pitching: item.pitching, football: item.football)
+                        Text(CareerText.record(
+                            me, batting: item.batting, pitching: item.pitching, football: item.football,
+                            basketball: item.basketball)
                             + " · 평점 \(CareerText.rating(item.averageRating))").note()
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -108,11 +117,14 @@ struct CareerTab: View {
 
     @ViewBuilder private func rivals(_ me: Player) -> some View {
         if let team = me.teamID {
-            let football = me.position.sport == .football
+            let basketball = me.position.sport == .basketball
+            let football = me.position.sport != .baseball
             let peers = game.roster(of: team).filter { football ? $0.position == me.position : $0.isPitcher == me.isPitcher }
                 .sorted { ($0.ability, -$0.id) > ($1.ability, -$1.id) }
             Card(football ? "주전 경쟁 (\(me.position.label))" : me.isPitcher ? "팀 투수진" : "팀 타선") {
-                if football {
+                if basketball {
+                    Text("\(me.position.label) 선발은 한 명입니다. 같은 포지션에서 가장 좋은 선수를 넘어서야 선발로 나오고, 감독 신뢰가 높으면 능력이 조금 낮아도 선발입니다. 벤치에서도 감독 신뢰만큼 출전 시간을 받습니다.").note()
+                } else if football {
                     let quota = game.formation(of: team).slots.filter { $0 == me.position }.count
                     Text("포메이션 \(game.formation(of: team).label): \(me.position.label) 선발은 \(quota)명입니다. 감독 신뢰가 높으면 능력이 조금 낮아도 선발로 나옵니다.").note()
                 }
