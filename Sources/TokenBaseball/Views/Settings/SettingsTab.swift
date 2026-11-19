@@ -38,6 +38,12 @@ struct SettingsTab: View {
                     Slider(value: setting(\.priceDifficulty), in: 0.1...2.0, step: 0.1)
                     Text("\(Int((game.settings.priceDifficulty * 100).rounded()))%").monospacedDigit().frame(width: 44, alignment: .trailing)
                 }
+                if game.isCareer {
+                    Toggle("추가 훈련 (횟수를 넘겨서도 훈련)", isOn: Binding(
+                        get: { game.careerExtraTrainingEnabled },
+                        set: { on in model.perform { $0.setCareerExtraTraining(on) } }))
+                    Text("꺼 두면 경기 사이에 \(Balance.careerSessionsPerMatch)번까지만 훈련합니다. 켜면 그 뒤로도 훈련할 수 있고, 한 번마다 비용이 \(Balance.careerExtraSessionCost)배씩 더 듭니다 (1.5배, 2.25배, 3.4배…). 다음 경기를 치르면 처음 값으로 돌아갑니다.").note()
+                }
                 Text(game.isCareer
                     ? "훈련 비용에 곱합니다. 토큰 수는 그대로입니다."
                     : "시설·홍보·영입·연봉 비용에 곱합니다. 토큰 수는 그대로입니다.").note()

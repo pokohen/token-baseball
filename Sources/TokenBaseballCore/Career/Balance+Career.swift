@@ -103,8 +103,8 @@ extension Balance {
     /// 훈련이 "크리티컬"로 터질 확률과, 터졌을 때 오르는 양의 배수. 포인트는 똑같이 든다.
     public static let careerCriticalChance = 0.01
     public static let careerCriticalMultiplier = 3.0
-    /// 훈련으로는 지금 리그 강도 범위의 위쪽 끝 + 이 값까지만 오른다.
-    public static let careerLeagueHeadroom = 5.0
+    /// 추가 훈련(설정에서 켠다): 정해진 횟수를 넘긴 훈련은 한 번마다 비용이 이 배수만큼 더 든다 (1.5배, 2.25배, 3.4배…).
+    public static let careerExtraSessionCost = 1.5
 
     /// 능력치 하나를 +1 올리는 데 드는 훈련 포인트.
     /// 훈련할 때마다 그 능력치의 다음 비용이 6%쯤 오른다 (25에서 25만, 50에서 116만, 70에서 397만, 85에서 1,000만).

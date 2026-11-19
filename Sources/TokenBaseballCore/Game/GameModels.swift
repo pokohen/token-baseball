@@ -40,6 +40,9 @@ public struct Settings: Codable, Equatable, Sendable {
     public var menuBarDisplay = MenuBarDisplay.funds
     public var animationEnabled = true
     public var notificationsEnabled = true
+    /// 선수 모드: 정해진 횟수를 넘겨서도 (더 비싼 값에) 훈련할 수 있는지. 꺼져 있으면 경기 사이에 정해진 횟수까지만 한다.
+    /// (예전 저장 파일에는 없어서 Optional이다. 없으면 꺼짐.)
+    public var extraTraining: Bool?
 
     public init() {}
 }

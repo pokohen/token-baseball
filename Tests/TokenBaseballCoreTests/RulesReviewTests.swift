@@ -280,21 +280,22 @@ enum ReviewGame {
         }
     }
 
-    @Test func 지금_리그_수준을_넘으면_윗_리그로_가야_훈련할_수_있다() throws {
+    @Test func 리그_수준을_넘어도_타고난_한계까지는_훈련할_수_있다() throws {
         var game = TestCareer.make(.center, seed: 89)
         TestGame.addTokens(&game, 500_000_000, id: "a", at: TestGame.hours(1))
         let id = try #require(game.career?.playerID)
-        let ceiling = try #require(game.careerLeagueCeiling)
-        #expect(ceiling == Balance.strengthRange(.citizenAmateur).upperBound + Balance.careerLeagueHeadroom)
-        for key in [Attributes.Key.contact, .power, .eye, .speed, .fielding, .arm] { game.players[id]?.attributes[key] = ceiling + 1 }
+        // 6부 강도 범위의 위쪽 끝을 훌쩍 넘긴 선수.
+        let high = Balance.strengthRange(.citizenAmateur).upperBound + 20
+        for key in [Attributes.Key.contact, .power, .eye, .speed, .fielding, .arm] { game.players[id]?.attributes[key] = high }
         game.players[id]?.potential = 90
-        #expect(throws: GameError.self) { try game.trainCareer(.contact) }
-        // 윗 리그 구단으로 옮기면 다시 훈련할 수 있다.
-        let target = try #require(game.teams(in: .citizenSemiPro).first).id
-        game.career?.offers = [CareerOffer(
-            id: 990, kind: .transfer, teamID: target, salary: 1_000_000, years: 2, role: .starter, matchesLeft: 1)]
-        try game.acceptCareerOffer(990)
+        #expect(game.userTier == .citizenAmateur)
+        let before = try #require(game.myPlayer).ability
         try game.trainCareer(.contact)
+        #expect(try #require(game.myPlayer).ability > before)
+        // 한계는 그대로 막는다.
+        let reached = try #require(game.myPlayer).ability
+        game.players[id]?.potential = reached
+        #expect(throws: GameError.self) { try game.trainCareer(.contact) }
     }
 
     @Test func 짧게_뛴_교체_출전은_감독_신뢰가_조금만_움직인다() {

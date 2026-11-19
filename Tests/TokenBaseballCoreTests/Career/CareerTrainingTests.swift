@@ -39,6 +39,52 @@ import Testing
         try game.trainCareer(.control)
     }
 
+    @Test func 추가_훈련을_켜면_횟수를_넘겨서도_점점_비싼_값에_훈련한다() throws {
+        var game = TestCareer.make(.starter)
+        TestGame.addTokens(&game, 500_000_000, id: "a", at: TestGame.hours(1))
+        // 기본은 꺼져 있다: 다섯 번까지만.
+        #expect(!game.careerExtraTrainingEnabled)
+        for _ in 0..<Balance.careerSessionsPerMatch { try game.trainCareer(.stamina) }
+        #expect(game.careerTrainingBlockedReason(.control) != nil)
+        #expect(game.careerBreakthroughBlockedReason != nil)
+        #expect(game.careerSessionCostMultiplier == 1)
+        let base = game.careerTrainingCost(.control)
+        let breakthrough = game.careerBreakthroughCost
+
+        game.setCareerExtraTraining(true)
+        #expect(game.careerTrainingBlockedReason(.control) == nil)
+        // 첫 추가 훈련은 1.5배, 그다음은 2.25배.
+        #expect(game.careerSessionCostMultiplier == 1.5)
+        #expect(game.careerTrainingCost(.control) == Int((Double(base) * 1.5).rounded()))
+        #expect(game.careerBreakthroughCost == Int((Double(breakthrough) * 1.5).rounded()))
+        var balance = game.funds.balance
+        try game.trainCareer(.control)
+        #expect(game.funds.balance == balance - Int((Double(base) * 1.5).rounded()))
+        #expect(game.careerExtraSessionsUsed == 1)
+        #expect(game.careerSessionCostMultiplier == 2.25)
+        // 한계 돌파도 횟수를 쓰므로 같이 비싸진다.
+        balance = game.funds.balance
+        try game.breakThroughCareer()
+        #expect(game.funds.balance == balance - Int((Double(breakthrough) * 2.25).rounded()))
+        #expect(game.careerExtraSessionsUsed == 2)
+
+        // 끄면 다시 막힌다.
+        game.setCareerExtraTraining(false)
+        #expect(game.careerTrainingBlockedReason(.control) != nil)
+        game.setCareerExtraTraining(true)
+
+        // 저장했다가 불러와도 그대로다.
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("extra-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try SaveStore(fileURL: url).save(GameSave(game: game))
+        #expect(try SaveStore(fileURL: url).load()?.game == game)
+
+        // 다음 경기를 치르면 처음 값으로 돌아간다.
+        try TestGame.playOne(&game, at: TestGame.hours(2))
+        #expect(game.careerSessionCostMultiplier == 1)
+        #expect(game.careerExtraSessionsUsed == 0)
+    }
+
     @Test func 가격_난이도가_훈련_비용에도_적용된다() {
         var game = TestCareer.make(.first)
         let normal = game.careerTrainingCost(.power)

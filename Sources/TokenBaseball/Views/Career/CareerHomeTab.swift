@@ -12,7 +12,7 @@ struct CareerHomeTab: View {
             if let career = game.career, let me = game.myPlayer {
                 playerCard(career, me)
                 notices(career)
-                Card("훈련 포인트", trailing: "남은 훈련 \(career.sessionsLeft)/\(Balance.careerSessionsPerMatch)") {
+                Card("훈련 포인트", trailing: "남은 훈련 \(max(0, career.sessionsLeft))/\(Balance.careerSessionsPerMatch)") {
                     Text("\(game.funds.balance.formatted()) P").font(.title2.bold().monospacedDigit())
                     KeyValueRow(key: "오늘 번 포인트 (오늘 쓴 토큰)", value: "\(model.todayTokens.formatted()) P")
                     KeyValueRow(key: "누적 포인트", value: "\(Format.tokens(game.funds.tokenIncome)) P")
