@@ -90,6 +90,18 @@ import Testing
         #expect(me.attributes[.physical] == plain.attributes[.physical])
     }
 
+    @Test(arguments: [Position.shortstop, .reliever, .forward])
+    func 경기를_치르면_능력이_오르고_결과에_적힌다(position: Position) throws {
+        var game = TestCareer.make(position, seed: 5)
+        let before = try #require(game.myPlayer).ability
+        try game.startMatch(now: TestGame.hours(1))
+        game.runMatchToEnd()
+        let gained = try #require(game.myPlayer).ability - before
+        #expect(gained > 0.05)
+        #expect(game.lastResult?.summary.contains("이번 경기 성장: 능력 +\(String(format: "%.2f", gained))") == true)
+        #expect(game.career?.peakAbility == game.myPlayer?.ability)
+    }
+
     @Test func 저장했다가_불러와도_그대로다() throws {
         var game = TestCareer.make(.starter, seed: 7)
         var auto = CareerAuto()
