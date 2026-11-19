@@ -16,7 +16,7 @@
 ## 새 버전 내기
 
 ```sh
-Scripts/release.sh 0.2.0            # build/TokenSport-0.2.0.dmg 를 만든다
+Scripts/release.sh 0.2.0            # build/TokenSports-0.2.0.dmg 를 만든다
 Scripts/release.sh 0.2.0 --publish  # 만든 뒤 GitHub Releases에 v0.2.0으로 올린다
 ```
 
@@ -34,7 +34,7 @@ Scripts/release.sh 0.2.0 --publish  # 만든 뒤 GitHub Releases에 v0.2.0으로
 
 ```sh
 xcrun notarytool history --keychain-profile "token-sport"
-xcrun stapler staple build/TokenSport-0.2.0.dmg
+xcrun stapler staple build/TokenSports-0.2.0.dmg
 ```
 
 ## 올린 뒤에 일어나는 일

@@ -65,4 +65,4 @@ rm -rf .build build
 Scripts/make-app.sh >/dev/null
 echo
 echo "완료. 실행 중인 앱이 있으면 설정 탭의 '앱 종료'로 끈 뒤 새 앱을 여세요:"
-echo "  open \"build/Token Baseball.app\""
+echo "  open \"build/Token Sports.app\""

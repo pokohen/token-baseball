@@ -141,7 +141,7 @@ enum SelfTest {
             == .available(.init(count: 3, titles: ["마지막 변경", "첫 변경"], head: "c3")))
         check("업데이트: 최신", UpdateChecker.parse(Data(#"{"ahead_by":0,"commits":[]}"#.utf8)) == .upToDate)
         if case .unknown = UpdateChecker.parse(Data("{}".utf8)) { check("업데이트: 깨진 응답", true) } else { check("업데이트: 깨진 응답", false) }
-        let release = Data(#"{"tag_name":"v0.10.0","name":"Token Sport 0.10.0","body":"변경 내용\n* 배속 추가\n* 버그 수정","html_url":"https://example.com/r","assets":[{"name":"a.txt","browser_download_url":"https://example.com/a.txt"},{"name":"a.dmg","browser_download_url":"https://example.com/a.dmg"}]}"#.utf8)
+        let release = Data(#"{"tag_name":"v0.10.0","name":"Token Sports 0.10.0","body":"변경 내용\n* 배속 추가\n* 버그 수정","html_url":"https://example.com/r","assets":[{"name":"a.txt","browser_download_url":"https://example.com/a.txt"},{"name":"a.dmg","browser_download_url":"https://example.com/a.dmg"}]}"#.utf8)
         if case .available(let found) = UpdateChecker.parseRelease(release, current: "0.9.3") {
             check("업데이트: 배포 버전", found.version == "0.10.0" && found.titles == ["배속 추가", "버그 수정"])
             check("업데이트: 내려받는 주소", found.download?.absoluteString == "https://example.com/a.dmg" && found.notes.count == 2)
