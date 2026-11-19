@@ -314,7 +314,7 @@ extension Game {
     mutating func giveFootballAwards() {
         for tier in LeagueTier.allCases {
             let everyone = teams(in: tier).flatMap { roster(of: $0.id) }
-            let regulars = everyone.filter { ($0.football?.games ?? 0) >= Balance.roundsPerSeason / 2 }
+            let regulars = everyone.filter { ($0.football?.games ?? 0) >= roundsPerSeason / 2 }
             let keepers = regulars.filter { $0.position == .goalkeeper }
             let outfield = regulars.filter { $0.position != .goalkeeper }
             func line(_ player: Player) -> FootballLine { player.football ?? FootballLine() }

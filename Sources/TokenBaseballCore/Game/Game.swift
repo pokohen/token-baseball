@@ -84,6 +84,8 @@ public struct Game: Codable, Equatable, Sendable {
     // MARK: 읽기
 
     public var sport: Sport { sportChoice ?? .baseball }
+    /// 이번 시즌의 정규시즌 라운드 수. 지금 쓰는 일정에서 읽으므로, 예전 크기의 리그로 시작한 시즌도 끝까지 맞는다.
+    public var roundsPerSeason: Int { schedules.first?.count ?? Balance.roundsPerSeason(sport) }
     /// 내 경기가 진행 중인지 (종목과 상관없이).
     public var isMatchLive: Bool { live != nil || liveFootball != nil }
 
@@ -131,7 +133,7 @@ public struct Game: Codable, Equatable, Sendable {
     /// 경기마다 내는 연봉 합계.
     public var salaryPerMatch: Int {
         let season = roster(of: userTeamID).reduce(0) { $0 + $1.contract.salary }
-        return price(season / Balance.roundsPerSeason)
+        return price(season / roundsPerSeason)
     }
 
     /// 계약이 끝나 떠날 선수인지 (재계약하지 않으면).

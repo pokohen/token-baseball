@@ -9,9 +9,9 @@ public struct Fixture: Codable, Equatable, Sendable {
 }
 
 public enum ScheduleBuilder {
-    /// 더블 라운드 로빈 2번: 모든 팀과 홈 2경기·원정 2경기.
-    /// 10팀이면 36라운드이고, 같은 상대와 연속으로 붙지 않는다.
-    public static func build(teams: [TeamID], _ rng: inout SeededRNG) -> [[Fixture]] {
+    /// 더블 라운드 로빈을 `repeats`번: 모든 팀과 홈·원정을 `repeats`경기씩.
+    /// 10팀이 두 번 돌면 36라운드, 20팀이 한 번 돌면 38라운드이고, 같은 상대와 연속으로 붙지 않는다.
+    public static func build(teams: [TeamID], repeats: Int = 2, _ rng: inout SeededRNG) -> [[Fixture]] {
         precondition(teams.count % 2 == 0 && teams.count >= 4)
         let order = rng.shuffled(teams)
         let count = order.count
@@ -35,7 +35,7 @@ public enum ScheduleBuilder {
 
         let secondLeg = firstLeg.map { $0.map { Fixture(home: $0.away, away: $0.home) } }
         let half = firstLeg + secondLeg
-        return half + half
+        return Array(repeating: half, count: max(1, repeats)).flatMap { $0 }
     }
 }
 

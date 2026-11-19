@@ -13,7 +13,7 @@ enum FootballGame {
     @Test func 축구로_창단하면_모든_구단이_축구_선수로_채워진다() {
         let game = FootballGame.make()
         #expect(game.sport == .football)
-        #expect(game.teams.count == 60)
+        #expect(game.teams.count == 120)
         #expect(game.roster(of: game.userTeamID).count == 16)
         #expect(game.teams(in: .pro).map(\.name).contains("울산 고래"))
         Invariants.check(game, "축구 새 게임")
@@ -50,18 +50,20 @@ enum FootballGame {
     @Test func 한_시즌을_치르면_승점으로_순위가_정해지고_다음_시즌이_시작된다() throws {
         var game = FootballGame.make(seed: 21)
         var manager = AutoManager(tokensPerMatch: 300_000)
-        for _ in 0..<36 { try manager.playOne(&game) }
-        #expect(game.round == 36 || game.phase != .regular)
+        for _ in 0..<38 { try manager.playOne(&game) }
+        #expect(game.round == 38 || game.phase != .regular)
         for tier in LeagueTier.allCases {
             let rows = game.rankedStandings(tier)
-            #expect(rows.allSatisfy { $0.games == 36 })
+            #expect(rows.allSatisfy { $0.games == 38 })
             #expect(zip(rows, rows.dropFirst()).allSatisfy { $0.points >= $1.points })
             // 한 리그의 승·패 수는 같고, 득점과 실점의 합도 같다.
             #expect(rows.reduce(0) { $0 + $1.wins } == rows.reduce(0) { $0 + $1.losses })
             #expect(rows.reduce(0) { $0 + $1.runsFor } == rows.reduce(0) { $0 + $1.runsAgainst })
-            let goals = Double(rows.reduce(0) { $0 + $1.runsFor }) / 180
+            // 20팀이 38라운드를 치르면 380경기다.
+            let matches = Double(rows.count / 2 * game.roundsPerSeason)
+            let goals = Double(rows.reduce(0) { $0 + $1.runsFor }) / matches
             #expect((1.8...3.8).contains(goals), "\(tier.displayName) 경기당 \(goals)골")
-            let draws = Double(rows.reduce(0) { $0 + $1.draws }) / 360
+            let draws = Double(rows.reduce(0) { $0 + $1.draws }) / (matches * 2)
             #expect((0.12...0.42).contains(draws), "\(tier.displayName) 무승부 \(draws)")
         }
         #expect(game.awards.contains { $0.title == "득점왕" })
@@ -160,5 +162,111 @@ enum FootballGame {
         #expect(text.hasSuffix("'"))
         game.runMatchToEnd()
         #expect(game.menuBarText(now: TestGame.hours(1), todayTokens: 0).hasPrefix("⚽ 경기 종료"))
+    }
+}
+
+@Suite struct FootballLeagueSizeTests {
+    @Test func 축구는_리그마다_스무_팀이_38라운드를_치른다() throws {
+        let game = Game.newCareer(
+            setup: CareerSetup(name: "스무팀", position: .midfielder), now: TestGame.start, seed: 11)
+        #expect(game.teams.count == 120)
+        #expect(Set(game.teams.map(\.name)).count == 120)
+        for tier in LeagueTier.allCases {
+            #expect(game.teams(in: tier).count == 20)
+            let schedule = game.schedules[tier.index]
+            #expect(schedule.count == 38)
+            #expect(schedule.allSatisfy { $0.count == 10 })
+            // 모든 팀이 다른 모든 팀과 홈에서 한 번, 원정에서 한 번 만난다.
+            var pairs: [String: Int] = [:]
+            for fixture in schedule.flatMap({ $0 }) { pairs["\(fixture.home)-\(fixture.away)", default: 0] += 1 }
+            #expect(pairs.count == 20 * 19)
+            #expect(pairs.values.allSatisfy { $0 == 1 })
+        }
+        #expect(game.roundsPerSeason == 38)
+        // 6부의 가운데 구단에 입단한다.
+        #expect(game.userTier == .citizenAmateur)
+        // 야구는 그대로다.
+        let baseball = TestCareer.make(.shortstop)
+        #expect(baseball.teams.count == 60)
+        #expect(baseball.roundsPerSeason == 36)
+    }
+
+    @Test func 컵대회는_120팀이_일곱_라운드를_치른다() throws {
+        var game = Game.newCareer(
+            setup: CareerSetup(name: "컵", position: .forward), now: TestGame.start, seed: 12)
+        game.ensureCup()
+        var cup = try #require(game.cup)
+        #expect(cup.byes.count == 8)
+        #expect(cup.ties.count == 56)
+        #expect(cup.totalRounds == 7)
+        #expect(cup.roundName == "1라운드")
+        var names: [String] = []
+        while let now = game.cup, !now.isFinished {
+            names.append(now.roundName)
+            #expect(now.totalRounds == 7)
+            game.finishCupRound()
+        }
+        #expect(names == ["1라운드", "64강", "32강", "16강", "8강", "준결승", "결승"])
+        cup = try #require(game.cup)
+        let champion = try #require(cup.champion)
+        #expect(cup.path(of: champion).map(\.round).suffix(6) == ["64강", "32강", "16강", "8강", "준결승", "결승"])
+        #expect(Balance.cupByes(entrants: 60) == 4)
+        #expect(Balance.cupByes(entrants: 120) == 8)
+        #expect(Balance.cupByes(entrants: 64) == 0)
+    }
+
+    @Test func 열_팀_리그로_만든_저장은_다음_시즌에_스무_팀으로_채워진다() throws {
+        var game = Game.newCareer(
+            setup: CareerSetup(name: "옛 선수", position: .forward), now: TestGame.start, seed: 13, leagueSize: 10)
+        #expect(game.teams.count == 60)
+        #expect(game.roundsPerSeason == 36)
+        let oldNames = game.teams.map(\.name)
+        var auto = CareerAuto()
+        // 시즌 도중: 저장했다가 불러와도 열 팀 36라운드로 그 시즌을 끝까지 치른다.
+        var regular = 0
+        var cupRounds = 0
+        for _ in 0..<5 {
+            if game.nextMatch()?.kind == .regular { regular += 1 }
+            try auto.playOne(&game)
+        }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("legacy-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let store = SaveStore(fileURL: url)
+        try store.save(GameSave(game: game))
+        game = try #require(try store.load()).game
+        var guardCount = 0
+        while game.season == 1, guardCount < 80 {
+            guardCount += 1
+            #expect(game.teams.count == 60)
+            if game.nextMatch()?.kind == .regular { regular += 1 }
+            try auto.playOne(&game)
+            if let cup = game.cup, cup.season == 1 { cupRounds = cup.history.count }
+        }
+        #expect(regular == 36)
+        #expect(cupRounds == 6)
+
+        // 새 시즌: 리그마다 열 팀이 채워진다.
+        #expect(game.season == 2)
+        #expect(game.teams.count == 120)
+        #expect(Array(game.teams.map(\.name).prefix(60)) == oldNames)
+        #expect(Set(game.teams.map(\.name)).count == 120)
+        for tier in LeagueTier.allCases {
+            #expect(game.teams(in: tier).count == 20)
+            #expect(game.schedules[tier.index].count == 38)
+            #expect(game.standings[tier.index].count == 20)
+            for team in game.teams(in: tier) {
+                #expect(game.roster(of: team.id).count >= Balance.footballStarters)
+                #expect(Balance.strengthRange(tier).contains(game.strength(of: team.id).rounded()))
+            }
+        }
+        #expect(game.roundsPerSeason == 38)
+        #expect(game.news.contains { $0.text.contains("리그 확장") })
+        #expect(game.myPlayer?.name == "옛 선수")
+        for _ in 0..<6 { try auto.playOne(&game) }
+        #expect(game.cup?.totalRounds == 7)
+        try store.save(GameSave(game: game))
+        #expect(try store.load()?.game == game)
+        // 다시 채우지 않는다.
+        #expect(game.expandLeaguesIfNeeded() == 0)
     }
 }

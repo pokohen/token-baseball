@@ -162,7 +162,7 @@ extension Game {
                 ? "\(me.name): 등판하지 않는 날입니다." : "\(me.name): 출전하지 않았습니다.")
         }
         if kind == .regular {
-            let pay = me.contract.salary / Balance.roundsPerSeason
+            let pay = me.contract.salary / roundsPerSeason
             career.earnings += pay
             lines.append("연봉 ₩\(pay.formatted())")
         }

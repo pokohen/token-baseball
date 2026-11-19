@@ -4,10 +4,17 @@ import Foundation
 extension Balance {
     // 컵대회
 
-    /// 1라운드를 쉬는 구단 수 (1부에서 강한 순서로).
-    public static let cupByes = 4
-    /// 컵 라운드가 열리는 때: 리그를 이만큼 치른 뒤 (1라운드, 32강, 16강, 8강, 준결승, 결승).
-    public static let cupAfterRounds = [4, 10, 16, 22, 28, 33]
+    /// 1라운드를 쉬는 구단 수 (1부에서 강한 순서로): 1라운드가 끝나면 32팀이나 64팀이 남게 맞춘다 (60팀이면 4, 120팀이면 8).
+    public static func cupByes(entrants: Int) -> Int {
+        var bracket = 1
+        while bracket * 2 <= entrants { bracket *= 2 }
+        return bracket == entrants ? 0 : bracket * 2 - entrants
+    }
+    /// 컵 라운드가 열리는 때: 리그를 이만큼 치른 뒤.
+    /// 여섯 라운드 대회(60팀: 1라운드, 32강, 16강, 8강, 준결승, 결승)와 일곱 라운드 대회(120팀: 64강이 더 있다).
+    public static func cupAfterRounds(total: Int) -> [Int] {
+        total >= 7 ? [3, 8, 13, 18, 23, 29, 35] : [4, 10, 16, 22, 28, 33]
+    }
     /// 컵 경기에서 이겨 올라갈 때 오르는 명성, 윗 리그 구단을 잡으면 리그 차이 하나마다 더 오르는 명성.
     public static let cupWinFame = 1.0
     public static let cupUpsetFame = 2.0
@@ -50,8 +57,6 @@ extension Balance {
     /// 능력치 하나에 넣을 수 있는 시작 포인트. 비중이 큰 능력치 하나(골키퍼의 골키핑 등)에 몰아넣어
     /// 포지션마다 시작 능력이 크게 벌어지는 것을 막는다 (다섯 개를 가장 좋게 넣으면 능력 +3.5 ~ +5.4).
     public static let careerStartPointsPerStat = 2
-    /// 6부 리그 열 구단 중 몇 번째 구단에 입단하는지 (0이 가장 강한 구단).
-    public static let careerStartSlot = 5
     public static let careerStartTrust = 40.0
     /// 경기와 경기 사이에 할 수 있는 훈련 횟수.
     public static let careerSessionsPerMatch = 5

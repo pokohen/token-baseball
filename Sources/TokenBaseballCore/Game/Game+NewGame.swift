@@ -18,14 +18,19 @@ extension Game {
 
     /// 새 게임: 6개 리그 60팀을 만들고, 내 시민 구단을 6부에 넣는다.
     public static func newGame(setup: ClubSetup, now: Date, seed: UInt64, sport: Sport = .baseball) -> Game {
+        newGame(setup: setup, now: now, seed: seed, sport: sport, leagueSize: Balance.teamsPerLeague(sport))
+    }
+
+    /// `leagueSize`: 리그마다 몇 팀인지. 예전 크기의 세계를 시험할 때만 따로 준다.
+    static func newGame(setup: ClubSetup, now: Date, seed: UInt64, sport: Sport, leagueSize: Int) -> Game {
         var game = Game(funds: FundsLedger(startedAt: now), rng: SeededRNG(seed: seed), chargeAnchor: now)
         if sport != .baseball { game.sportChoice = sport }
         var taken: Set<String> = [setup.name]
 
         for tier in LeagueTier.allCases {
-            for slot in 0..<Balance.teamsPerLeague {
+            for slot in 0..<leagueSize {
                 let id = game.teams.count
-                let isUser = tier == .citizenAmateur && slot == Balance.teamsPerLeague - 1
+                let isUser = tier == .citizenAmateur && slot == leagueSize - 1
                 if isUser {
                     var team = Team(
                         id: id, name: setup.name, city: setup.city, tier: tier, isUser: true, season: 1)
@@ -35,9 +40,7 @@ extension Game {
                     game.userTeamID = id
                     game.fillUserStartRoster()
                 } else {
-                    let identity = tier == .pro
-                        ? NameGenerator.proTeams(sport)[slot]
-                        : NameGenerator.cpuTeam(tier: tier, taken: taken, sport: sport, &game.rng)
+                    let identity = game.newTeamIdentity(tier: tier, slot: slot, taken: taken)
                     taken.insert(identity.name)
                     game.teams.append(Team(
                         id: id, name: identity.name, city: identity.city, tier: tier, isUser: false, season: 1))
@@ -73,6 +76,40 @@ extension Game {
             let player = makePlayer(spec)
             add(player.id, to: userTeamID)
         }
+    }
+
+    /// 새 CPU 구단의 이름: 1부는 정해 둔 이름을 차례로 쓰고(다 썼으면 만들어 낸다), 나머지는 만들어 낸다.
+    mutating func newTeamIdentity(tier: LeagueTier, slot: Int, taken: Set<String>) -> (city: String, name: String) {
+        let pro = NameGenerator.proTeams(sport)
+        if tier == .pro, slot < pro.count, !taken.contains(pro[slot].name) { return pro[slot] }
+        if tier == .pro, let free = pro.first(where: { !taken.contains($0.name) }) { return free }
+        return NameGenerator.cpuTeam(tier: tier, taken: taken, sport: sport, &rng)
+    }
+
+    /// 리그 확장: 리그가 지금 크기(축구 20팀)보다 작으면 새 CPU 구단으로 채운다.
+    /// 10팀 리그 때 만든 축구 저장 파일이 새 시즌을 시작할 때 한 번 일어난다. 채운 구단 수를 돌려준다.
+    @discardableResult
+    mutating func expandLeaguesIfNeeded() -> Int {
+        let size = Balance.teamsPerLeague(sport)
+        var taken = Set(teams.map(\.name))
+        var added = 0
+        for tier in LeagueTier.allCases {
+            let have = teams(in: tier).count
+            guard have < size else { continue }
+            for slot in have..<size {
+                let id = teams.count
+                let identity = newTeamIdentity(tier: tier, slot: slot, taken: taken)
+                taken.insert(identity.name)
+                teams.append(Team(
+                    id: id, name: identity.name, city: identity.city, tier: tier, isUser: false, season: season))
+                setUpCPUTeam(id, slot: slot)
+                added += 1
+            }
+        }
+        if added > 0 {
+            post("리그 확장: 이번 시즌부터 리그마다 \(size)개 구단이 \(Balance.roundsPerSeason(sport))라운드를 치릅니다. 새 구단 \(added)곳이 합류했습니다.")
+        }
+        return added
     }
 
     /// CPU 구단 초기 설정: 리그 강도 범위 안에서 강팀·중위권·약팀을 고르게 만든다.
@@ -124,7 +161,8 @@ extension Game {
         leagueStartAverage = []
         for tier in LeagueTier.allCases {
             let ids = teams(in: tier).map(\.id)
-            schedules.append(ScheduleBuilder.build(teams: ids, &rng))
+            schedules.append(ScheduleBuilder.build(
+                teams: ids, repeats: Balance.scheduleRepeats(teams: ids.count), &rng))
             standings.append(ids.map { StandingRow(teamID: $0) })
             leagueStartAverage.append(cpuAverageStrength(tier))
         }

@@ -8,7 +8,7 @@ import Testing
         let game = TestCareer.make(position, seed: 61)
         let me = try #require(game.myPlayer)
         #expect(game.sport == .football)
-        #expect(game.teams.count == 60)
+        #expect(game.teams.count == 120)
         #expect(game.teams.allSatisfy { !$0.isUser })
         #expect(me.position == position)
         #expect(me.age == Balance.careerStartAge)
@@ -66,7 +66,7 @@ import Testing
         #expect(game.career?.lastRating != nil)
         let line = try #require(game.career?.lastLine)
         let minutes = try #require(Int(line.prefix { $0.isNumber }))
-        #expect(minutes > 0 && minutes <= 90 - Balance.careerSubMinute(trust: 40) + 12)
+        #expect(minutes > 0 && minutes <= 90 - Balance.careerSubMinute(trust: 40) + 15)
     }
 
     @Test func 감독_신뢰가_높으면_일찍_들어가고_능력이_좋으면_선발이다() throws {
