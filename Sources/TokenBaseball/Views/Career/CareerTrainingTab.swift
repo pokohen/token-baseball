@@ -56,8 +56,13 @@ struct CareerTrainingTab: View {
             }
             .frame(width: 118, alignment: .leading)
             Bar(fraction: value / 99, color: .accentColor)
-            Button("+\(String(format: "%.1f", game.careerTrainingGain(key))) · \(Format.tokens(game.careerTrainingCost(key))) P") {
+            // 버튼 너비를 맞춰 둔다. 글자 수에 따라 버튼이 달라지면 막대의 오른쪽 끝이 줄마다 어긋난다.
+            Button {
                 model.perform { try $0.trainCareer(key) }
+            } label: {
+                Text("+\(String(format: "%.1f", game.careerTrainingGain(key))) · \(Format.tokens(game.careerTrainingCost(key))) P")
+                    .monospacedDigit().lineLimit(1).minimumScaleFactor(0.8)
+                    .frame(width: 104)
             }
             .disabled(blocked != nil)
             .help(blocked ?? "\(label(key)) +\(String(format: "%.1f", game.careerTrainingGain(key)))")
