@@ -130,7 +130,7 @@ extension Balance {
     /// 축구 평점의 포지션별 기준 보정. 시뮬레이션으로 맞춘다.
     public static func careerFootballBaseline(_ position: Position) -> Double {
         switch position {
-        case .goalkeeper: 0.1
+        case .goalkeeper: 0.18
         case .defender: 0.0
         case .midfielder: -0.1
         default: 0.2

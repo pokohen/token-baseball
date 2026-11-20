@@ -270,8 +270,12 @@ extension Game {
         if entry.fouledOut { text += " 5반칙 퇴장" }
         // 감독 신뢰는 축구의 "30분도 못 뛴 경기"와 같은 규칙으로 본다: 20분 미만이면 짧게 뛴 경기다.
         // (벤치에서 나온 선수는 평점이 6점 근처에 몰려서, 보통 규칙을 쓰면 신뢰가 내려가기만 한다.)
+        // 농구는 기록이 많이 쌓여서 압도적인 날에는 평점이 10을 훌쩍 넘는다. 8.5 위로는 완만하게 올려서
+        // 아주 잘한 날과 역사적인 날이 구분되게 한다 (계산값 10 → 9.0, 12 → 9.7).
+        var rating = 6 + delta * weight
+        if rating > 8.5 { rating = 8.5 + (rating - 8.5) * 0.35 }
         return CareerPerformance(
-            rating: clamp(6 + delta * weight, 1, 10), line: text,
+            rating: clamp(rating, 1, 10), line: text,
             minutes: minutes * 3 / 2, scored: line.points >= 10)
     }
 
