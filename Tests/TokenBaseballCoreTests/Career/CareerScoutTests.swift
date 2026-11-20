@@ -124,13 +124,60 @@ import Testing
         #expect(game.careerRole(on: game.userTeamID) == .starter)
         #expect(!game.careerScoutEligible(same))
         #expect(!game.careerScoutEligible(game.userTeamID))
-        // 두 단계 위 리그는 지켜보지 않는다.
-        let far = try #require(game.teams(in: .citizenPro).first).id
-        #expect(!game.careerScoutEligible(far))
+        // 두 리그 위(4부)까지는 지켜보고, 세 리그 위(3부)는 지켜보지 않는다.
+        let twoUp = try #require(game.teams(in: .citizenPro).first { game.careerRole(on: $0.id) != .prospect }).id
+        #expect(game.careerScoutEligible(twoUp))
+        #expect(game.teams(in: .amateur).allSatisfy { !game.careerScoutEligible($0.id) })
+        #expect(game.teams(in: .pro).allSatisfy { !game.careerScoutEligible($0.id) })
         // 계약이 끝났으면 주전이어도 같은 리그 구단이 데려갈 수 있다.
         game.players[id]?.contract.seasonsLeft = 0
         #expect(game.careerScoutEligible(same))
         #expect(game.careerScoutOfferThreshold == Balance.careerScoutOfferInterestExpired)
+    }
+
+    @Test func 두_리그를_뛰어오르려면_유망주가_아니라_주전을_다툴_실력이어야_한다() throws {
+        var game = TestCareer.make(.shortstop, seed: 75)
+        let id = try #require(game.career?.playerID)
+        game.career?.fame = 100
+        // 5부에서는 유망주로 볼 만하지만 4부에서는 한참 모자란 능력.
+        let level = Balance.abilityRange(.citizenSemiPro).lowerBound - 4
+        for (key, _) in Attributes.weights(for: .shortstop) { game.players[id]?.attributes[key] = level }
+        let oneUp = game.teams(in: .citizenSemiPro).filter { game.careerRole(on: $0.id) == .prospect }
+        let twoUp = game.teams(in: .citizenPro).filter { game.careerRole(on: $0.id) == .prospect }
+        try #require(!oneUp.isEmpty && !twoUp.isEmpty)
+        #expect(oneUp.allSatisfy { game.careerScoutEligible($0.id) })
+        #expect(twoUp.allSatisfy { !game.careerScoutEligible($0.id) })
+        // 이름이 알려지지 않았으면 바로 위 리그도 유망주로 보지 않는다.
+        game.career?.fame = 0
+        #expect(oneUp.allSatisfy { !game.careerScoutEligible($0.id) })
+    }
+
+    @Test func 윗_리그일수록_훈련_한_번에_더_많이_오르고_더_비싸다() throws {
+        var game = TestCareer.make(.shortstop, seed: 76)
+        TestGame.addTokens(&game, 500_000_000, id: "a", at: TestGame.hours(1))
+        let id = try #require(game.career?.playerID)
+        game.players[id]?.potential = 99
+        var steps: [Double] = [], costs: [Int] = []
+        for tier in LeagueTier.allCases.reversed() {
+            game.teams[game.userTeamID].tier = tier
+            #expect(game.careerTrainingStep == Balance.careerTrainingStep(tier))
+            let before = try #require(game.myPlayer).ability
+            var copy = game
+            costs.append(copy.careerTrainingCost(.contact))
+            try copy.trainCareer(.contact, critical: false)
+            steps.append(try #require(copy.myPlayer).ability - before)
+            #expect(abs(steps.last! - Balance.careerTrainingStep(tier)) < 0.0001)
+        }
+        #expect(zip(steps, steps.dropFirst()).allSatisfy { $0 < $1 })
+        #expect(zip(costs, costs.dropFirst()).allSatisfy { $0 < $1 })
+        // 능력 1을 올리는 값도 윗 리그가 더 비싸다.
+        #expect(Double(costs.last!) / steps.last! > Double(costs.first!) / steps.first!)
+        // 한계까지 조금 남았으면 남은 만큼만 오른다.
+        let ability = try #require(game.myPlayer).ability
+        game.players[id]?.potential = ability + 0.05
+        try game.trainCareer(.contact, critical: false)
+        #expect(abs(try #require(game.myPlayer).ability - (ability + 0.05)) < 0.0001)
+        #expect(throws: GameError.self) { try game.trainCareer(.contact, critical: false) }
     }
 
     @Test func 자리가_다_차면_주전으로_쓸_구단이_관심_낮은_구단을_밀어낸다() throws {
@@ -145,6 +192,7 @@ import Testing
         let level = (bar(sorted[2]) + bar(sorted[3])) / 2
         for (key, _) in Attributes.weights(for: .shortstop) { game.players[id]?.attributes[key] = level }
         game.players[id]?.potential = 90
+        game.career?.fame = 100
         let notStarter = sorted.filter { game.careerRole(on: $0.id) != .starter && game.careerScoutEligible($0.id) }
         try #require(notStarter.count >= 3)
         #expect(sorted.contains { game.careerRole(on: $0.id) == .starter })

@@ -42,7 +42,7 @@ extension Game {
     }
 
     /// 그 구단이 나를 데려갈 만한지.
-    /// - 윗 리그 구단: 가면 주전이나 주전 경쟁이거나, 유망주로 볼 만큼 어리고 능력이 닿는다.
+    /// - 윗 리그 구단 (두 리그 위까지): 가면 주전이나 주전 경쟁이거나, 유망주로 볼 만큼 어리고 능력이 닿는다.
     /// - 같은 리그 구단: 지금 구단에서 주전이 아닌데 그 구단에 가면 주전이나 주전 경쟁일 때만 (벤치에 묶인 선수의 출구).
     ///   이미 주전인 선수를 같은 리그의 다른 구단이 데려가려 하지는 않는다.
     func careerScoutEligible(_ team: TeamID) -> Bool {
@@ -54,9 +54,14 @@ extension Game {
             let available = careerRole(on: myTeam) != .starter || me.contract.seasonsLeft <= 0
             return role != .prospect && available
         }
-        guard theirs == myTier.upper else { return false }
+        // 위로는 두 리그까지만 본다. 6부 선수를 1부 구단이 지켜보지는 않는다. 1부 선수는 1부 구단만 본다.
+        let gap = myTier.rawValue - theirs.rawValue
+        guard (1...Balance.careerScoutTierReach).contains(gap) else { return false }
         if role != .prospect { return true }
-        return me.age <= 23 && me.ability >= Balance.abilityRange(theirs).lowerBound - 8
+        // 유망주로 데려가는 것은 바로 위 리그만이고, 이름이 알려진 어린 선수여야 한다.
+        // 두 리그를 한 번에 뛰어오르려면 그 구단에서 곧바로 주전을 다툴 실력이어야 한다.
+        return gap == 1 && me.age <= 23 && career.fame >= Balance.careerFameCap(myTier) * 0.8
+            && me.ability >= Balance.abilityRange(theirs).lowerBound - 8
     }
 
     // MARK: 경기 뒤
