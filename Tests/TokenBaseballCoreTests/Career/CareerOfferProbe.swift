@@ -75,6 +75,66 @@ struct CareerOfferProbe {
         print("PACEPROBE\(out)")
     }
 
+    /// 리그 수준을 훌쩍 넘는 선수(모든 능력치 `level`)가 6부에서 한 시즌 동안 얼마나 압도하는지.
+    /// 같은 포지션의 리그 평균 선수와 나란히 찍는다. `TB_PROBE=star swift test --filter CareerOfferProbe`
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["TB_PROBE"] == "star"))
+    func 능력이_압도적인_선수의_활약() throws {
+        // `TB_LEVELS=28,48,62,76,90` 능력 수준들, `TB_SEEDS=2` 수준마다 돌릴 횟수(평균을 낸다),
+        // `TB_SHAPE=spike`면 포지션에서 가장 중요한 능력치만 그 수준이고 나머지는 25 낮다.
+        let env = ProcessInfo.processInfo.environment
+        let levels = (env["TB_LEVELS"] ?? "90").split(separator: ",").compactMap { Double($0) }
+        let seeds = Int(env["TB_SEEDS"] ?? "1") ?? 1
+        let spike = env["TB_SHAPE"] == "spike"
+        var out = ""
+        func f(_ v: Double) -> String { String(format: "%.2f", v) }
+        for position in [Position.forward, .midfielder, .goalkeeper, .shortstop, .starter, .shootingGuard] {
+            out += "\n\(position.rawValue):"
+            for level in levels {
+                var rating = 0.0, a = 0.0, b = 0.0, c = 0.0
+                for seed in 0..<seeds {
+                    var game = TestCareer.make(position, seed: UInt64(81 + seed))
+                    let id = game.career!.playerID
+                    let main = Attributes.weights(for: position).max { $0.1 < $1.1 }?.0
+                    for key in Attributes.Key.all(for: position.sport) {
+                        game.players[id]?.attributes[key] = spike && key != main ? level - 25 : level
+                    }
+                    game.players[id]?.potential = 99
+                    game.career?.trust = 90
+                    var clock = TestGame.start
+                    while game.season == 1, game.phase == .regular, game.nextMatch() != nil {
+                        clock = clock.addingTimeInterval(3600)
+                        try game.startMatch(now: clock)
+                        game.runMatchToEnd()
+                    }
+                    let me = game.players[id]!
+                    let career = game.career!
+                    rating += (career.history.last?.averageRating ?? career.seasonAverageRating) ?? 0
+                    switch position {
+                    case .goalkeeper:
+                        let l = career.history.last?.football ?? me.football ?? FootballLine()
+                        a += Double(l.cleanSheets); b += Double(l.saves) / Double(max(1, l.games)); c += Double(l.conceded) / Double(max(1, l.games))
+                    case .forward, .midfielder:
+                        let l = career.history.last?.football ?? me.football ?? FootballLine()
+                        let g = Double(max(1, l.games))
+                        a += Double(l.goals) / g; b += Double(l.assists) / g; c += Double(l.shots) / g
+                    case .shootingGuard:
+                        let l = career.history.last?.basketball ?? me.basketball ?? BasketballLine()
+                        a += l.pointsPerGame; b += l.reboundsPerGame; c += l.minutesPerGame
+                    case .starter:
+                        let l = career.history.last?.pitching ?? me.pitching
+                        a += l.era; b += Double(l.wins); c += Double(l.strikeouts)
+                    default:
+                        let l = career.history.last?.batting ?? me.batting
+                        a += l.average; b += Double(l.homeRuns); c += l.ops
+                    }
+                }
+                let n = Double(seeds)
+                out += "  [\(Int(level)): 평점 \(f(rating / n)) · \(f(a / n)) / \(f(b / n)) / \(f(c / n))]"
+            }
+        }
+        print("STARPROBE (FW·MF: 경기당 골/도움/슈팅, GK: 무실점 경기/경기당 선방/경기당 실점, SS: 타율/홈런/OPS, SP: 평균자책점/승/탈삼진, SG: 득점/리바운드/분)\(out)")
+    }
+
     func scoutText(_ game: Game) -> String {
         game.careerScouts.map { "\(Int($0.interest))" }.joined(separator: "/")
     }

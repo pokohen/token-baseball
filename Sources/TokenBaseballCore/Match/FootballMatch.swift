@@ -292,7 +292,7 @@ public struct FootballMatch: Codable, Equatable, Sendable {
             index = pool[rng.weighted(pool.map { slot in
                 let player = side.players[slot]
                 let skill = defensive ? player.tackling : (player.passing + player.dribbling) / 2
-                return (0.5 + skill / 100) * (defensive ? player.style?.defenseWeight ?? 1 : 1)
+                return Self.skillShare(skill) * (defensive ? player.style?.defenseWeight ?? 1 : 1)
             })]
         } else {
             index = rng.pick(pool)
@@ -321,6 +321,15 @@ public struct FootballMatch: Codable, Equatable, Sendable {
         }
         guard !indices.isEmpty else { return nil }
         return indices[rng.weighted(weights)]
+    }
+
+    /// 능력치가 높을수록 그 일을 맡는 몫. 능력 차이가 클수록 몫이 더 가파르게 벌어진다.
+    ///
+    /// 예전에는 `0.5 + 능력/100`이라 슈팅 90과 25의 몫이 1.9배밖에 차이 나지 않았다. 그래서 리그 수준을
+    /// 훌쩍 넘는 선수도 슛을 조금 더 가져갈 뿐이었다. 지금은 3.8배다 (90 → 1.97, 60 → 1.22, 25 → 0.52).
+    /// 비슷한 선수끼리는 몫이 거의 같아서 팀 전체의 슈팅 수는 달라지지 않는다.
+    static func skillShare(_ skill: Double) -> Double {
+        pow((max(1, skill) + 20) / 70, 1.5)
     }
 
     static func slotWeight(_ slot: Position, forward: Double, midfielder: Double, defender: Double) -> Double {

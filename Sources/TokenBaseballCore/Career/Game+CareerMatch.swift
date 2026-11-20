@@ -206,10 +206,13 @@ extension Game {
         delta += Double(detail.advances) * 0.05 + Double(detail.tackles) * 0.12 + Double(detail.clearances) * 0.12
         delta -= Double(detail.fouls) * 0.1 + Double(line.yellowCards) * 0.3 + Double(line.redCards) * 1.5
         if entry.natural == .goalkeeper {
-            delta += Double(line.saves) * 0.25 - Double(line.conceded) * 0.3
+            delta += Double(line.saves) * 0.15 - Double(line.conceded) * 0.3
         }
         // 무실점: 골키퍼와 수비수가 60분 이상 뛰었을 때.
-        if conceded == 0, minutes >= 60, entry.natural == .goalkeeper || entry.natural == .defender { delta += 0.5 }
+        // 골키퍼는 무실점이 가장 큰 일이다. 팀이 강해서 선방할 일이 없는 날에도 평가받게 한다.
+        if conceded == 0, minutes >= 60 {
+            if entry.natural == .goalkeeper { delta += 1.5 } else if entry.natural == .defender { delta += 0.5 }
+        }
         delta += Double(result) * 0.2
         // 포지션마다 기록이 쌓이는 양이 달라서 기준을 맞춘다 (90분 뛴 평균 선수가 6.5 근처).
         delta += Balance.careerFootballBaseline(entry.natural)
