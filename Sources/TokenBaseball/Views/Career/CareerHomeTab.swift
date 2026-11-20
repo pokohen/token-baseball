@@ -60,7 +60,7 @@ struct CareerHomeTab: View {
                 Spacer()
                 VStack(alignment: .trailing) {
                     Text(me.grade).font(.title.bold())
-                    Text("능력 \(Int(me.ability))").note()
+                    Text("능력 \(String(format: "%.1f", me.ability))").note()
                 }
             }
             if let talent = game.careerTalent {

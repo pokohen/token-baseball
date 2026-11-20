@@ -42,12 +42,14 @@ extension Balance {
     /// 라이벌과의 맞대결에서 이기면 오르는 명성.
     public static let careerRivalFame = 1.0
     /// 토큰으로 치른 경기에서 얻는 능력: 기본 + (평점 − 6) × 평점당, 최대까지.
-    public static let careerExtraMatchBase = 0.05
-    public static let careerExtraMatchPerRating = 0.08
-    public static let careerExtraMatchMax = 0.3
+    public static let careerExtraMatchBase = 0.02
+    public static let careerExtraMatchPerRating = 0.03
+    public static let careerExtraMatchMax = 0.1
 
     // 스카우트
 
+    /// 스카우트가 오는 구단은 내 리그보다 이만큼 위까지다 (같은 리그 포함). 한 번에 두 리그까지만 뛰어오를 수 있다.
+    public static let careerScoutTierReach = 2
     /// 한 번에 나를 지켜보는 구단 수.
     public static let careerScoutMax = 3
     /// 이 관심도를 넘은 구단이 이적 기간에 제안한다. 이적을 요청했으면, 계약이 끝났으면 문턱이 낮아진다.
@@ -141,9 +143,36 @@ extension Balance {
         Int(clamp(90 - trust * 0.5, 50, 85))
     }
     /// 훈련하지 않아도 저절로 크는 정도 (다른 선수의 성장에 곱하는 값).
-    public static let careerNaturalGrowth = 0.3
+    public static let careerNaturalGrowth = 0.15
     /// 훈련 한 번에 오르는 능력(CA).
-    public static let careerTrainingStep = 0.25
+    /// 가운데 리그(4부)의 값이다. 리그마다의 값은 `careerTrainingStep(_:)`.
+    public static let careerTrainingStep = 0.035
+    /// 리그별 훈련 효과: 윗 리그일수록 훈련 한 번에 능력이 더 많이 오른다 (6부 0.025 → 1부 0.05).
+    /// 시설과 코치가 좋아지는 만큼이다. 아랫 리그에서는 아무리 포인트가 많아도 천천히 큰다.
+    ///
+    /// 한 시즌에 훈련을 220번쯤 할 수 있다 (경기 44개 × 다섯 번). 그래서 훈련을 하나도 빼먹지 않으면
+    /// 한 시즌에 6부 +5.5, 3부 +9, 1부 +11이 오른다. 경기만 뛰어 저절로 크는 양(시즌에 4쯤)의 두세 배다.
+    public static func careerTrainingStep(_ tier: LeagueTier) -> Double {
+        switch tier {
+        case .citizenAmateur: 0.025
+        case .citizenSemiPro: 0.03
+        case .citizenPro: careerTrainingStep
+        case .amateur: 0.04
+        case .semiPro: 0.045
+        case .pro: 0.05
+        }
+    }
+    /// 리그별 훈련 비용 배수: 윗 리그일수록 훈련 한 번이 비싸다 (6부 0.5배 → 1부 2.0배).
+    public static func careerTrainingCostFactor(_ tier: LeagueTier) -> Double {
+        switch tier {
+        case .citizenAmateur: 0.5
+        case .citizenSemiPro: 0.7
+        case .citizenPro: 1.0
+        case .amateur: 1.3
+        case .semiPro: 1.6
+        case .pro: 2.0
+        }
+    }
     /// 훈련이 "크리티컬"로 터질 확률과, 터졌을 때 오르는 양의 배수. 포인트는 똑같이 든다.
     public static let careerCriticalChance = 0.01
     public static let careerCriticalMultiplier = 3.0
@@ -154,7 +183,8 @@ extension Balance {
     /// 훈련할 때마다 그 능력치의 다음 비용이 6%쯤 오른다 (25에서 25만, 50에서 116만, 70에서 397만, 85에서 1,000만).
     public static func careerTrainingCost(value: Double) -> Int {
         let cost = 250_000 * exp((value - 25) * 0.0615)
-        return max(100_000, Int(cost / 10_000) * 10_000)
+        // 훈련 한 번에 오르는 양이 작아서, 값이 조금 올라도 비용이 따라 오르는 것이 보이게 천 단위로 끊는다.
+        return max(100_000, Int(cost / 1_000) * 1_000)
     }
 
     /// 그 리그에서 뛰는 동안 명성이 오를 수 있는 한도.
