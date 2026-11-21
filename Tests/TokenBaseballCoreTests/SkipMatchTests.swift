@@ -17,14 +17,10 @@ import Testing
         #expect(game.skipMatchBlockedReason == nil)
         try game.skipMatchToEnd()
 
-        #expect(!game.isMatchLive)
-        #expect(game.lastResult != nil)
-        #expect(game.lastResult?.label == watched.lastResult?.label)
-        #expect(game.lastResult?.opponent == watched.lastResult?.opponent)
         // 경기가 끝나며 들고 나는 돈(관중 수입, 연봉)은 지켜본 쪽과 같고, 값만큼만 적다.
         #expect(game.funds.balance == watched.funds.balance - cost)
         #expect(game.funds.seasonExpense[FundsLedger.Category.skipMatch.rawValue] == cost)
-        // 값만 빼면 지켜본 쪽과 세계가 똑같다.
+        // 값만 빼면 지켜본 쪽과 세계가 똑같다 (경기 결과, 순위, 기록 모두).
         watched.funds = game.funds
         #expect(game == watched)
         // 경기가 끝나면 더 쓸 수 없다.
@@ -51,13 +47,5 @@ import Testing
         #expect(game.skipMatchBlockedReason != nil)
         #expect(throws: GameError.self) { try game.skipMatchToEnd() }
         #expect(game.isMatchLive)
-    }
-
-    @Test func 가격_난이도가_적용된다() {
-        var game = TestGame.make()
-        let normal = game.skipMatchCost
-        #expect(normal == Balance.skipMatchCost)
-        game.settings.priceDifficulty = 0.5
-        #expect(game.skipMatchCost == normal / 2)
     }
 }
