@@ -71,7 +71,7 @@ extension Game {
             return "한계에 닿았습니다. 지금은 더 오르지 않습니다."
         }
         let cost = careerTrainingCost(key)
-        if funds.balance < cost { return "훈련 포인트가 모자랍니다. \(Format.tokens(cost)) P가 필요합니다." }
+        if let reason = insufficientFundsReason(cost) { return reason }
         return nil
     }
 
@@ -122,10 +122,7 @@ extension Game {
         }
         if careerSessionsExhausted { return "다음 경기를 치르면 다시 훈련할 수 있습니다." }
         if me.potential >= 99 { return "더 넓힐 한계가 없습니다." }
-        if funds.balance < careerBreakthroughCost {
-            return "훈련 포인트가 모자랍니다. \(Format.tokens(careerBreakthroughCost)) P가 필요합니다."
-        }
-        return nil
+        return insufficientFundsReason(careerBreakthroughCost)
     }
 
     /// 한계 돌파 훈련: 큰 포인트를 들여 잠재력(능력의 한계)을 +1 넓힌다. 훈련 횟수를 한 번 쓴다.

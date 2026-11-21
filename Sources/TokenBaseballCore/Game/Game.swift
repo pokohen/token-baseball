@@ -204,12 +204,7 @@ public struct Game: Codable, Equatable, Sendable {
         if isMatchLive { return "진행 중인 경기가 끝나야 합니다." }
         if charges > 0 { return "경기 기회가 남아 있습니다." }
         if nextMatch() == nil { return "지금은 치를 경기가 없습니다." }
-        if funds.balance < extraMatchCost {
-            return isCareer
-                ? "훈련 포인트가 모자랍니다. \(Format.tokens(extraMatchCost)) P가 필요합니다."
-                : "자금이 모자랍니다. \(Format.money(extraMatchCost))이 필요합니다."
-        }
-        return nil
+        return insufficientFundsReason(extraMatchCost)
     }
 
     /// 한 시간을 기다리지 않고 토큰으로 경기 기회를 하나 산다. 경기 기회가 없을 때만 살 수 있다.
@@ -230,12 +225,7 @@ public struct Game: Codable, Equatable, Sendable {
     /// 지금 결과 바로 보기를 할 수 없는 이유. 할 수 있으면 nil.
     public var skipMatchBlockedReason: String? {
         if !isMatchLive { return "진행 중인 경기가 없습니다." }
-        if funds.balance < skipMatchCost {
-            return isCareer
-                ? "훈련 포인트가 모자랍니다. \(Format.tokens(skipMatchCost)) P가 필요합니다."
-                : "자금이 모자랍니다. \(Format.money(skipMatchCost))이 필요합니다."
-        }
-        return nil
+        return insufficientFundsReason(skipMatchCost)
     }
 
     /// 토큰을 내고 남은 경기를 화면 없이 끝까지 치른다.
