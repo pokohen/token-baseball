@@ -9,7 +9,7 @@ struct CareerTrainingTab: View {
         VStack(spacing: 10) {
             if let career = game.career, let me = game.myPlayer {
                 Card("훈련", trailing: sessionsText(career)) {
-                    KeyValueRow(key: "훈련 포인트", value: "\(game.funds.balance.formatted()) P")
+                    KeyValueRow(key: "훈련 포인트", value: "\(Format.tokens(game.funds.balance)) P")
                     if let critical = career.lastCritical {
                         Label(critical, systemImage: "sparkles")
                             .font(.callout.weight(.semibold)).foregroundStyle(Theme.warn)

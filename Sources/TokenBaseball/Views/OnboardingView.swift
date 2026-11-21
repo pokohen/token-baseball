@@ -133,7 +133,7 @@ struct OnboardingView: View {
                     : "구단과 선수는 따로 저장됩니다. 나중에 설정에서 다른 모드로 바꿔 하나 더 만들 수 있습니다. 한 번에 하나만 토큰을 받습니다.").note()
             case 2 where makingPlayer:
                 CareerForm(setup: $career, sport: slot.sport)
-                Text("\(LeagueTier.citizenAmateur.displayName) 리그의 시민 구단에 입단합니다. 시작 훈련 포인트 \(FundsLedger.startingFunds.formatted()) P.").note()
+                Text("\(LeagueTier.citizenAmateur.displayName) 리그의 시민 구단에 입단합니다. 시작 훈련 포인트 \(Format.tokens(FundsLedger.startingFunds)) P.").note()
             case 2:
                 ChoiceGrid(items: NameGenerator.userCities, selection: $city, columns: 4) { $0 }
             case 3:

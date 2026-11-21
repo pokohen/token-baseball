@@ -151,7 +151,13 @@ enum SelfTest {
             [UsageRecord(id: "selftest-extra", timestamp: Date(), usage: TokenUsage(output: 30_000_000))], now: Date())
         model.buyExtraMatchAndStart()
         check("추가 경기: 사서 바로 시작", model.game?.isMatchLive == true, model.message ?? "")
-        model.game?.runMatchToEnd()
+        // 결과 바로 보기: 중계가 도는 중에 눌러도 경기가 끝나고 값이 빠진다
+        let beforeSkip = model.game?.funds.seasonExpense[FundsLedger.Category.skipMatch.rawValue] ?? 0
+        model.skipMatch()
+        check("결과 바로 보기: 경기 끝", model.game?.isMatchLive == false && model.game?.lastResult != nil, model.message ?? "")
+        check("결과 바로 보기: 값 냄",
+              (model.game?.funds.seasonExpense[FundsLedger.Category.skipMatch.rawValue] ?? 0) - beforeSkip
+                  == model.game?.skipMatchCost)
         check("추가 경기: 값이 두 배", model.game?.extraMatchCost == Balance.extraMatchCost * 2)
         // 배속은 고른 값이 남는다
         let speedBefore = model.matchSpeed

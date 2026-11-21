@@ -222,6 +222,30 @@ public struct Game: Codable, Equatable, Sendable {
         charges += 1
     }
 
+    // MARK: 결과 바로 보기
+
+    /// 진행 중인 경기를 곧바로 끝내는 값.
+    public var skipMatchCost: Int { price(Balance.skipMatchCost) }
+
+    /// 지금 결과 바로 보기를 할 수 없는 이유. 할 수 있으면 nil.
+    public var skipMatchBlockedReason: String? {
+        if !isMatchLive { return "진행 중인 경기가 없습니다." }
+        if funds.balance < skipMatchCost {
+            return isCareer
+                ? "훈련 포인트가 모자랍니다. \(Format.tokens(skipMatchCost)) P가 필요합니다."
+                : "자금이 모자랍니다. \(Format.money(skipMatchCost))이 필요합니다."
+        }
+        return nil
+    }
+
+    /// 토큰을 내고 남은 경기를 화면 없이 끝까지 치른다.
+    /// 경기는 시작할 때 정해진 시드로 흘러가므로, 지켜봤을 때와 결과가 같다.
+    public mutating func skipMatchToEnd() throws {
+        if let reason = skipMatchBlockedReason { throw GameError(reason) }
+        funds.spend(skipMatchCost, .skipMatch)
+        runMatchToEnd()
+    }
+
     // MARK: 선수 만들기
 
     mutating func makePlayer(_ spec: PlayerFactory.Spec) -> Player {

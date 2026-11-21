@@ -1,7 +1,7 @@
 import SwiftUI
 import TokenBaseballCore
 
-/// 중계 배속 고르기. 경기 도중에도 바꿀 수 있다.
+/// 중계 배속 고르기와 결과 바로 보기. 경기 도중에도 쓸 수 있다.
 struct MatchSpeedCard: View {
     @EnvironmentObject var model: AppModel
 
@@ -15,6 +15,19 @@ struct MatchSpeedCard: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
             }
+            if let game = model.game {
+                HStack {
+                    Text("기다리지 않고 남은 경기를 끝까지 치릅니다. 결과는 지켜봤을 때와 같습니다.").note()
+                    Spacer(minLength: 8)
+                    Button("결과 바로 보기 · \(costText(game))") { model.skipMatch() }
+                        .disabled(game.skipMatchBlockedReason != nil)
+                        .help(game.skipMatchBlockedReason ?? "토큰을 내고 경기 결과를 바로 봅니다")
+                }
+            }
         }
+    }
+
+    private func costText(_ game: Game) -> String {
+        game.isCareer ? "\(Format.tokens(game.skipMatchCost)) P" : Format.money(game.skipMatchCost)
     }
 }
