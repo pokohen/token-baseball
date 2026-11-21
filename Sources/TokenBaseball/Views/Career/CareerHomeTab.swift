@@ -13,8 +13,8 @@ struct CareerHomeTab: View {
                 playerCard(career, me)
                 notices(career)
                 Card("훈련 포인트", trailing: "남은 훈련 \(max(0, career.sessionsLeft))/\(Balance.careerSessionsPerMatch)") {
-                    Text("\(game.funds.balance.formatted()) P").font(.title2.bold().monospacedDigit())
-                    KeyValueRow(key: "오늘 번 포인트 (오늘 쓴 토큰)", value: "\(model.todayTokens.formatted()) P")
+                    Text("\(Format.tokens(game.funds.balance)) P").font(.title2.bold().monospacedDigit())
+                    KeyValueRow(key: "오늘 번 포인트 (오늘 쓴 토큰)", value: "\(Format.tokens(model.todayTokens)) P")
                     KeyValueRow(key: "누적 포인트", value: "\(Format.tokens(game.funds.tokenIncome)) P")
                     Text("AI 코딩에 쓴 토큰이 그대로 훈련 포인트가 됩니다. 훈련 탭에서 능력치를 올리세요.").note()
                 }

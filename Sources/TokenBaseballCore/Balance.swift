@@ -410,6 +410,8 @@ public enum Balance {
     /// 토큰으로 경기 기회를 하나 사는 값. 연달아 사면 두 배씩 오른다 (최대 `extraMatchMaxDoublings`번).
     public static let extraMatchCost = 3_000_000
     public static let extraMatchMaxDoublings = 6
+    /// 진행 중인 경기를 기다리지 않고 끝까지 치르는 값 (토큰). 결과는 지켜봤을 때와 같다.
+    public static let skipMatchCost = 1_000_000
 
     // MARK: 영입
 

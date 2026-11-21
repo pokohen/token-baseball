@@ -18,6 +18,13 @@ extension AppModel {
         startMatch()
     }
 
+    /// 토큰을 내고 진행 중인 경기를 곧바로 끝낸다. 돌던 중계는 다음에 깨어날 때 경기가 끝난 것을 보고 멈춘다.
+    func skipMatch() {
+        perform { try $0.skipMatchToEnd() }
+        guard message == nil else { return }
+        handle([], iScored: false)
+    }
+
     func acknowledgeResult() {
         guard game?.lastResult?.acknowledged == false else { return }
         game?.acknowledgeResult()
